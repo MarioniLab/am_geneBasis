@@ -50,7 +50,7 @@ For now work only with highly variable genes
 
 HVGs = getHVGs(sce.atlas, dir = "cluster")
 sce.atlas = sce.atlas[rownames(sce.atlas) %in% HVGs,]
-counts.atlas = assay( sce.atlas, "logcounts" )
+counts.atlas = cosineNorm( assay( sce.atlas, "logcounts" ) )
 batchFactor = factor( as.character(sce.atlas$sample ) )
 genes = rownames(counts.atlas)
 
