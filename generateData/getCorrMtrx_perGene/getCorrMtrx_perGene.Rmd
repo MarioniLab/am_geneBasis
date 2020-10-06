@@ -43,10 +43,13 @@ meta.atlas = as.data.frame(colData(sce.atlas))
 
 # Get corrected counts: PCA + Batch correction
 
+For now work only with highly variable genes
+
 ```{r pca-and-batchCorrect, message = FALSE}
 
 
 HVGs = getHVGs(sce.atlas, dir = "cluster")
+sce.atlas = sce.atlas[rownames(sce.atlas) %in% HVGs,]
 counts.atlas = assay( sce.atlas, "logcounts" )
 batchFactor = factor( as.character(sce.atlas$sample ) )
 genes = rownames(counts.atlas)
@@ -97,8 +100,10 @@ corr.mtrx = bplapply(1:nrow(cells.mapped), function(cell){
     return(out)
   })
   corr.mtrx.perCell = do.call(rbind , corr.mtrx.perCell)
-  corr.mtrx.perCell$p.pearson = p.adjust(corr.mtrx.perCell$p.pearson, method = "BH")
-  corr.mtrx.perCell$p.spearman = p.adjust(corr.mtrx.perCell$p.spearman, method = "BH")
+  
+  # do multiple test correction adjustment afterwards (in analysis)
+  # corr.mtrx.perCell$p.pearson = p.adjust(corr.mtrx.perCell$p.pearson, method = "BH")
+  # corr.mtrx.perCell$p.spearman = p.adjust(corr.mtrx.perCell$p.spearman, method = "BH")
   return(corr.mtrx.perCell)
 }, BPPARAM = mcparam)
 names(corr.mtrx) = colnames(sce.atlas)
@@ -122,8 +127,6 @@ saveRDS(out , paste0(root.dir , "data/atlas__8_5/corr_per_gene.Rds"))
 
 
 ```
-
-
 
 #Session Info
 
