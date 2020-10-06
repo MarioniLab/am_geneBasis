@@ -1,0 +1,133 @@
+---
+title: "For each cell/each gene -- correlation between difference in counts for the gene VS overall transcriptional distance"
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+# Load dependancies
+
+
+```{r load, message = FALSE}
+# load libraries we are going to use
+
+
+library(Matrix)
+library(scran)
+library(scater)
+library(batchelor)
+library(knitr)
+library(pheatmap)
+library(reshape2)
+library(edgeR)
+library(MouseGastrulationData)
+library(BiocSingular)
+library(BiocParallel)
+library(BiocNeighbors)
+library(SingleCellExperiment)
+ncores = 5
+mcparam = MulticoreParam(workers = ncores)
+register(mcparam)
+
+set.seed(32)
+
+root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
+
+source(paste0(root.dir, "amScripts_geneBasis/core_functions.R"))
+sce.atlas = readRDS(paste0( root.dir, "data/atlas__8_5/sce_atlas_8.5.Rds"))
+rownames(sce.atlas) = rowData(sce.atlas, "SYMBOL")[,2]
+meta.atlas = as.data.frame(colData(sce.atlas))
+
+```
+
+# Get corrected counts: PCA + Batch correction
+
+```{r pca-and-batchCorrect, message = FALSE}
+
+
+HVGs = getHVGs(sce.atlas, dir = "cluster")
+counts.atlas = assay( sce.atlas, "logcounts" )
+batchFactor = factor( as.character(sce.atlas$sample ) )
+genes = rownames(counts.atlas)
+
+nPC = 50
+mbpca = multiBatchPCA(counts.atlas, batch = batchFactor, d = nPC)
+out = do.call(reducedMNN, mbpca)
+mbpca.corrected = out$corrected
+saveRDS(mbpca.corrected , paste0(root.dir , "data/atlas__8_5/PCs_corrected.Rds"))
+
+
+```
+
+# Get KNNs for each cell
+
+```{r get-knns-and-corr, message = FALSE}
+
+
+n.neigh = 26
+knns = queryKNN( mbpca.corrected[colnames(sce.atlas) , ], mbpca.corrected[colnames(sce.atlas) , ], k = n.neigh, 
+                           get.index = TRUE, get.distance = TRUE)
+
+# for each cell and for each gene - record correlation and p-value
+cells.mapped = t( apply(knns$index, 1, function(x) colnames(sce.atlas)[x[2:n.neigh]]) ) 
+dist.mapped = knns$distance[, 2:n.neigh]
+rownames(cells.mapped) = colnames(sce.atlas) 
+rownames(dist.mapped) = colnames(sce.atlas) 
+
+
+corr.mtrx = bplapply(1:nrow(cells.mapped), function(cell){
+  current.dist.overall = dist.mapped[cell,]
+  current.neighbors = cells.mapped[cell,]
+  
+  current.dist.genes = lapply(current.neighbors, function(neighbor){
+    return( counts.atlas[,colnames(counts.atlas) == neighbor] - 
+      counts.atlas[,colnames(counts.atlas) == rownames(cells.mapped)[cell]] )
+  })
+  current.dist.genes = do.call(cbind, current.dist.genes)
+  
+  corr.mtrx.perCell = lapply(1:nrow(counts.atlas), function(gene){
+    current.corr.pearson = cor.test(current.dist.overall , current.dist.genes[gene,], method = "pearson")
+    current.corr.spearman = cor.test(current.dist.overall , current.dist.genes[gene,], method = "spearman")
+    out = data.frame(
+                     corr.pearson = current.corr.pearson$estimate, 
+                     p.pearson = current.corr.pearson$p.value, 
+                     corr.spearman = current.corr.spearman$estimate,
+                     p.spearman = current.corr.spearman$p.value
+                     )
+    return(out)
+  })
+  corr.mtrx.perCell = do.call(rbind , corr.mtrx.perCell)
+  corr.mtrx.perCell$p.pearson = p.adjust(corr.mtrx.perCell$p.pearson, method = "BH")
+  corr.mtrx.perCell$p.spearman = p.adjust(corr.mtrx.perCell$p.spearman, method = "BH")
+  return(corr.mtrx.perCell)
+}, BPPARAM = mcparam)
+names(corr.mtrx) = rownames(cells.mapped)
+
+# transpose
+getTransposedCorrMtrx = function(variable){
+  out = lapply(corr.mtrx, function(x){
+    return(x[, variable])
+  })
+out = do.call(cbind , out)  
+rownames(out) = genes  
+return(out)  
+}
+
+out = list(corr.pearson = getTransposedCorrMtrx("corr.pearson"), 
+           p.pearson = getTransposedCorrMtrx("p.pearson"), 
+           corr.spearman = getTransposedCorrMtrx("corr.spearman"), 
+           p.spearman = getTransposedCorrMtrx("p.spearman")
+           )
+saveRDS(out , paste0(root.dir , "data/atlas__8_5/corr_per_gene.Rds"))
+
+
+```
+
+
+
+#Session Info
+
+```{r sessinf}
+sessionInfo()
+```
