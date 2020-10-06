@@ -33,7 +33,7 @@ register(mcparam)
 set.seed(32)
 
 root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
-
+#root.dir = "/Users/alsu/Develop/geneBasis/"
 source(paste0(root.dir, "am_geneBasis/core_functions.R"))
 sce.atlas = readRDS(paste0( root.dir, "data/atlas__8_5/sce_atlas_8.5.Rds"))
 rownames(sce.atlas) = rowData(sce.atlas, "SYMBOL")[,2]
@@ -75,10 +75,10 @@ knns = queryKNN( mbpca.corrected[colnames(sce.atlas) , ], mbpca.corrected[colnam
 # for each cell and for each gene - record correlation and p-value
 cells.mapped = t( apply(knns$index, 1, function(x) colnames(sce.atlas)[x[2:n.neigh]]) ) 
 dist.mapped = knns$distance[, 2:n.neigh]
-#rownames(cells.mapped) = colnames(sce.atlas) 
+rownames(cells.mapped) = colnames(sce.atlas) 
 #rownames(dist.mapped) = colnames(sce.atlas) 
 
-corr.mtrx = bplapply(1:nrow(cells.mapped), function(cell){
+corr.mtrx = lapply(1:nrow(cells.mapped), function(cell){
   current.dist.overall = dist.mapped[cell,]
   current.neighbors = cells.mapped[cell,]
   
@@ -105,8 +105,8 @@ corr.mtrx = bplapply(1:nrow(cells.mapped), function(cell){
   # corr.mtrx.perCell$p.pearson = p.adjust(corr.mtrx.perCell$p.pearson, method = "BH")
   # corr.mtrx.perCell$p.spearman = p.adjust(corr.mtrx.perCell$p.spearman, method = "BH")
   return(corr.mtrx.perCell)
-}, BPPARAM = mcparam)
-names(corr.mtrx) = colnames(sce.atlas)
+})
+names(corr.mtrx) = rownames(cells.mapped)
 
 # transpose
 getTransposedCorrMtrx = function(variable){
@@ -117,6 +117,7 @@ out = do.call(cbind , out)
 rownames(out) = genes  
 return(out)  
 }
+
 
 out = list(corr.pearson = getTransposedCorrMtrx("corr.pearson"), 
            p.pearson = getTransposedCorrMtrx("p.pearson"), 
