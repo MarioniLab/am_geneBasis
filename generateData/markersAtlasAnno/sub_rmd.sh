@@ -9,10 +9,10 @@ script_name=markers_anno
 
 #CHOOSE PARAMETERS
 #RAM in megabytes
-memory=95000
+memory=75000
 r_command="rusage[mem=${memory}]"
 #num_processors
-nproc=7
+nproc=5
 
 smg=/nfs/research1/marioni/alsu/singularity/R1.simg
 script=/nfs/research1/marioni/alsu/geneBasis/am_geneBasis/generateData/markersAtlasAnno/run_rmd.R

@@ -29,7 +29,7 @@ library(SingleCellExperiment)
 library(tibble)
 library(viridis)
 set.seed(32)
-ncores = 7
+ncores = 5
 mcparam = MulticoreParam(workers = ncores)
 register(mcparam)
 
