@@ -29,20 +29,12 @@ library(SingleCellExperiment)
 library(tibble)
 library(viridis)
 set.seed(32)
-ncores = 1
-mcparam = MulticoreParam(workers = ncores)
-register(mcparam)
+
 
 root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
 source(paste0(root.dir, "am_geneBasis/core_functions.R"))
 sce.atlas = readRDS(paste0( root.dir, "data/atlas__8_5/sce_atlas_8.5.Rds"))
 meta.atlas = as.data.frame(colData(sce.atlas))
-
-# load spatialEmbryo
-load_embryo_8.5(dir = "cluster")
-sce.seq = sce[!rownames(sce) == "Xist", ]
-meta = data.frame(colData(sce.seq))
-genes.seq = rownames(sce.seq)
 
 
 ```
@@ -53,11 +45,10 @@ genes.seq = rownames(sce.seq)
 ```{r findMarkers-atlas, message = FALSE}
 
 
-lfc.thresh = 0.25
+lfc.thresh = 0.5
 FDR.thresh = 0.05
 
-markers = bplapply(unique(meta.atlas$celltype), function(CT){
-  print(CT)
+markers = lapply(unique(meta.atlas$celltype), function(CT){
   current.markers = findMarkers( sce.atlas , sce.atlas$celltype %in% CT, lfc = lfc.thresh, direction = "up", assay.type="logcounts")
   current.markers = as.data.frame( current.markers[[2]] )                
   idx = current.markers$FDR < FDR.thresh
@@ -69,23 +60,19 @@ markers = bplapply(unique(meta.atlas$celltype), function(CT){
     current.markers$celltype = CT
     return(current.markers)
   }
-}, BPPARAM = mcparam)
+})
 markers = do.call(rbind, markers)
-
-# save it
-write.table(markers, file = paste0(root.dir, "data/markers/markers__atlas_E8_5.tab"), row.names = F, col.names = T, quote = F, sep = "\t")
 
 
 ```
 
-# Assign discrimanatory celltype capacity for each marker (only for seq markers)
+# Assign discrimanatory capacity 
 
-To assign discriminatory capacity for each marker separately - we will map all cells using only this marker (basically linear) - and see how often we get the celltype of interest wring
+To assign discriminatory capacity for each marker separately - we will map all cells using only this marker (R1 space) - and see how often we get the celltype of interest wring (cal)
 
 ```{r discriminatory-capacity-markers, message = FALSE}
 
 
-markers.seq = markers[markers$external_gene_name %in% genes.seq , ]
 unq.samples = unique(sce.atlas$sample)
 n.neigh = 20
 
@@ -106,7 +93,9 @@ discriminatoryCapacityMarker = function(celltype , gene){
     return(celltype.mode)
   })
   celltype.mapped = do.call(rbind, celltype.mapped)
+  
   celltype.actual = data.frame( cell = colnames(sce.atlas),  celltype.actual = sce.atlas$celltype )
+  
   celltype.comparison = merge(celltype.actual, celltype.mapped)
   celltype.comparison$celltype.actual = celltype.comparison$celltype.actual == celltype
   celltype.comparison$celltype.mapped = celltype.comparison$celltype.mapped == celltype
@@ -118,16 +107,18 @@ discriminatoryCapacityMarker = function(celltype , gene){
   out = list(sensitivity = sensitivity, specificity = specificity)
 }
 
-
-markers.extended.seq = bplapply(1:nrow(markers.seq), function(i){
+markers.extended = lapply(1:nrow(markers), function(i){
   current.markers = markers[i,]
-  out = discriminatoryCapacityMarker(current.markers$celltype , current.markers$external_gene_name)
-  current.markers$sensitivity = out$sensitivity
-  current.markers$specificty = out$specificity
+  out = discriminatoryCapacityMarker(current.markers$celltype[1] , current.markers$external_gene_name[1])
+  current.markers$sensitivity[1] = out$sensitivity
+  current.markers$specificity[1] = out$specificity
   return(current.markers)
-}, BPPARAM = mcparam)
-markers.extended.seq = do.call(rbind, markers.extended.seq)
-write.table(markers.extended.seq, file = paste0(root.dir, "data/markers/markers_seqSpatialEmbryo.tab"), row.names = F, col.names = T, quote = F, sep = "\t")
+})
+markers.extended = do.call(rbind, markers.extended)
+
+
+# save it
+write.table(markers.extended, file = paste0(root.dir, "data/markers/markers__atlas_E8_5.tab"), row.names = F, col.names = T, quote = F, sep = "\t")
 
 
 ```
