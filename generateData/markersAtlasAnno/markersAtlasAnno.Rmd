@@ -76,7 +76,7 @@ markers = lapply(unique(meta.atlas$celltype), function(CT){
 markers = do.call(rbind, markers)
 
 # save it
-write.table(markers.extended, file = paste0(root.dir, "data/markers/markers__atlas_E8_5.tab"), row.names = F, col.names = T, quote = F, sep = "\t")
+write.table(markers, file = paste0(root.dir, "data/markers/markers__atlas_E8_5.tab"), row.names = F, col.names = T, quote = F, sep = "\t")
 
 ```
 
@@ -162,9 +162,7 @@ markers = do.call(rbind, markers)
 
 
 # save it
-write.table(markers.extended, file = paste0(root.dir, "data/markers/markers__atlas_E8_5.tab"), row.names = F, col.names = T, quote = F, sep = "\t")
-
-
+write.table(markers, file = paste0(root.dir, "data/markers/markers__atlas_E8_5.tab"), row.names = F, col.names = T, quote = F, sep = "\t")
 
 
 ```
