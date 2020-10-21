@@ -1,0 +1,234 @@
+---
+title: "Mapping to the atlas"
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+#Introduction & method
+
+In this script we map cells from the FAS-affected embryos (+ 4 samples from the atlas experiment) onto our atlas.
+
+```{r load, message = FALSE}
+# load libraries we are going to use
+
+library(Matrix)
+library(scran)
+library(scater)
+library(batchelor)
+library(knitr)
+#library(pheatmap)
+library(reshape2)
+library(edgeR)
+#library(ggpubr)
+library(ggplot2)
+#library(MouseGastrulationData)
+library(BiocSingular)
+library(BiocParallel)
+library(BiocNeighbors)
+library(SingleCellExperiment)
+#library(e1071)  
+library(dplyr)
+#library(tibble)
+#library(plyr)
+#library(aroma.light)
+set.seed(32)
+
+
+root.dir = "/Users/alsu/Develop/geneBasis/"
+source(paste0(root.dir, "am_geneBasis/core_functions.R"))
+sce.atlas = readRDS(paste0( root.dir, "data/atlas__8_5/sce_atlas_8.5.Rds"))
+
+genes.info = as.data.frame(rowData(sce.atlas))
+
+# work only with celltypes we get in sample 29
+sce.atlas.ref = sce.atlas[ , sce.atlas$sample == 29]
+# delete rare CTs
+tab = table(sce.atlas.ref$celltype)
+nCells.thresh = 20
+CTs.2keep = names(tab)[tab > nCells.thresh]
+
+sce.atlas = sce.atlas[, sce.atlas$celltype %in% CTs.2keep]
+meta.atlas = as.data.frame(colData(sce.atlas))
+
+# read gene selection
+genes.unweighted.scaled.both = read.table(paste0(root.dir , "data/gene_selection/atlas__E8_5/" , "genes_unweighted_scaled_both" , ".tab"), header = T , sep = "\t")
+genes.unweighted.scaled.one = read.table(paste0(root.dir , "data/gene_selection/atlas__E8_5/" , "genes_unweighted_scaled_one" , ".tab"), header = T , sep = "\t")
+genes.unweighted.not_scaled.both = read.table(paste0(root.dir , "data/gene_selection/atlas__E8_5/" , "genes_unweighted_not_scaled_both" , ".tab"), header = T , sep = "\t")
+genes.unweighted.not_scaled.one = read.table(paste0(root.dir , "data/gene_selection/atlas__E8_5/" , "genes_unweighted_not_scaled_one" , ".tab"), header = T , sep = "\t")
+
+genes.weighted.scaled.both = read.table(paste0(root.dir , "data/gene_selection/atlas__E8_5/" , "genes_weighted_scaled_both" , ".tab"), header = T , sep = "\t")
+genes.weighted.scaled.one = read.table(paste0(root.dir , "data/gene_selection/atlas__E8_5/" , "genes_weighted_scaled_one" , ".tab"), header = T , sep = "\t")
+genes.weighted.not_scaled.both = read.table(paste0(root.dir , "data/gene_selection/atlas__E8_5/" , "genes_weighted_not_scaled_both" , ".tab"), header = T , sep = "\t")
+genes.weighted.not_scaled.one = read.table(paste0(root.dir , "data/gene_selection/atlas__E8_5/" , "genes_weighted_not_scaled_one" , ".tab"), header = T , sep = "\t")
+
+
+
+
+```
+
+# Mapping - all
+
+```{r mappings-all , message = FALSE}
+
+getMapping_all = function(genes, n.neigh = 10){
+  current.sce.atlas = sce.atlas[rownames(sce.atlas) %in% genes , ]
+  # preselect cells with 0 counts in all the genes
+  current.counts.atlas = as.matrix(counts(current.sce.atlas))
+  colsums.current.counts.atlas = colSums(current.counts.atlas)
+  cells.0genes = names(colsums.current.counts.atlas)[colsums.current.counts.atlas == 0]
+  
+  # do mapping
+  batchFactor = factor(current.sce.atlas$sample)
+  corrected.atlas = fastMNN(current.sce.atlas , batch = batchFactor, assay.type = "logcounts")
+  corrected.atlas = reducedDim(corrected.atlas)
+  reference.cells = colnames(current.sce.atlas[,current.sce.atlas$sample == 29]) 
+  query.cells = colnames(current.sce.atlas[, !current.sce.atlas$sample == 29]) 
+  current.knns = queryKNN( corrected.atlas[reference.cells ,], corrected.atlas[query.cells ,], k = n.neigh, 
+                           get.index = TRUE, get.distance = FALSE)
+  cells.mapped = t( apply(current.knns$index, 1, function(x) reference.cells[x]) )
+  celltypes = t(apply(cells.mapped, 1, function(x) meta.atlas$celltype[match(x, meta.atlas$cell)]))
+  celltype.mapped = apply(celltypes, 1, function(x) getmode(x, 1:length(x)))
+  out = data.frame(cell = query.cells , celltype.mapped = celltype.mapped , n.genes = length(genes))
+  
+  out$celltype.mapped = as.character(out$celltype.mapped)
+  idx = which(out$cell %in% cells.0genes)
+  out$celltype.mapped[idx] = "Unmapped" 
+  
+  out = cbind(out , as.data.frame( cells.mapped) )
+  return(out)
+}
+
+# get my mappings
+nPC.grid = seq(12,48,4) 
+
+
+mappings.weighted.scaled.both = lapply(nPC.grid , function(i){
+  current.genes = genes.weighted.scaled.both$gene[1:i]
+  return(getMapping_all(current.genes))
+})
+names(mappings.weighted.scaled.both) = paste0("nGenes_" , nPC.grid)
+saveRDS(mappings.weighted.scaled.both , file = paste0(root.dir, "data/mappings/all/alsu__weighted_scaled_both.Rds"))
+
+
+mappings.weighted.scaled.one = lapply(nPC.grid , function(i){
+  current.genes = genes.weighted.scaled.one$gene[1:i]
+  return(getMapping_all(current.genes))
+})
+names(mappings.weighted.scaled.one) = paste0("nGenes_" , nPC.grid)
+saveRDS(mappings.weighted.scaled.one , file = paste0(root.dir, "data/mappings/all/alsu__weighted_scaled_one.Rds"))
+
+
+mappings.weighted.not_scaled.both = lapply(nPC.grid , function(i){
+  current.genes = genes.weighted.not_scaled.both$gene[1:i]
+  return(getMapping_all(current.genes))
+})
+names(mappings.weighted.not_scaled.both) = paste0("nGenes_" , nPC.grid)
+saveRDS(mappings.weighted.not_scaled.both , file = paste0(root.dir, "data/mappings/atlas__E8_5/all/alsu__weighted_not_scaled_both.Rds"))
+
+
+mappings.weighted.not_scaled.one = lapply(nPC.grid , function(i){
+  current.genes = genes.weighted.not_scaled.one$gene[1:i]
+  return(getMapping_all(current.genes))
+})
+names(mappings.weighted.not_scaled.one) = paste0("nGenes_" , nPC.grid)
+saveRDS(mappings.weighted.not_scaled.one , file = paste0(root.dir, "data/mappings/atlas__E8_5/all/alsu__weighted_not_scaled_one.Rds"))
+
+mappings.unweighted.scaled.both = lapply(nPC.grid , function(i){
+  current.genes = genes.unweighted.scaled.both$gene[1:i]
+  return(getMapping_all(current.genes))
+})
+names(mappings.unweighted.scaled.both) = paste0("nGenes_" , nPC.grid)
+saveRDS(mappings.unweighted.scaled.both , file = paste0(root.dir, "data/mappings/atlas__E8_5/all/alsu__unweighted_scaled_both.Rds"))
+
+
+mappings.unweighted.scaled.one = lapply(nPC.grid , function(i){
+  current.genes = genes.unweighted.scaled.one$gene[1:i]
+  return(getMapping_all(current.genes))
+})
+names(mappings.unweighted.scaled.one) = paste0("nGenes_" , nPC.grid)
+saveRDS(mappings.unweighted.scaled.one , file = paste0(root.dir, "data/mappings/atlas__E8_5/all/alsu__unweighted_scaled_one.Rds"))
+
+
+mappings.unweighted.not_scaled.both = lapply(nPC.grid , function(i){
+  current.genes = genes.unweighted.not_scaled.both$gene[1:i]
+  return(getMapping_all(current.genes))
+})
+names(mappings.unweighted.not_scaled.both) = paste0("nGenes_" , nPC.grid)
+saveRDS(mappings.unweighted.not_scaled.both , file = paste0(root.dir, "data/mappings/atlas__E8_5/all/alsu__unweighted_not_scaled_both.Rds"))
+
+
+mappings.unweighted.not_scaled.one = lapply(nPC.grid , function(i){
+  current.genes = genes.unweighted.not_scaled.one$gene[1:i]
+  return(getMapping_all(current.genes))
+})
+names(mappings.unweighted.not_scaled.one) = paste0("nGenes_" , nPC.grid)
+saveRDS(mappings.unweighted.not_scaled.one , file = paste0(root.dir, "data/mappings/atlas__E8_5/all/alsu__unweighted_not_scaled_one.Rds"))
+
+
+# Bianca's
+mappings.bianca.centers = lapply(nPC.grid , function(i){
+  current.genes = read.table(paste0(root.dir , "data/gene_selection/atlas__E8_5/bianca_markers/centers/num_markers__" , i , ".tab"), header = F, sep = "\t")
+  current.genes = current.genes$V1
+  return(getMapping_all(current.genes))
+})
+saveRDS(mappings.bianca.centers , file = paste0(root.dir, "data/mappings/atlas__E8_5/all/bianca__centers.Rds"))
+
+
+mappings.bianca.pairwise = lapply(nPC.grid , function(i){
+  current.genes = read.table(paste0(root.dir , "data/gene_selection/atlas__E8_5/bianca_markers/pairwise/num_markers__" , i , ".tab"), header = F, sep = "\t")
+  current.genes = current.genes$V1
+  return(getMapping_all(current.genes))
+})
+saveRDS(mappings.bianca.pairwise , file = paste0(root.dir, "data/mappings/atlas__E8_5/all/bianca__pairwise.Rds"))
+
+
+mappings.bianca.pairwise_centers = lapply(nPC.grid , function(i){
+  current.genes = read.table(paste0(root.dir , "data/gene_selection/atlas__E8_5/bianca_markers/pairwise_centers/num_markers__" , i , ".tab"), header = F, sep = "\t")
+  current.genes = current.genes$V1
+  return(getMapping_all(current.genes))
+})
+saveRDS(mappings.bianca.pairwise_centers , file = paste0(root.dir, "data/mappings/atlas__E8_5/all/bianca__pairwise_centers.Rds"))
+
+
+# random forest
+current.genes = read.table(paste0(root.dir , "data/gene_selection/atlas__E8_5/RF_markers" , ".tab"), header = T, sep = "\t")
+current.genes = genes.info$SYMBOL[genes.info$ENSEMBL %in% current.genes$gene]
+mappings.rf = getMapping_all(current.genes)
+saveRDS(mappings.rf , file = paste0(root.dir, "data/mappings/atlas__E8_5/all/RF.Rds"))
+
+
+
+```
+
+# Mapping - w downsampling
+
+```{r mapping-w-downsampling, message = FALSE}
+
+
+getDownsampledAtlas = function(sce.atlas){
+  sce.atlas.ref = sce.atlas[, sce.atlas$sample == 29]
+  sce.atlas.query = sce.atlas[, !sce.atlas$sample == 29]
+  stat.ct = table(sce.atlas.ref$celltype)
+  
+  downsampled.sce.ref = lapply(unique(sce.atlas.ref$celltype) , function(CT){
+    idx = which(sce.atlas.ref$celltype == CT)
+    idx = sample(idx , min(stat.ct))
+    return(sce.atlas.ref[,idx])
+  })
+  downsampled.sce.ref = do.call(cbind , downsampled.sce.ref)
+  downsampled.sce = cbind(downsampled.sce.ref , sce.atlas.query)
+  return(downsampled.sce)
+}
+
+
+```
+
+
+
+#Session Info
+
+```{r sessinf}
+sessionInfo()
+```
