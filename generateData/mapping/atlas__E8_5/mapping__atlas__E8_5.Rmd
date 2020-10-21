@@ -109,7 +109,7 @@ mappings.weighted.scaled.both = lapply(nPC.grid , function(i){
   return(getMapping_all(current.genes))
 })
 names(mappings.weighted.scaled.both) = paste0("nGenes_" , nPC.grid)
-saveRDS(mappings.weighted.scaled.both , file = paste0(root.dir, "data/mappings/all/alsu__weighted_scaled_both.Rds"))
+saveRDS(mappings.weighted.scaled.both , file = paste0(root.dir, "data/mappings/atlas__E8_5/all/alsu__weighted_scaled_both.Rds"))
 
 
 mappings.weighted.scaled.one = lapply(nPC.grid , function(i){
@@ -117,7 +117,7 @@ mappings.weighted.scaled.one = lapply(nPC.grid , function(i){
   return(getMapping_all(current.genes))
 })
 names(mappings.weighted.scaled.one) = paste0("nGenes_" , nPC.grid)
-saveRDS(mappings.weighted.scaled.one , file = paste0(root.dir, "data/mappings/all/alsu__weighted_scaled_one.Rds"))
+saveRDS(mappings.weighted.scaled.one , file = paste0(root.dir, "data/mappings/atlas__E8_5/all/alsu__weighted_scaled_one.Rds"))
 
 
 mappings.weighted.not_scaled.both = lapply(nPC.grid , function(i){
