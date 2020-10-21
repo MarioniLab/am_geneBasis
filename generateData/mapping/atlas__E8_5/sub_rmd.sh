@@ -19,5 +19,5 @@ script=/nfs/research1/marioni/alsu/geneBasis/am_geneBasis/generateData/mapping/a
 
 bsub -q research-rh74 -e ${err_folder}/${script_name} \
 -o ${out_folder}/${script_name} \
--M $memory -R $r_command -n $nproc -J ${script_name} \
+-M $memory -R $r_command -n $nproc -P bigmem -J ${script_name} \
 "singularity exec $smg Rscript $script"
