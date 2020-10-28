@@ -1,0 +1,134 @@
+---
+title: "Mapping to the atlas"
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+#Introduction & method
+
+In this script we map cells from the FAS-affected embryos (+ 4 samples from the atlas experiment) onto our atlas.
+
+```{r load, message = FALSE}
+# load libraries we are going to use
+
+library(Matrix)
+library(scran)
+library(scater)
+library(batchelor)
+library(knitr)
+library(pheatmap)
+library(reshape2)
+library(edgeR)
+library(BiocSingular)
+library(BiocParallel)
+library(BiocNeighbors)
+library(SingleCellExperiment)
+library(dplyr)
+library(tibble)
+library(plyr)
+set.seed(32)
+
+root.dir = "/Users/alsu/Develop/geneBasis/"
+source(paste0(root.dir, "am_geneBasis/core_functions.R"))
+
+
+
+```
+
+# Read logcounts
+
+```{r load-logcounts, message = FALSE}
+
+
+
+logcounts = read.table(paste0(root.dir, "data/spleen/norm/SCT_normalized.txt"), sep = " ", header = F)
+colnames(logcounts) = c("gene.num" , "cell.num" , "logcounts")
+rownames.logcounts = read.table(paste0(root.dir, "data/spleen/norm/rownames.txt"), sep = "\n", header = F) 
+rownames.logcounts = data.frame(gene.num = c(1:nrow(rownames.logcounts)) , gene =  rownames.logcounts$V1 )
+colnames.logcounts = read.table(paste0(root.dir, "data/spleen/norm/colnames.txt"), sep = "\n", header = F)
+colnames.logcounts = data.frame(cell.num = c(1:nrow(colnames.logcounts) ) , cell = colnames.logcounts$V1 )
+ 
+
+logcounts = merge(logcounts , rownames.logcounts , by = "gene.num", all.x = T, all.y = F)
+logcounts = merge(logcounts , colnames.logcounts , by = "cell.num", all.x = T, all.y = F)
+logcounts = logcounts[, c("gene" , "cell" , "logcounts")]
+
+
+logcounts = dcast(logcounts, gene ~ cell)
+logcounts[is.na(logcounts)] <- 0
+
+rownames(logcounts) <- logcounts$gene
+logcounts = logcounts[,2:ncol(logcounts)]
+
+logcounts = logcounts[order(rownames(logcounts)),]
+logcounts = logcounts[, order(colnames(logcounts))]
+
+
+
+```
+
+# Read counts
+
+```{r load-counts, message = FALSE}
+
+
+counts = read.table(paste0(root.dir, "data/spleen/raw/raw_counts.txt"), sep = " ", header = F)
+colnames(counts) = c("gene.num" , "cell.num" , "counts")
+rownames.counts = read.table(paste0(root.dir, "data/spleen/raw/rownames.txt"), sep = "\n", header = F) 
+rownames.counts = data.frame(gene.num = c(1:nrow(rownames.counts)) , gene =  rownames.counts$V1 )
+colnames.counts = read.table(paste0(root.dir, "data/spleen/raw/colnames.txt"), sep = "\n", header = F)
+colnames.counts = data.frame(cell.num = c(1:nrow(colnames.counts) ) , cell = colnames.counts$V1 )
+
+counts = merge(counts , rownames.counts , by = "gene.num", all.x = T, all.y = F)
+counts = merge(counts , colnames.counts , by = "cell.num", all.x = T, all.y = F)
+counts = counts[, c("gene" , "cell" , "counts")]
+
+counts = dcast(counts, gene ~ cell)
+counts[is.na(counts)] <- 0
+
+rownames(counts) <- counts$gene
+counts = counts[,2:ncol(counts)]
+
+# only keep counts for which we also have logcounts
+counts = counts[rownames(counts) %in% rownames(logcounts) , ]
+
+counts = counts[order(rownames(counts)),]
+counts = counts[, order(colnames(counts))]
+
+
+
+```
+
+# Metadata
+
+```{r load-meta, message = FALSE}
+
+cells = read.table(paste0(root.dir, "data/spleen/raw/colnames.txt"), sep = "\n", header = F)
+celltypes = read.table(paste0(root.dir, "data/spleen/metadata/annotations.txt"), sep = "\n", header = F)
+samples =  read.table(paste0(root.dir, "data/spleen/metadata/batch.txt"), sep = "\n", header = F)
+meta = data.frame(cell = cells$V1, sample = samples$V1 , celltype = celltypes$V1)
+meta = meta[order(meta$cell),]
+
+
+```
+
+
+# Combine together
+
+```{r combine, message = FALSE}
+
+sce = SingleCellExperiment(list(counts=counts),
+     colData=DataFrame(meta))
+assay(sce , "logcounts") <- logcounts
+saveRDS(sce, file = paste0(root.dir, "data/sce/sce_spleen.Rds"))
+
+
+```
+
+#Session Info
+
+```{r sessinf}
+sessionInfo()
+```
