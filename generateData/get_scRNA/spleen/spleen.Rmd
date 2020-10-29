@@ -123,7 +123,7 @@ meta = meta[order(meta$cell),]
 sce = SingleCellExperiment(list(counts=counts),
      colData=DataFrame(meta))
 assay(sce , "logcounts") <- logcounts
-saveRDS(sce, file = paste0(root.dir, "data/sce/sce_spleen.Rds"))
+saveRDS(sce, file = paste0(root.dir, "data/spleen/sce_spleen.Rds"))
 
 
 ```
