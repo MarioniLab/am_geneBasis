@@ -30,7 +30,8 @@ library(tibble)
 library(plyr)
 set.seed(32)
 
-root.dir = "/Users/alsu/Develop/geneBasis/"
+#root.dir = "/Users/alsu/Develop/geneBasis/"
+root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
 source(paste0(root.dir, "am_geneBasis/core_functions.R"))
 
 
