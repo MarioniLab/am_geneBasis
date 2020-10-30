@@ -35,7 +35,6 @@ root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
 source(paste0(root.dir, "am_geneBasis/core_functions.R"))
 
 
-
 ```
 
 # Read logcounts
@@ -96,14 +95,22 @@ counts[is.na(counts)] <- 0
 rownames(counts) <- counts$gene
 counts = counts[,2:ncol(counts)]
 
+counts = data.matrix(counts , rownames.force = NA)
+counts <- as(counts, "dgTMatrix") 
+
+
+
 # only keep counts for which we also have logcounts
-counts = counts[rownames(counts) %in% rownames(logcounts) , ]
+genes = intersect(rownames(logcounts) , rownames(counts))
+cells = intersect(colnames(logcounts), colnames(counts))
+counts = counts[rownames(counts) %in% genes, colnames(counts) %in% cells]
+logcounts = logcounts[rownames(logcounts) %in% genes, colnames(logcounts) %in% cells]
 
 counts = counts[order(rownames(counts)),]
 counts = counts[, order(colnames(counts))]
 
-counts = data.matrix(counts , rownames.force = NA)
-counts <- as(counts, "dgTMatrix") 
+logcounts = logcounts[order(rownames(logcounts)),]
+logcounts = logcounts[, order(colnames(logcounts))]
 
 
 ```
