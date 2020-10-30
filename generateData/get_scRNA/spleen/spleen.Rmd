@@ -141,6 +141,8 @@ sce$cell = as.character(sce$cell)
 sce$celltype = as.character(sce$celltype)
 sce$sample = as.character(sce$sample)
 
+saveRDS(counts, file = paste0(root.dir, "data/spleen/counts_spleen.Rds"))
+saveRDS(logcounts, file = paste0(root.dir, "data/spleen/logcounts_spleen.Rds"))
 saveRDS(sce, file = paste0(root.dir, "data/spleen/sce_spleen.Rds"))
 
 
