@@ -136,6 +136,11 @@ meta = meta[order(meta$cell),]
 sce = SingleCellExperiment(list(counts=counts),
      colData=DataFrame(meta))
 assay(sce , "logcounts") <- logcounts
+
+sce$cell = as.character(sce$cell)
+sce$celltype = as.character(sce$celltype)
+sce$sample = as.character(sce$sample)
+
 saveRDS(sce, file = paste0(root.dir, "data/spleen/sce_spleen.Rds"))
 
 
