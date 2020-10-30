@@ -66,7 +66,7 @@ logcounts = logcounts[,2:ncol(logcounts)]
 logcounts = logcounts[order(rownames(logcounts)),]
 logcounts = logcounts[, order(colnames(logcounts))]
 
-
+logcounts <- as(logcounts, "dgTMatrix") 
 
 ```
 
@@ -98,7 +98,7 @@ counts = counts[rownames(counts) %in% rownames(logcounts) , ]
 counts = counts[order(rownames(counts)),]
 counts = counts[, order(colnames(counts))]
 
-
+counts <- as(counts, "dgTMatrix") 
 
 ```
 
