@@ -130,7 +130,7 @@ saveRDS(mapping.all , file = paste0(root.dir, "data/mappings/atlas__E8_5/all_mar
 getMapping = function(genes, n.neigh = 10){
   current.sce = sce[rownames(sce) %in% genes , ]
   # preselect cells with 0 counts in all the genes
-  current.counts = as.matrix ( cosineNorm( logcounts(sce)))
+  current.counts = as.matrix ( cosineNorm( logcounts(current.sce)))
   colsums.current.counts = colSums(current.counts)
   cells.0genes = names(colsums.current.counts)[colsums.current.counts == 0]
   
