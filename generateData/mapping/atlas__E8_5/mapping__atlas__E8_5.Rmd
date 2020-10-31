@@ -98,7 +98,7 @@ unq.markers = unique(unq.markers$gene)
 # mapping all
 current.sce = sce[rownames(sce) %in% unq.markers , ]
 batchFactor = factor(current.sce$sample)
-current.counts = as.matrix ( cosineNorm( logcounts(sce)))
+current.counts = as.matrix ( cosineNorm( logcounts(current.sce)))
 
 mbpca = multiBatchPCA(current.counts, batch = batchFactor, d = 50)
 out = do.call(reducedMNN, mbpca)
