@@ -268,7 +268,7 @@ saveRDS(mappings , file = paste0(root.dir, "data/mappings/atlas__E8_5/unweighted
 mappings.bianca.centers = lapply(nPC.grid , function(i){
   current.genes = read.table(paste0(root.dir , "data/gene_selection/atlas__E8_5/bianca_markers/centers/num_markers__" , i , ".tab"), header = F, sep = "\t")
   current.genes = current.genes$V1
-  return(getMapping_all(current.genes))
+  return(getMapping(current.genes))
 })
 saveRDS(mappings.bianca.centers , file = paste0(root.dir, "data/mappings/atlas__E8_5/bianca__centers.Rds"))
 
@@ -276,7 +276,7 @@ saveRDS(mappings.bianca.centers , file = paste0(root.dir, "data/mappings/atlas__
 mappings.bianca.pairwise = lapply(nPC.grid , function(i){
   current.genes = read.table(paste0(root.dir , "data/gene_selection/atlas__E8_5/bianca_markers/pairwise/num_markers__" , i , ".tab"), header = F, sep = "\t")
   current.genes = current.genes$V1
-  return(getMapping_all(current.genes))
+  return(getMapping(current.genes))
 })
 saveRDS(mappings.bianca.pairwise , file = paste0(root.dir, "data/mappings/atlas__E8_5/bianca__pairwise.Rds"))
 
@@ -284,7 +284,7 @@ saveRDS(mappings.bianca.pairwise , file = paste0(root.dir, "data/mappings/atlas_
 mappings.bianca.pairwise_centers = lapply(nPC.grid , function(i){
   current.genes = read.table(paste0(root.dir , "data/gene_selection/atlas__E8_5/bianca_markers/pairwise_centers/num_markers__" , i , ".tab"), header = F, sep = "\t")
   current.genes = current.genes$V1
-  return(getMapping_all(current.genes))
+  return(getMapping(current.genes))
 })
 saveRDS(mappings.bianca.pairwise_centers , file = paste0(root.dir, "data/mappings/atlas__E8_5/bianca__pairwise_centers.Rds"))
 
