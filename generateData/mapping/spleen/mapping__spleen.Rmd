@@ -90,29 +90,29 @@ unq.markers = unique(unq.markers$gene)
 ```{r mappings-big , message = FALSE}
 
 
-
-# mapping all
-current.sce = sce[rownames(sce) %in% unq.markers , ]
-batchFactor = factor(current.sce$sample)
-current.counts = as.matrix ( cosineNorm( logcounts(current.sce)))
-
-mbpca = multiBatchPCA(current.counts, batch = batchFactor, d = 50)
-out = do.call(reducedMNN, mbpca)
-joint.pca = out$corrected
-  
-reference.cells = colnames(current.sce[,current.sce$reference == T]) 
-query.cells = colnames(current.sce[, current.sce$reference == F]) 
-current.knns = queryKNN( joint.pca[reference.cells ,], joint.pca[query.cells ,], k = 10, 
-                           get.index = TRUE, get.distance = FALSE)
-cells.mapped = t( apply(current.knns$index, 1, function(x) reference.cells[x]) )
-celltypes = t(apply(cells.mapped, 1, function(x) meta$celltype[match(x, meta$cell)]))
-celltype.mapped = apply(celltypes, 1, function(x) getmode(x, 1:length(x)))
-mapping.all = data.frame(cell = query.cells , celltype.mapped = celltype.mapped , n.genes = length(unq.markers))
-mapping.all$celltype.mapped = as.character(mapping.all$celltype.mapped)
-mapping.all = cbind(mapping.all , as.data.frame( cells.mapped) ) 
-saveRDS(mapping.all , file = paste0(root.dir, "data/mappings/spleen/all_markers.Rds"))
-  
-
+# 
+# # mapping all
+# current.sce = sce[rownames(sce) %in% unq.markers , ]
+# batchFactor = factor(current.sce$sample)
+# current.counts = as.matrix ( cosineNorm( logcounts(current.sce)))
+# 
+# mbpca = multiBatchPCA(current.counts, batch = batchFactor, d = 50)
+# out = do.call(reducedMNN, mbpca)
+# joint.pca = out$corrected
+#   
+# reference.cells = colnames(current.sce[,current.sce$reference == T]) 
+# query.cells = colnames(current.sce[, current.sce$reference == F]) 
+# current.knns = queryKNN( joint.pca[reference.cells ,], joint.pca[query.cells ,], k = 10, 
+#                            get.index = TRUE, get.distance = FALSE)
+# cells.mapped = t( apply(current.knns$index, 1, function(x) reference.cells[x]) )
+# celltypes = t(apply(cells.mapped, 1, function(x) meta$celltype[match(x, meta$cell)]))
+# celltype.mapped = apply(celltypes, 1, function(x) getmode(x, 1:length(x)))
+# mapping.all = data.frame(cell = query.cells , celltype.mapped = celltype.mapped , n.genes = length(unq.markers))
+# mapping.all$celltype.mapped = as.character(mapping.all$celltype.mapped)
+# mapping.all = cbind(mapping.all , as.data.frame( cells.mapped) ) 
+# saveRDS(mapping.all , file = paste0(root.dir, "data/mappings/spleen/all_markers.Rds"))
+#   
+# 
 
 
 
@@ -139,7 +139,7 @@ getMapping = function(genes, n.neigh = 10){
   
   reference.cells = colnames(current.sce[,current.sce$reference == T]) 
   query.cells = colnames(current.sce[, current.sce$reference == F]) 
-  current.knns = queryKNN( corrected.atlas[reference.cells ,], corrected.atlas[query.cells ,], k = n.neigh, 
+  current.knns = queryKNN( joint.pca[reference.cells ,], joint.pca[query.cells ,], k = n.neigh, 
                            get.index = TRUE, get.distance = FALSE)
   cells.mapped = t( apply(current.knns$index, 1, function(x) reference.cells[x]) )
   celltypes = t(apply(cells.mapped, 1, function(x) meta$celltype[match(x, meta$cell)]))
