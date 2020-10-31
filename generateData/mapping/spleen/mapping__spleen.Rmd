@@ -105,7 +105,7 @@ query.cells = colnames(current.sce[, current.sce$reference == F])
 current.knns = queryKNN( joint.pca[reference.cells ,], joint.pca[query.cells ,], k = 10, 
                            get.index = TRUE, get.distance = FALSE)
 cells.mapped = t( apply(current.knns$index, 1, function(x) reference.cells[x]) )
-celltypes = t(apply(cells.mapped, 1, function(x) meta.atlas$celltype[match(x, meta.atlas$cell)]))
+celltypes = t(apply(cells.mapped, 1, function(x) meta$celltype[match(x, meta$cell)]))
 celltype.mapped = apply(celltypes, 1, function(x) getmode(x, 1:length(x)))
 mapping.all = data.frame(cell = query.cells , celltype.mapped = celltype.mapped , n.genes = length(unq.markers))
 mapping.all$celltype.mapped = as.character(mapping.all$celltype.mapped)
@@ -142,7 +142,7 @@ getMapping = function(genes, n.neigh = 10){
   current.knns = queryKNN( corrected.atlas[reference.cells ,], corrected.atlas[query.cells ,], k = n.neigh, 
                            get.index = TRUE, get.distance = FALSE)
   cells.mapped = t( apply(current.knns$index, 1, function(x) reference.cells[x]) )
-  celltypes = t(apply(cells.mapped, 1, function(x) meta.atlas$celltype[match(x, meta.atlas$cell)]))
+  celltypes = t(apply(cells.mapped, 1, function(x) meta$celltype[match(x, meta$cell)]))
   celltype.mapped = apply(celltypes, 1, function(x) getmode(x, 1:length(x)))
   out = data.frame(cell = query.cells , celltype.mapped = celltype.mapped , n.genes = length(genes))
   
