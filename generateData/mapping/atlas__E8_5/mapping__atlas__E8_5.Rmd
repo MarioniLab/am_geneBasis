@@ -32,9 +32,9 @@ set.seed(32)
 #root.dir = "/Users/alsu/Develop/geneBasis/"
 root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
 source(paste0(root.dir, "am_geneBasis/core_functions.R"))
-sce.atlas = readRDS(paste0( root.dir, "data/atlas__8_5/sce_atlas_8.5.Rds"))
+sce = readRDS(paste0( root.dir, "data/atlas__8_5/sce_atlas_8.5.Rds"))
 
-genes.info = as.data.frame(rowData(sce.atlas))
+genes.info = as.data.frame(rowData(sce))
 
 reference.bool = sapply(1:ncol(sce), function(i){
   if (sce$sample[i] == 29){
