@@ -75,13 +75,13 @@ genes_weighted_unscaled__twoRounds = read.table(paste0(root.dir , "data/gene_sel
 
 
 
-genes_unweighted_scaled__totalScore = read.table(paste0(root.dir , "data/gene_selection/atlas__E8_5/" , "genes_unweighted_scaled__twoRounds" , ".tab"), header = T , sep = "\t")
+genes_unweighted_scaled__totalScore = read.table(paste0(root.dir , "data/gene_selection/atlas__E8_5/" , "genes_unweighted_scaled__totalScore" , ".tab"), header = T , sep = "\t")
 
-genes_weighted_scaled__totalScore = read.table(paste0(root.dir , "data/gene_selection/atlas__E8_5/" , "genes_weighted_scaled__twoRounds" , ".tab"), header = T , sep = "\t")
+genes_weighted_scaled__totalScore = read.table(paste0(root.dir , "data/gene_selection/atlas__E8_5/" , "genes_weighted_scaled__totalScore" , ".tab"), header = T , sep = "\t")
 
-genes_unweighted_unscaled__totalScore = read.table(paste0(root.dir , "data/gene_selection/atlas__E8_5/" , "genes_unweighted_unscaled__twoRounds" , ".tab"), header = T , sep = "\t")
+genes_unweighted_unscaled__totalScore = read.table(paste0(root.dir , "data/gene_selection/atlas__E8_5/" , "genes_unweighted_unscaled__totalScore" , ".tab"), header = T , sep = "\t")
 
-genes_weighted_unscaled__totalScore = read.table(paste0(root.dir , "data/gene_selection/atlas__E8_5/" , "genes_weighted_unscaled__twoRounds" , ".tab"), header = T , sep = "\t")
+genes_weighted_unscaled__totalScore = read.table(paste0(root.dir , "data/gene_selection/atlas__E8_5/" , "genes_weighted_unscaled__totalScore" , ".tab"), header = T , sep = "\t")
 
 
 unq.markers = read.table(paste0(root.dir , "data/markers/" , "markers__atlas_E8_5" , ".tab"), header = T , sep = "\t")

@@ -71,13 +71,13 @@ genes_weighted_unscaled__twoRounds = read.table(paste0(root.dir , "data/gene_sel
 
 
 
-genes_unweighted_scaled__totalScore = read.table(paste0(root.dir , "data/gene_selection/spleen/" , "genes_unweighted_scaled__twoRounds" , ".tab"), header = T , sep = "\t")
+genes_unweighted_scaled__totalScore = read.table(paste0(root.dir , "data/gene_selection/spleen/" , "genes_unweighted_scaled__totalScore" , ".tab"), header = T , sep = "\t")
 
-genes_weighted_scaled__totalScore = read.table(paste0(root.dir , "data/gene_selection/spleen/" , "genes_weighted_scaled__twoRounds" , ".tab"), header = T , sep = "\t")
+genes_weighted_scaled__totalScore = read.table(paste0(root.dir , "data/gene_selection/spleen/" , "genes_weighted_scaled__totalScore" , ".tab"), header = T , sep = "\t")
 
-genes_unweighted_unscaled__totalScore = read.table(paste0(root.dir , "data/gene_selection/spleen/" , "genes_unweighted_unscaled__twoRounds" , ".tab"), header = T , sep = "\t")
+genes_unweighted_unscaled__totalScore = read.table(paste0(root.dir , "data/gene_selection/spleen/" , "genes_unweighted_unscaled__totalScore" , ".tab"), header = T , sep = "\t")
 
-genes_weighted_unscaled__totalScore = read.table(paste0(root.dir , "data/gene_selection/spleen/" , "genes_weighted_unscaled__twoRounds" , ".tab"), header = T , sep = "\t")
+genes_weighted_unscaled__totalScore = read.table(paste0(root.dir , "data/gene_selection/spleen/" , "genes_weighted_unscaled__totalScore" , ".tab"), header = T , sep = "\t")
 
 
 unq.markers = read.table(paste0(root.dir , "data/markers/" , "markers__spleen" , ".tab"), header = T , sep = "\t")
@@ -227,6 +227,7 @@ saveRDS(mappings , file = paste0(root.dir, "data/mappings/spleen/unweighted_unsc
 
 
 mappings = lapply(nPC.grid , function(i){
+  print(i)
   current.genes = genes_weighted_scaled__totalScore$gene[1:i]
   return(getMapping(current.genes))
 })
@@ -234,6 +235,7 @@ names(mappings) = paste0("nGenes_" , nPC.grid)
 saveRDS(mappings , file = paste0(root.dir, "data/mappings/spleen/weighted_scaled__totalScore.Rds"))
 #
 mappings = lapply(nPC.grid , function(i){
+  print(i)
   current.genes = genes_weighted_unscaled__totalScore$gene[1:i]
   return(getMapping(current.genes))
 })
@@ -241,6 +243,7 @@ names(mappings) = paste0("nGenes_" , nPC.grid)
 saveRDS(mappings , file = paste0(root.dir, "data/mappings/spleen/weighted_unscaled__totalScore.Rds"))
 #
 mappings = lapply(nPC.grid , function(i){
+  print(i)
   current.genes = genes_unweighted_scaled__totalScore$gene[1:i]
   return(getMapping(current.genes))
 })
@@ -248,6 +251,7 @@ names(mappings) = paste0("nGenes_" , nPC.grid)
 saveRDS(mappings , file = paste0(root.dir, "data/mappings/spleen/unweighted_scaled__totalScore.Rds"))
 #
 mappings = lapply(nPC.grid , function(i){
+  print(i)
   current.genes = genes_unweighted_unscaled__totalScore$gene[1:i]
   return(getMapping(current.genes))
 })
@@ -262,6 +266,7 @@ saveRDS(mappings , file = paste0(root.dir, "data/mappings/spleen/unweighted_unsc
 
 # Bianca's
 mappings.bianca.centers = lapply(nPC.grid , function(i){
+  print(i)
   current.genes = read.table(paste0(root.dir , "data/gene_selection/spleen/bianca_markers/centers/num_markers__" , i , ".tab"), header = F, sep = "\t")
   current.genes = current.genes$V1
   return(getMapping(current.genes))
