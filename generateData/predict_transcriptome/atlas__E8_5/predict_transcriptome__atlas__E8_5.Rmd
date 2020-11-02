@@ -97,7 +97,7 @@ updateMapping = function(mapping){
 logcounts = as.matrix(logcounts(sce))
 cols.cells = paste0("V" , c(1:10))
 getCorrTranscriptome = function(mapping){
-  if (class(mapping) == "type"){
+  if (class(mapping) == "list"){
     stat.per_nGenes = lapply(c(1,9,19), function(current.mapping.id){
       current.mapping = mapping[[current.mapping.id]]
       current.mapping = updateMapping(current.mapping)
@@ -150,6 +150,8 @@ getCorrTranscriptome = function(mapping){
 }
 
 stat.corr.weighted_unscaled__twoRounds = getCorrTranscriptome(mappings.weighted_unscaled__twoRounds)
+
+
 saveRDS(stat.corr.weighted_unscaled__twoRounds , file = paste0(root.dir, "data/corr_stat/atlas__E8_5/weighted_unscaled__twoRounds.Rds"))
 
 stat.corr.unweighted_unscaled__twoRounds = getCorrTranscriptome(mappings.unweighted_unscaled__twoRounds)
