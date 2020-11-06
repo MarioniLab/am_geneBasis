@@ -64,7 +64,7 @@ get_PCs = function(genes , sce){
 ```{r pc-HVGs, message = FALSE}
 
 
-HVGs = getHVGs(sce , dir = "local")
+HVGs = getHVGs(sce , dir = "cluster")
 HVGs = intersect(HVGs , genes.4seq)
 mbpca = get_PCs(HVGs, sce)
 saveRDS(mbpca , file =  paste0( save.dir, "PC_HVGs.Rds"))
