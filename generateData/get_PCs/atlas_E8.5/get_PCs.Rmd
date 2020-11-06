@@ -42,7 +42,7 @@ reference.bool = sapply(1:ncol(sce), function(i){
     return(F)
   }
 })
-sce$reference = reference.bools
+sce$reference = reference.bool
 
 # get suitable for seq genes
 genes.4seq = get_suitable4seq_genes("mouse_E8.5" , mean.thresh = 7, max.thresh = 350)
