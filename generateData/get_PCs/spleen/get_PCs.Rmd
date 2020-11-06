@@ -1,0 +1,141 @@
+---
+title: "This script is dedicated to get PC coordinates for gene matrix for different set of features."
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+
+# Spleen
+
+```{r load, message = FALSE}
+# load libraries we are going to use
+
+
+library(Matrix)
+library(scran)
+library(scater)
+library(batchelor)
+library(knitr)
+library(pheatmap)
+library(reshape2)
+library(edgeR)
+library(BiocSingular)
+library(BiocParallel)
+library(BiocNeighbors)
+library(SingleCellExperiment)
+library(dplyr)
+library(tibble)
+set.seed(32)
+
+root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
+save.dir = paste0(root.dir , "data/PCs/spleen/")
+source(paste0(root.dir, "am_geneBasis/core_functions.R"))
+sce = readRDS(paste0( root.dir, "data/scRNA_datasets/spleen/sce_spleen.Rds"))
+
+# assign reference sample
+reference.bool = sapply(1:ncol(sce), function(i){
+  if (sce$sample[i] == 4){
+    return(T)
+  } else {
+    return(F)
+  }
+})
+sce$reference = reference.bool
+
+# get suitable for seq genes
+genes.4seq = get_suitable4seq_genes(dir = "cluster", system = "spleen" , mean.thresh = 7, max.thresh = 350)
+
+get_PCs = function(genes , sce){
+  current.sce = sce[rownames(sce) %in% genes, ]
+  current.counts = cosineNorm(logcounts(current.sce))
+  batchFactor = factor(c(as.character(current.sce$sample)))
+  mbpca = multiBatchPCA(current.counts, batch = batchFactor, d = 100)
+  mbpca = do.call(rbind , mbpca)
+  return(mbpca)
+}
+
+
+```
+
+# All HVGs
+
+```{r pc-HVGs, message = FALSE}
+
+
+HVGs = getHVGs(sce , dir = "cluster")
+HVGs = intersect(HVGs , genes.4seq)
+mbpca = get_PCs(HVGs, sce)
+saveRDS(mbpca , file =  paste0( save.dir, "PC_HVGs.Rds"))
+
+
+```
+
+# Markers 
+
+## All samples
+
+### Binomial test
+
+```{r pc-allSamples-binom, message = FALSE}
+
+markers = getMarkers(sce, pval.type = "some" , test = "binom", FDR.thresh = .01)
+markers = unique(markers$gene)
+markers = intersect(markers , genes.4seq)
+mbpca = get_PCs(markers, sce)
+saveRDS(mbpca , file =  paste0( save.dir, "PC_allSamples_Binom.Rds"))
+
+
+
+```
+
+### T-test
+
+```{r pc-allSamples-t, message = FALSE}
+
+markers = getMarkers(sce, pval.type = "some" , test = "t", FDR.thresh = .01)
+markers = unique(markers$gene)
+markers = intersect(markers , genes.4seq)
+mbpca = get_PCs(markers, sce)
+saveRDS(mbpca , file =  paste0( save.dir, "PC_allSamples_Ttest.Rds"))
+
+
+
+```
+
+
+## Reference sample
+
+### Binomial test
+
+```{r pc-refSample-binom, message = FALSE}
+
+markers = getMarkers(sce[,sce$reference], pval.type = "some" , test = "binom", FDR.thresh = .01)
+markers = unique(markers$gene)
+markers = intersect(markers , genes.4seq)
+mbpca = get_PCs(markers, sce)
+saveRDS(mbpca , file =  paste0( save.dir, "PC_refSample_Binom.Rds"))
+
+
+```
+
+### T-test
+
+```{r pc-refSample-t, message = FALSE}
+
+markers = getMarkers(sce[,sce$reference], pval.type = "some" , test = "t", FDR.thresh = .01)
+markers = unique(markers$gene)
+markers = intersect(markers , genes.4seq)
+mbpca = get_PCs(markers, sce)
+saveRDS(mbpca , file =  paste0( save.dir, "PC_refSample_Ttest.Rds"))
+
+
+```
+
+
+#Session Info
+
+```{r sessinf}
+sessionInfo()
+```
