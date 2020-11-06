@@ -1,155 +1,5 @@
-celltype_colours = c("Epiblast" = "#635547",
-                     "Primitive Streak" = "#DABE99",
-                     "Caudal epiblast" = "#9e6762",
-                     
-                     "PGC" = "#FACB12",
-                     
-                     "Anterior Primitive Streak" = "#c19f70",
-                     "Notochord" = "#0F4A9C",
-                     "Def. endoderm" = "#F397C0",
-                     "Gut" = "#EF5A9D",
-                     
-                     "Nascent mesoderm" = "#C594BF",
-                     "Mixed mesoderm" = "#DFCDE4",
-                     "Intermediate mesoderm" = "#139992",
-                     "Caudal Mesoderm" = "#3F84AA",
-                     "Paraxial mesoderm" = "#8DB5CE",
-                     "Somitic mesoderm" = "#005579",
-                     "Pharyngeal mesoderm" = "#C9EBFB",
-                     "Cardiomyocytes" = "#B51D8D",
-                     "Allantois" = "#532C8A",
-                     "ExE mesoderm" = "#8870ad",
-                     "Mesenchyme" = "#cc7818",
-                     
-                     "Haematoendothelial progenitors" = "#FBBE92",
-                     "Endothelium" = "#ff891c",
-                     "Blood progenitors 1" = "#f9decf",
-                     "Blood progenitors 2" = "#c9a997",
-                     "Erythroid1" = "#C72228",
-                     "Erythroid2" = "#f79083",
-                     "Erythroid3" = "#EF4E22",
-                     
-                     "NMP" = "#8EC792",
-                     
-                     "Rostral neurectoderm" = "#65A83E",
-                     "Caudal neurectoderm" = "#354E23",
-                     "Neural crest" = "#C3C388",
-                     "Forebrain/Midbrain/Hindbrain" = "#647a4f",
-                     "Spinal cord" = "#CDE088",
-                     
-                     "Surface ectoderm" = "#f7f79e",
-                     
-                     "Visceral endoderm" = "#F6BFCB",
-                     "ExE endoderm" = "#7F6874",
-                     "ExE ectoderm" = "#989898",
-                     "Parietal endoderm" = "#1A1A1A", 
-                     "Doublet" = "black", "Stripped" = "black"
-                     
-)
-
-haem_colours = c(
-  "Mes1"= "#c4a6b2",
-  "Mes2"= "#ca728c",
-  
-  "Cardiomyocytes" =  "#B51D8D",  
-  
-  "BP1" = "#6460c5",
-  "BP2" = "#96b8e4",
-  "Haem3"= "#02f9ff",
-  "BP3" = "#07499f",
-  "BP4" = "#036ef9",
-  
-  "Haem1"= "#bb22a7",
-  "Haem2" = "#f695e9",
-  "Haem4" = "#4c4a81",
-  
-  "EC1"= "#006737",
-  
-  "EC2" = "#5eba46",
-  "EC3" = "#818068",
-  "EC4"="#d6de22",
-  "EC5"="#5f7238",
-  "EC6"="#2ab572",
-  "EC7"="#000000",
-  "EC8"="#a0cb3b",
-  
-  "Ery1"="#f67a58",
-  "Ery2" ="#a26724",
-  "Ery3"="#cdaf7f",
-  "Ery4"= "#625218",
-  
-  "My" = "#c62127",
-  "Mk"= "#f6931d"
-)
-
-stage_colours = c("E6.5" = "#D53E4F",
-                  "E6.75" = "#F46D43",
-                  "E7.0" = "#FDAE61",
-                  "E7.25" = "#FEE08B",
-                  "E7.5" = "#FFFFBF",
-                  "E7.75" = "#E6F598",
-                  "E8.0" = "#ABDDA4",
-                  "E8.25" = "#66C2A5",
-                  "E8.5" = "#3288BD",
-                  "mixed_gastrulation" = "#A9A9A9")
-
-cc_colours = c("G1" = "firebrick", "S" = "darkcyan", "G2M" = "gold")
-
-
-stage_labels = names(stage_colours)
-names(stage_labels) = names(stage_colours)
-stage_labels[10] = "Mixed"
-
-# ROUTINELY USED PACKAGES
-library(irlba)
-library(cowplot)
-
-
-#removed yellow from position 2 ("#FFFF00")
-scale_colour_Publication <- function(...){
-  library(scales)
-  discrete_scale("colour", "Publication",
-                 manual_pal(values = c(
-                   "#000000", "#1CE6FF", "#FF34FF", "#FF4A46", "#008941", "#006FA6", "#A30059",
-                   "#7A4900", "#0000A6", "#63FFAC", "#B79762", "#004D43", "#8FB0FF", "#997D87",
-                   "#5A0007", "#809693", "#1B4400", "#4FC601", "#3B5DFF", "#4A3B53", "#FF2F80",
-                   "#61615A", "#BA0900", "#6B7900", "#00C2A0", "#FFAA92", "#FF90C9", "#B903AA", "#D16100",
-                   "#000035", "#7B4F4B", "#A1C299", "#300018", "#0AA6D8", "#013349", "#00846F",
-                   "#372101", "#FFB500", "#A079BF", "#CC0744", "#C0B9B2", "#C2FF99", "#001E09",
-                   "#00489C", "#6F0062", "#0CBD66", "#EEC3FF", "#456D75", "#B77B68", "#7A87A1", "#788D66",
-                   "#885578", "#FAD09F", "#FF8A9A", "#D157A0", "#BEC459", "#456648", "#0086ED", "#886F4C",
-                   "#34362D", "#B4A8BD", "#00A6AA", "#452C2C", "#636375", "#A3C8C9", "#FF913F", "#938A81",
-                   "#575329", "#00FECF", "#B05B6F", "#8CD0FF", "#3B9700", "#04F757", "#C8A1A1", "#1E6E00",
-                   "#7900D7", "#A77500", "#6367A9", "#A05837", "#6B002C", "#772600", "#D790FF", "#9B9700",
-                   "#549E79", "#FFF69F", "#201625", "#72418F", "#BC23FF", "#99ADC0", "#3A2465", "#922329",
-                   "#5B4534", "#FDE8DC", "#404E55", "#0089A3", "#CB7E98", "#A4E804", "#324E72", "#6A3A4C")), ...)
-}
-
-scale_color_Publication = scale_colour_Publication
-
-#removed yellow from position 2 ("#FFFF00")
-scale_fill_Publication <- function(...){
-  library(scales)
-  discrete_scale("fill", "Publication",
-                 manual_pal(values = c(
-                   "#000000", "#1CE6FF", "#FF34FF", "#FF4A46", "#008941", "#006FA6", "#A30059",
-                   "#7A4900", "#0000A6", "#63FFAC", "#B79762", "#004D43", "#8FB0FF", "#997D87",
-                   "#5A0007", "#809693", "#1B4400", "#4FC601", "#3B5DFF", "#4A3B53", "#FF2F80",
-                   "#61615A", "#BA0900", "#6B7900", "#00C2A0", "#FFAA92", "#FF90C9", "#B903AA", "#D16100",
-                   "#000035", "#7B4F4B", "#A1C299", "#300018", "#0AA6D8", "#013349", "#00846F",
-                   "#372101", "#FFB500", "#A079BF", "#CC0744", "#C0B9B2", "#C2FF99", "#001E09",
-                   "#00489C", "#6F0062", "#0CBD66", "#EEC3FF", "#456D75", "#B77B68", "#7A87A1", "#788D66",
-                   "#885578", "#FAD09F", "#FF8A9A", "#D157A0", "#BEC459", "#456648", "#0086ED", "#886F4C",
-                   "#34362D", "#B4A8BD", "#00A6AA", "#452C2C", "#636375", "#A3C8C9", "#FF913F", "#938A81",
-                   "#575329", "#00FECF", "#B05B6F", "#8CD0FF", "#3B9700", "#04F757", "#C8A1A1", "#1E6E00",
-                   "#7900D7", "#A77500", "#6367A9", "#A05837", "#6B002C", "#772600", "#D790FF", "#9B9700",
-                   "#549E79", "#FFF69F", "#201625", "#72418F", "#BC23FF", "#99ADC0", "#3A2465", "#922329",
-                   "#5B4534", "#FDE8DC", "#404E55", "#0089A3", "#CB7E98", "#A4E804", "#324E72", "#6A3A4C")), ...)
-}
-
-
-#gene_df is the cellranger gene table
-getHVGs = function(sce, min.mean = 1e-3, dir = "cluster"){
+# GENE SELECTION SCRIPTS
+getHVGs = function(sce, min.mean = 1e-3, dir = "cluster", FDR = 0.05){
   require(biomaRt)
   trend = scran::trendVar(sce, use.spikes = FALSE, loess.args = list(span = 0.05))
   decomp = scran::decomposeVar(sce, fit = trend)
@@ -165,73 +15,59 @@ getHVGs = function(sce, min.mean = 1e-3, dir = "cluster"){
   decomp = decomp[!rownames(decomp) %in% c(xist, ychr),]
   
   decomp$FDR = p.adjust(decomp$p.value, method = "fdr")
-  return(rownames(decomp)[decomp$FDR < 0.05])
+  return(rownames(decomp)[decomp$FDR < FDR])
 }
 
-
-#use ensembl gene IDs
-enrich_genes_topGO = function(hits, universe, n.out = 100){
-  require(topGO)
-  require(org.Mm.eg.db)
-  
-  hits = as.character(hits)
-  universe = as.character(universe)
-  
-  input = as.numeric(universe %in% hits)
-  names(input) = universe
-  
-  topgo = new("topGOdata",
-              ontology = "BP",
-              geneSelectionFun = function(x){x==1},
-              allGenes = input,
-              # nodeSize = 10,
-              annot = annFUN.org,
-              mapping = "org.Mm.eg.db",
-              ID = "ensembl")
-  
-  ks.test = suppressMessages(
-    runTest(topgo, algorithm = "elim", statistic = "ks")
-    )
-  out = GenTable(topgo, ks.test, topNodes = n.out)
+getBrokenStickDistribution = function(n){
+  out = sapply(1:n ,function(i){
+    current.out = sapply(i : n , function(k){
+      return(1/k)
+    })
+    return(sum(current.out)) 
+  })
+  out = out / n
   return(out)
 }
 
-#use ensembl gene IDs
-enrich_genes_goana = function(hits, universe, warn_missing = TRUE){
-  require(limma)
-  require(org.Mm.eg.db)
+
+getMarkers = function(sce , pval.type = "some", test , FDR.thresh){
+  # assumes there is a column called celltype and assay called logcounts
+  require(scran)
+  # get potential relevant genes
+  markers <- findMarkers(sce , groups=sce$celltype, direction = "up", pval.type=pval.type, test = test, assay.type = "logcounts")
   
-  db = org.Mm.egENSEMBL
-  mappedgenes = mappedkeys(db)
-  mapping = unlist(as.list(db[mappedgenes]))
-  
-  hits = as.character(hits)
-  universe = as.character(universe)
-  
-  hits_missing = hits[which(!hits %in% mapping)]
-  universe_missing = universe[which(!universe %in% mapping)]
-  
-  if(length(universe)>0 & warn_missing){
-    warning("Some genes do not map to Entrez identifiers")
-  }
-  
-  hits_sub = hits[which(hits %in% mapping)]
-  universe_sub = universe[which(universe %in% mapping)]
-  
-  hits_entrez = names(mapping)[match(hits_sub, mapping)]
-  universe_entrez = names(mapping)[match(universe_sub, mapping)]
- 
-  out = goana(de = hits_entrez,
-              universe = universe_entrez,
-              species = "Mm")
-  
-  out = out[order(out$P.DE),]
-  
-  return(list(result = out,
-              excluded = list(hits = hits_missing,
-                              universe = universe_missing)))
-   
+  # put together
+  CTs = names(markers)
+  markers = lapply(1:length(CTs), function(i){
+    current.markers = as.data.frame(markers[[i]])
+    current.markers = current.markers[!is.na(current.markers$FDR) & current.markers$FDR < FDR.thresh , ]
+    if (nrow(current.markers) > 0){
+      out = data.frame( celltype = CTs[i], gene = rownames(current.markers))
+      return(out)
+    }
+  })
+  markers = do.call(rbind,markers)
+  return(markers)
 }
+
+
+
+
+# get genes that are highly correlated with the chosen one
+
+getCorrelatedGenes = function(corr.thresh , counts , gene){
+  counts.rest = counts[, !colnames(counts) == gene]
+  counts.gene = counts[, colnames(counts) == gene]
+  corr.genes = lapply(1:ncol(counts.rest) , function(i){
+    out = data.frame(gene = colnames(counts.rest)[i] , corr = cor(counts.gene , counts.rest[,i] , method = "pearson"))
+    return(out)
+  })
+  corr.genes = do.call(rbind , corr.genes)
+  corr.genes = corr.genes[corr.genes$corr > corr.thresh , ]
+  return( corr.genes$gene) 
+}
+
+
 
 #MAPPING FUNCTIONS
 
@@ -278,4 +114,103 @@ load_embryo_8.5 = function(dir = "local"){
   assign("sce", sce, envir = .GlobalEnv)
   assign("meta", meta, envir = .GlobalEnv)
   invisible(0)
+}
+
+
+getSegmentationVerticesDF = function(DF,
+                                     xname = "segmentation_vertices_x_global",
+                                     yname = "segmentation_vertices_y_global",
+                                     othercols = c("uniqueID","z")) {
+  # DF is a DataFrame object
+  # othercols is the others to keep
+  
+  long_x = unlist(DF[,xname])
+  long_y = unlist(DF[,yname])
+  
+  if (length(long_x) != length(long_y)) stop("x and y need to be same length")
+  
+  long_xy = data.frame(
+    long_x,
+    long_y
+  )
+  colnames(long_xy) <- c(xname, yname)
+  
+  long_DF = cbind(
+    rep(DF[,othercols], times = unlist(lapply(DF[,xname], length))),
+    long_xy
+  )
+  
+  return(as.data.frame(long_DF))
+}
+
+add_scalebar = function(dist_um = 250, x = 2.75, y = -3.20, ...) {
+  # this is a quantity to add to an existing ggplot
+  
+  # dist_um is the distance for the scalebar in um, default 250um
+  # x and y are the coordinates to place the scalebar
+  # usage: to add to a ggplot object like "g + add_scalebar()"
+  
+  # useful optional argument is box.col = "white"
+  
+  # need to make sure that ggplot of interest doesn't have group aesthetic
+  # defined in the ggplot, but in the geom_polygon itself
+  
+  require(ggsn)
+  add = ggsn::scalebar(location = "bottomright",
+                       dist = dist_um/227.74, dist_unit = "units", 
+                       transform = FALSE,
+                       x.min = x, x.max = x,
+                       y.min = y, y.max = y,
+                       height = 0.2, 
+                       box.fill = "black",
+                       st.size = 0,
+                       inherit.aes = FALSE,
+                       ...)
+  return(add)
+}
+
+# function to rotate the embryos
+rotateDF = function(DF, 
+                    xname = "segmentation_vertices_x_global_affine", 
+                    yname = "segmentation_vertices_y_global_affine", 
+                    ang = 0) {
+  # ang is a numeric vector named three values corresponding to embryo1, embryo2, and embryo3
+  
+  ang_long = ang[as.character(DF$embryo)]
+  ang_rad = ang_long/180
+  
+  x = DF[,xname]
+  y = DF[,yname]
+  
+  x_turn = x*cos(ang_rad) - y*sin(ang_rad)
+  y_turn = x*sin(ang_rad) + y*cos(ang_rad)
+  
+  # reset the columns and then return the DF
+  
+  DF[,xname] <- x_turn
+  DF[,yname] <- y_turn
+  
+  return(DF)
+  
+}
+
+
+get_suitable4seq_genes = function(dir = "local", system , mean.thresh , max.thresh){
+  if (dir == "cluster"){
+    root.dir = "/nfs/research1/marioni/alsu/geneBasis"
+  } 
+  else if (dir == "local"){
+    root.dir = "/Users/alsu/Develop/geneBasis/"
+  }
+  
+  if (system == "mouse_E8.5") {
+    stat = read.table(paste0(root.dir , "data/expression_stat_perGene/stat__mouse_E8_5.tab"), header = T, sep = "\t")
+  }
+  else if (system == "spleen") {
+    stat = read.table(paste0(root.dir , "data/expression_stat_perGene/stat__spleen.tab"), header = T, sep = "\t")
+  }
+    
+  idx = stat$mean.counts < mean.thresh & stat$max.counts < max.thresh
+  print(paste0(sum(idx) , " genes are kept for the analysis"))
+  return(stat$gene[idx])
 }
