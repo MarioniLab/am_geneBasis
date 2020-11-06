@@ -203,16 +203,7 @@ get_suitable4seq_genes = function(dir = "local", system , mean.thresh , max.thre
     root.dir = "/Users/alsu/Develop/geneBasis/"
   }
   
-  
-  if (system == "mouse_E8.5") {
-    stat = read.table(paste0(root.dir , "data/expression_stat_perGene/stat__mouse_E8_5.tab"), header = T, sep = "\t")
-  }
-  else if (system == "spleen") {
-    stat = read.table(paste0(root.dir , "data/expression_stat_perGene/stat__spleen.tab"), header = T, sep = "\t")
-  }
-  else if (system == "spleen") {
-    stat = read.table(paste0(root.dir , "data/expression_stat_perGene/stat__spleen.tab"), header = T, sep = "\t")
-  }
+  stat = read.table(paste0(root.dir , "data/expression_stat_perGene/stat__" , system , ".tab"), header = T, sep = "\t")
     
   idx = stat$mean.counts < mean.thresh & stat$max.counts < max.thresh
   print(paste0(sum(idx) , " genes are kept for the analysis"))
