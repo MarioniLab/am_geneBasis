@@ -197,7 +197,7 @@ rotateDF = function(DF,
 
 get_suitable4seq_genes = function(dir = "local", system , mean.thresh , max.thresh){
   if (dir == "cluster"){
-    root.dir = "/nfs/research1/marioni/alsu/geneBasis"
+    root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
   } 
   else if (dir == "local"){
     root.dir = "/Users/alsu/Develop/geneBasis/"
