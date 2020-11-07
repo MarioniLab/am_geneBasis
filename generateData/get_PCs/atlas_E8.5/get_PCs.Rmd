@@ -53,7 +53,7 @@ sce = sce[, sce$celltype %in% CTs.2keep]
 
 
 # get suitable for seq genes
-genes.4seq = get_suitable4seq_genes(dir = "cluster", system = "mouse_E8_5" , mean.thresh = 7, max.thresh = 350)
+genes.4seq = get_suitable4seq_genes(dir = "cluster", system = "atlas_E8.5" , mean.thresh = 7, max.thresh = 350)
 
 get_PCs = function(genes , sce){
   current.sce = sce[rownames(sce) %in% genes, ]
