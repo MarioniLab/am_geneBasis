@@ -6,8 +6,8 @@ output:
     number_sections: yes
     toc: yes  
 ---
+# Atlas - E8.5
 
-# Spleen
 
 ```{r load, message = FALSE}
 # load libraries we are going to use
@@ -44,6 +44,13 @@ reference.bool = sapply(1:ncol(sce), function(i){
 })
 sce$reference = reference.bool
 
+
+# delete v rare CTs
+tab = table(sce$celltype[sce$reference])
+CTs.2keep = names(tab)[tab >= 5]
+sce = sce[, sce$celltype %in% CTs.2keep] 
+
+
 # get suitable for seq genes
 genes.4seq = get_suitable4seq_genes(dir = "cluster", system = "spleen" , mean.thresh = 7, max.thresh = 350)
 
@@ -74,64 +81,33 @@ saveRDS(mbpca , file =  paste0( save.dir, "PC_HVGs.Rds"))
 
 # Markers 
 
-## All samples
-
-### Binomial test
+## Binomial test
 
 ```{r pc-allSamples-binom, message = FALSE}
 
-markers = getMarkers(sce, pval.type = "some" , test = "binom", FDR.thresh = .01)
+markers = read.table(paste0(root.dir , "data/markers/spleen/markers__binom.tab") , header = T, sep = "\t")
 markers = unique(markers$gene)
 markers = intersect(markers , genes.4seq)
 mbpca = get_PCs(markers, sce)
-saveRDS(mbpca , file =  paste0( save.dir, "PC_allSamples_Binom.Rds"))
-
-
+saveRDS(mbpca , file =  paste0( save.dir, "PC_markers_Binom.Rds"))
 
 ```
 
-### T-test
+## T-test
 
 ```{r pc-allSamples-t, message = FALSE}
 
-markers = getMarkers(sce, pval.type = "some" , test = "t", FDR.thresh = .01)
+
+markers = read.table(paste0(root.dir , "data/markers/spleen/markers__t.tab") , header = T, sep = "\t")
 markers = unique(markers$gene)
 markers = intersect(markers , genes.4seq)
 mbpca = get_PCs(markers, sce)
-saveRDS(mbpca , file =  paste0( save.dir, "PC_allSamples_Ttest.Rds"))
-
+saveRDS(mbpca , file =  paste0( save.dir, "PC_markers_Ttest.Rds"))
 
 
 ```
 
 
-## Reference sample
-
-### Binomial test
-
-```{r pc-refSample-binom, message = FALSE}
-
-markers = getMarkers(sce[,sce$reference], pval.type = "some" , test = "binom", FDR.thresh = .01)
-markers = unique(markers$gene)
-markers = intersect(markers , genes.4seq)
-mbpca = get_PCs(markers, sce)
-saveRDS(mbpca , file =  paste0( save.dir, "PC_refSample_Binom.Rds"))
-
-
-```
-
-### T-test
-
-```{r pc-refSample-t, message = FALSE}
-
-markers = getMarkers(sce[,sce$reference], pval.type = "some" , test = "t", FDR.thresh = .01)
-markers = unique(markers$gene)
-markers = intersect(markers , genes.4seq)
-mbpca = get_PCs(markers, sce)
-saveRDS(mbpca , file =  paste0( save.dir, "PC_refSample_Ttest.Rds"))
-
-
-```
 
 
 #Session Info
