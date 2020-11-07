@@ -36,7 +36,7 @@ sce = readRDS(paste0( root.dir, "data/scRNA_datasets/kidney/sce_kidney.Rds"))
 
 # assign reference sample
 reference.bool = sapply(1:ncol(sce), function(i){
-  if (sce$sample[i] == "Experiment set 1"){
+  if (sce$sample[i] == "Teen Tx"){
     return(T)
   } else {
     return(F)
