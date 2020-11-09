@@ -102,7 +102,7 @@ get_mapping = function(genes , sce ){
 nPC.grid = seq(10,180,10) 
 genes.dirs = paste0("binom_", c("scaled_unweighted",  "scaled_weighted" , "unscaled_unweighted",  "unscaled_weighted"))
 
-mappings = lapply(genes.dirs , function(genes.dir){
+mappings.all = lapply(genes.dirs , function(genes.dir){
   genes = read.table(paste0(root.dir , "data/gene_ranking/atlas_E8.5/" , genes.dir, ".tab"), header = T , sep = "\t")
   mappings = lapply(nPC.grid , function(nPC){
     current.genes = genes$gene[1:nPC]
@@ -124,7 +124,7 @@ mappings = lapply(genes.dirs , function(genes.dir){
 nPC.grid = seq(10,180,10) 
 genes.dirs = paste0("t_", c("scaled_unweighted",  "scaled_weighted" , "unscaled_unweighted",  "unscaled_weighted"))
 
-mappings = lapply(genes.dirs , function(genes.dir){
+mappings.all = lapply(genes.dirs , function(genes.dir){
   genes = read.table(paste0(root.dir , "data/gene_ranking/atlas_E8.5/" , genes.dir, ".tab"), header = T , sep = "\t")
   mappings = lapply(nPC.grid , function(nPC){
     current.genes = genes$gene[1:nPC]
