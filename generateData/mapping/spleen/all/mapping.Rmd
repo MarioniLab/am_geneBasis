@@ -32,7 +32,6 @@ set.seed(32)
 root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
 source(paste0(root.dir, "am_geneBasis/core_functions.R"))
 sce = readRDS(paste0( root.dir, "data/scRNA_datasets/spleen/sce_spleen.Rds"))
-rownames(sce) = rowData(sce)[,1]
 
 reference.bool = sapply(1:ncol(sce), function(i){
   if (sce$sample[i] == 4){
