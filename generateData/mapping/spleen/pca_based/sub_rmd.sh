@@ -5,7 +5,7 @@ err_folder=${my_folder}/clust_err/geneBasis
 
 #SELECT SCRIPT
 #If you change this, you MUST update the wrapper's grep
-script_name=map_emb_pca
+script_name=map_spl_pca
 
 #CHOOSE PARAMETERS
 #RAM in megabytes
