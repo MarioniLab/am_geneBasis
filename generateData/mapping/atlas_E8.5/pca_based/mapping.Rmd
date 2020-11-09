@@ -1,0 +1,145 @@
+---
+title: "Mapping to the atlas"
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+# Loading dependancies
+
+
+```{r load, message = FALSE}
+# load libraries we are going to use
+
+library(Matrix)
+library(scran)
+library(scater)
+library(batchelor)
+library(knitr)
+library(reshape2)
+library(edgeR)
+library(ggplot2)
+library(BiocSingular)
+library(BiocParallel)
+library(BiocNeighbors)
+library(SingleCellExperiment)
+library(dplyr)
+set.seed(32)
+
+
+#root.dir = "/Users/alsu/Develop/geneBasis/"
+root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
+save.dir = paste0(root.dir, "data/mappings/atlas_E8.5/")
+source(paste0(root.dir, "am_geneBasis/core_functions.R"))
+sce = readRDS(paste0( root.dir, "data/scRNA_datasets/atlas_E8.5/sce_atlas_E8.5.Rds"))
+rownames(sce) = rowData(sce)[,1]
+
+reference.bool = sapply(1:ncol(sce), function(i){
+  if (sce$sample[i] == 29){
+    return(T)
+  } else {
+    return(F)
+  }
+})
+sce$reference = reference.bool
+
+# delete v rare CTs
+tab = table(sce$celltype[sce$reference])
+CTs.2keep = names(tab)[tab >= 5]
+sce = sce[, sce$celltype %in% CTs.2keep] 
+meta = as.data.frame(colData(sce))
+
+# get suitable for seq genes
+genes.4seq = get_suitable4seq_genes(dir = "cluster", system = "atlas_E8.5" , mean.thresh = 7, max.thresh = 350)
+
+
+# function
+get_mapping = function(genes , sce ){
+  current.sce = sce[rownames(sce) %in% genes , ]
+  current.counts = as.matrix ( cosineNorm( logcounts(current.sce)))
+  colsums.current.counts = colSums(current.counts)
+  cells.0genes = names(colsums.current.counts)[colsums.current.counts == 0]
+  
+  batchFactor = factor(current.sce$sample)
+  current.counts = as.matrix ( cosineNorm( logcounts(current.sce)))
+  
+  mbpca = multiBatchPCA(current.counts, batch = batchFactor, d = 50)
+  out = do.call(reducedMNN, mbpca)
+  joint.pca = out$corrected
+  
+  reference.cells = colnames(current.sce[,current.sce$reference == T])
+  query.cells = colnames(current.sce[, current.sce$reference == F])
+  current.knns = queryKNN( joint.pca[reference.cells ,], joint.pca[query.cells ,], k = 10,
+                           get.index = TRUE, get.distance = FALSE)
+  cells.mapped = t( apply(current.knns$index, 1, function(x) reference.cells[x]) )
+  cells.mapped = as.data.frame( cells.mapped) 
+  for (i in 1:ncol(cells.mapped)){
+    cells.mapped[, i] = as.character(cells.mapped[, i])
+  }
+  
+  celltypes = t(apply(cells.mapped, 1, function(x) meta$celltype[match(x, meta$cell)]))
+  celltype.mapped = apply(celltypes, 1, function(x) getmode(x, 1:length(x)))
+  mapping = data.frame(cell = query.cells , celltype.mapped = celltype.mapped , n.genes = length(genes))
+  mapping$celltype.mapped = as.character(mapping$celltype.mapped)
+  idx = which(mapping$cell %in% cells.0genes)
+  mapping$celltype.mapped[idx] = "Unmapped" 
+  
+  mapping = cbind(mapping , cells.mapped )
+  return(mapping)
+}
+
+
+```
+
+# Mapping
+
+## Binom
+
+```{r mapping-binom , message = FALSE}
+
+
+nPC.grid = seq(10,180,10) 
+genes.dirs = paste0("binom_", c("scaled_unweighted",  "scaled_weighted" , "unscaled_unweighted",  "unscaled_weighted"))
+
+mappings = lapply(genes.dirs , function(genes.dir){
+  genes = read.table(paste0(root.dir , "data/gene_ranking/atlas_E8.5/" , genes.dir, ".tab"), header = T , sep = "\t")
+  mappings = lapply(nPC.grid , function(nPC){
+    current.genes = genes$gene[1:nPC]
+    current.mapping = get_mapping(current.genes , sce)
+    return(current.mapping)
+  })
+  names(mappings) = paste0("nGenes_" , nPC.grid)
+  saveRDS(mappings , file = paste0(save.dir, genes.dir, ".Rds"))
+})
+
+
+```
+
+## T
+
+```{r mapping-t , message = FALSE}
+
+
+nPC.grid = seq(10,180,10) 
+genes.dirs = paste0("t_", c("scaled_unweighted",  "scaled_weighted" , "unscaled_unweighted",  "unscaled_weighted"))
+
+mappings = lapply(genes.dirs , function(genes.dir){
+  genes = read.table(paste0(root.dir , "data/gene_ranking/atlas_E8.5/" , genes.dir, ".tab"), header = T , sep = "\t")
+  mappings = lapply(nPC.grid , function(nPC){
+    current.genes = genes$gene[1:nPC]
+    current.mapping = get_mapping(current.genes , sce)
+    return(current.mapping)
+  })
+  names(mappings) = paste0("nGenes_" , nPC.grid)
+  saveRDS(mappings , file = paste0(save.dir, genes.dir, ".Rds"))
+})
+
+
+```
+
+#Session Info
+
+```{r sessinf}
+sessionInfo()
+```
