@@ -28,10 +28,12 @@ library(dplyr)
 set.seed(32)
 
 
+system = "spleen"
 #root.dir = "/Users/alsu/Develop/geneBasis/"
 root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
+save.dir = paste0(root.dir, "data/mappings/" , system , "/")
 source(paste0(root.dir, "am_geneBasis/core_functions.R"))
-sce = readRDS(paste0( root.dir, "data/scRNA_datasets/spleen/sce_spleen.Rds"))
+sce = readRDS(paste0( root.dir, "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
 
 reference.bool = sapply(1:ncol(sce), function(i){
   if (sce$sample[i] == 4){
@@ -49,7 +51,7 @@ sce = sce[, sce$celltype %in% CTs.2keep]
 meta = as.data.frame(colData(sce))
 
 # get suitable for seq genes
-genes.4seq = get_suitable4seq_genes(dir = "cluster", system = "spleen" , mean.thresh = 7, max.thresh = 350)
+genes.4seq = get_suitable4seq_genes(dir = "cluster", system = system , mean.thresh = 7, max.thresh = 350)
 
 
 # function
@@ -95,7 +97,7 @@ markers = unique(markers$gene)
 markers = intersect(markers , genes.4seq)
 
 mapping = get_mapping(markers , sce)
-saveRDS(mapping , file = paste0(root.dir, "data/mappings/spleen/binom_all.Rds"))
+saveRDS(mapping , file = paste0(save.dir, "binom_all.Rds"))
 
 
 ```
@@ -110,7 +112,7 @@ markers = unique(markers$gene)
 markers = intersect(markers , genes.4seq)
 
 mapping = get_mapping(markers , sce)
-saveRDS(mapping , file = paste0(root.dir, "data/mappings/spleen/t_all.Rds"))
+saveRDS(mapping , file = paste0(save.dir, "t_all.Rds"))
 
 
 ```
