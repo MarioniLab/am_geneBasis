@@ -70,11 +70,11 @@ get_PCs = function(genes , sce){
 
 ```{r pc-HVGs, message = FALSE}
 
-
-HVGs = getHVGs(sce , dir = "cluster")
-HVGs = intersect(HVGs , genes.4seq)
-mbpca = get_PCs(HVGs, sce)
-saveRDS(mbpca , file =  paste0( save.dir, "PC_HVGs.Rds"))
+# 
+# HVGs = getHVGs(sce , dir = "cluster")
+# HVGs = intersect(HVGs , genes.4seq)
+# mbpca = get_PCs(HVGs, sce)
+# saveRDS(mbpca , file =  paste0( save.dir, "PC_HVGs.Rds"))
 
 
 ```
@@ -84,25 +84,25 @@ saveRDS(mbpca , file =  paste0( save.dir, "PC_HVGs.Rds"))
 ## Binomial test
 
 ```{r pc-all-binom, message = FALSE}
-
-markers = read.table(paste0(root.dir , "data/markers/spleen/markers__binom.tab") , header = T, sep = "\t")
-markers = unique(markers$gene)
-markers = intersect(markers , genes.4seq)
-mbpca = get_PCs(markers, sce)
-saveRDS(mbpca , file =  paste0( save.dir, "PC_binom_all.Rds"))
+# 
+# markers = read.table(paste0(root.dir , "data/markers/spleen/markers__binom.tab") , header = T, sep = "\t")
+# markers = unique(markers$gene)
+# markers = intersect(markers , genes.4seq)
+# mbpca = get_PCs(markers, sce)
+# saveRDS(mbpca , file =  paste0( save.dir, "PC_binom_all.Rds"))
 
 ```
 
 ## T-test
 
 ```{r pc-all-t, message = FALSE}
-
-
-markers = read.table(paste0(root.dir , "data/markers/spleen/markers__t.tab") , header = T, sep = "\t")
-markers = unique(markers$gene)
-markers = intersect(markers , genes.4seq)
-mbpca = get_PCs(markers, sce)
-saveRDS(mbpca , file =  paste0( save.dir, "PC_t_all.Rds"))
+# 
+# 
+# markers = read.table(paste0(root.dir , "data/markers/spleen/markers__t.tab") , header = T, sep = "\t")
+# markers = unique(markers$gene)
+# markers = intersect(markers , genes.4seq)
+# mbpca = get_PCs(markers, sce)
+# saveRDS(mbpca , file =  paste0( save.dir, "PC_t_all.Rds"))
 
 
 ```
@@ -113,20 +113,20 @@ saveRDS(mbpca , file =  paste0( save.dir, "PC_t_all.Rds"))
 
 ```{r pc-pcaBased-binom, message = FALSE}
 
-
-nPC.grid = seq(10,180,10) 
-genes.dirs = paste0("binom_", c("scaled_unweighted",  "scaled_weighted" , "unscaled_unweighted",  "unscaled_weighted"))
-
-pcs.all = lapply(genes.dirs , function(genes.dir){
-  genes = read.table(paste0(root.dir , "data/gene_ranking/spleen/" , genes.dir, ".tab"), header = T , sep = "\t")
-  pcs = lapply(nPC.grid , function(nPC){
-    current.genes = genes$gene[1:nPC]
-    current.pcs = get_PCs(current.genes , sce)
-    return(current.pcs)
-  })
-  names(pcs) = paste0("nGenes_" , nPC.grid)
-  saveRDS(pcs , file = paste0(save.dir, genes.dir, ".Rds"))
-})
+# 
+# nPC.grid = seq(10,180,10) 
+# genes.dirs = paste0("binom_", c("scaled_unweighted",  "scaled_weighted" , "unscaled_unweighted",  "unscaled_weighted"))
+# 
+# pcs.all = lapply(genes.dirs , function(genes.dir){
+#   genes = read.table(paste0(root.dir , "data/gene_ranking/spleen/" , genes.dir, ".tab"), header = T , sep = "\t")
+#   pcs = lapply(nPC.grid , function(nPC){
+#     current.genes = genes$gene[1:nPC]
+#     current.pcs = get_PCs(current.genes , sce)
+#     return(current.pcs)
+#   })
+#   names(pcs) = paste0("nGenes_" , nPC.grid)
+#   saveRDS(pcs , file = paste0(save.dir, genes.dir, ".Rds"))
+# })
 
 ```
 
@@ -134,25 +134,70 @@ pcs.all = lapply(genes.dirs , function(genes.dir){
 
 ```{r pc-pcaBased-t, message = FALSE}
 
-
-nPC.grid = seq(10,180,10) 
-genes.dirs = paste0("t_", c("scaled_unweighted",  "scaled_weighted" , "unscaled_unweighted",  "unscaled_weighted"))
-
-pcs.all = lapply(genes.dirs , function(genes.dir){
-  genes = read.table(paste0(root.dir , "data/gene_ranking/spleen/" , genes.dir, ".tab"), header = T , sep = "\t")
-  pcs = lapply(nPC.grid , function(nPC){
-    current.genes = genes$gene[1:nPC]
-    current.pcs = get_PCs(current.genes , sce)
-    return(current.pcs)
-  })
-  names(pcs) = paste0("nGenes_" , nPC.grid)
-  saveRDS(pcs , file = paste0(save.dir, genes.dir, ".Rds"))
-})
+# 
+# nPC.grid = seq(10,180,10) 
+# genes.dirs = paste0("t_", c("scaled_unweighted",  "scaled_weighted" , "unscaled_unweighted",  "unscaled_weighted"))
+# 
+# pcs.all = lapply(genes.dirs , function(genes.dir){
+#   genes = read.table(paste0(root.dir , "data/gene_ranking/spleen/" , genes.dir, ".tab"), header = T , sep = "\t")
+#   pcs = lapply(nPC.grid , function(nPC){
+#     current.genes = genes$gene[1:nPC]
+#     current.pcs = get_PCs(current.genes , sce)
+#     return(current.pcs)
+#   })
+#   names(pcs) = paste0("nGenes_" , nPC.grid)
+#   saveRDS(pcs , file = paste0(save.dir, genes.dir, ".Rds"))
+# })
 
 
 ```
 
 
+# scGene-Fit
+
+## Binom
+
+```{r pc-scgenefit-binom, message = FALSE}
+
+
+nPC.grid = seq(10,180,10)
+genes.dir = paste0(root.dir , "data/gene_ranking/spleen/binom_pairwise_centers/")
+
+
+pcs = lapply(nPC.grid , function(nPC){
+  current.genes = read.table(paste0(genes.dir , "num_markers__" , nPC, ".tab"), header = F , sep = "\t")
+  current.genes = current.genes$V1
+  current.pcs = get_PCs(current.genes , sce)
+  return(current.pcs)
+  saveRDS(pcs , file = paste0(save.dir, genes.dir, ".Rds"))
+})
+names(pcs) = paste0("nGenes_" , nPC.grid)
+saveRDS(pcs , file = paste0(save.dir, "binom_pairwise_centers", ".Rds"))
+
+
+```
+
+## T
+
+```{r pc-scgenefit-t, message = FALSE}
+
+
+nPC.grid = seq(10,180,10)
+genes.dir = paste0(root.dir , "data/gene_ranking/spleen/t_pairwise_centers/")
+
+
+pcs = lapply(nPC.grid , function(nPC){
+  current.genes = read.table(paste0(genes.dir , "num_markers__" , nPC, ".tab"), header = F , sep = "\t")
+  current.genes = current.genes$V1
+  current.pcs = get_PCs(current.genes , sce)
+  return(current.pcs)
+  saveRDS(pcs , file = paste0(save.dir, genes.dir, ".Rds"))
+})
+names(pcs) = paste0("nGenes_" , nPC.grid)
+saveRDS(pcs , file = paste0(save.dir, "t_pairwise_centers", ".Rds"))
+
+
+```
 
 #Session Info
 
