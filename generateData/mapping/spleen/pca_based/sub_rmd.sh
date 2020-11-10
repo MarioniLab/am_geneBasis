@@ -15,7 +15,7 @@ r_command="rusage[mem=${memory}]"
 nproc=1
 
 smg=/nfs/research1/marioni/alsu/singularity/R1.simg
-script=/nfs/research1/marioni/alsu/geneBasis/am_geneBasis/generateData/mapping/atlas_E8.5/pca_based/run_rmd.R
+script=/nfs/research1/marioni/alsu/geneBasis/am_geneBasis/generateData/mapping/spleen/pca_based/run_rmd.R
 
 bsub -q research-rh74 -e ${err_folder}/${script_name} \
 -o ${out_folder}/${script_name} \
