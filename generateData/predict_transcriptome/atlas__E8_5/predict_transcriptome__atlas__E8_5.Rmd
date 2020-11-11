@@ -32,8 +32,8 @@ register(mcparam)
 set.seed(32)
 
 
-#root.dir = "/Users/alsu/Develop/geneBasis/"
-root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
+root.dir = "/Users/alsu/Develop/geneBasis/"
+#root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
 source(paste0(root.dir, "am_geneBasis/core_functions.R"))
 sce = readRDS(paste0( root.dir, "data/atlas__8_5/sce_atlas_8.5.Rds"))
 
@@ -148,8 +148,6 @@ getCorrTranscriptome = function(mapping){
     return(stat)
   }
 }
-
-
 
 
 stat.corr.weighted_unscaled__twoRounds = getCorrTranscriptome(mappings.weighted_unscaled__twoRounds)
