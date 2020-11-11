@@ -141,12 +141,12 @@ saveRDS(mappings , file = paste0(save.dir, "t_pairwise_centers", ".Rds"))
 
 ```{r rf-binom , message = FALSE}
 
-
-
-current.genes = read.table(paste0(root.dir , "data/gene_ranking/spleen/binom_RF.tab") , header = T , sep = "\t")
-current.genes = unique(current.genes$gene)
-mappings = get_mapping(current.genes , sce)
-saveRDS(mappings , file = paste0(save.dir, "binom_RF", ".Rds"))
+# 
+# 
+# current.genes = read.table(paste0(root.dir , "data/gene_ranking/spleen/binom_RF.tab") , header = T , sep = "\t")
+# current.genes = unique(current.genes$gene)
+# mappings = get_mapping(current.genes , sce)
+# saveRDS(mappings , file = paste0(save.dir, "binom_RF", ".Rds"))
 
 
 ```
@@ -154,12 +154,12 @@ saveRDS(mappings , file = paste0(save.dir, "binom_RF", ".Rds"))
 ## T
 
 ```{r rf-t , message = FALSE}
-
-
-current.genes = read.table(paste0(root.dir , "data/gene_ranking/spleen/t_RF.tab") , header = T , sep = "\t")
-current.genes = unique(current.genes$gene)
-mappings = get_mapping(current.genes , sce)
-saveRDS(mappings , file = paste0(save.dir, "t_RF", ".Rds"))
+# 
+# 
+# current.genes = read.table(paste0(root.dir , "data/gene_ranking/spleen/t_RF.tab") , header = T , sep = "\t")
+# current.genes = unique(current.genes$gene)
+# mappings = get_mapping(current.genes , sce)
+# saveRDS(mappings , file = paste0(save.dir, "t_RF", ".Rds"))
 
 ```
 
