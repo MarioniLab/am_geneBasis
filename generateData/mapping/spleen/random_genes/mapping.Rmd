@@ -99,7 +99,7 @@ get_mapping = function(genes , sce ){
 
 
 # load markers
-markers = read.table(paste0(root.dir , "data/markers/atlas_E8.5/markers__binom.tab") , header = T, sep = "\t")
+markers = read.table(paste0(root.dir , "data/markers/" , system , "/markers__binom.tab") , header = T, sep = "\t")
 markers = unique(markers$gene)
 markers = intersect(markers , genes.4seq)
 
@@ -125,7 +125,7 @@ mappings.all = lapply(1:K , function(i){
 
 
 # load markers
-markers = read.table(paste0(root.dir , "data/markers/atlas_E8.5/markers__t.tab") , header = T, sep = "\t")
+markers = read.table(paste0(root.dir , "data/markers/" , system , "/markers__t.tab") , header = T, sep = "\t")
 markers = unique(markers$gene)
 markers = intersect(markers , genes.4seq)
 
