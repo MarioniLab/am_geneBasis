@@ -64,7 +64,7 @@ markers.t = intersect(markers.t , genes.4seq)
 
 # read mappings
 mappings.dir = paste0(root.dir , "data/mappings/" , system , "/")
-types = c("t_unscaled_unweighted" , "t_unscaled_weighted" , "t_pairwise_centers" , "t_all" , "t_rand_1" , "t_rand_2" , "t_rand_3" , "t_rand_4" , "t_rand_5")
+types = c("t_rand_1" , "t_rand_2" , "t_rand_3")
 
 mappings = lapply(types , function(type){
   current.mapping = readRDS(paste0(mappings.dir , type , ".Rds"))
