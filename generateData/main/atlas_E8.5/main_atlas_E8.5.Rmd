@@ -11,7 +11,8 @@ output:
 ```{r load, message = FALSE}
 
 system = "atlas_E8.5"
-root.dir = "/Users/alsu/Develop/geneBasis/"
+#root.dir = "/Users/alsu/Develop/geneBasis/"
+root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
 save.dir = paste0(root.dir , "data/main_analysis/" , system , "/")
 source(paste0(root.dir, "am_geneBasis/functions/1_get_markers.R"))
 source(paste0(root.dir, "am_geneBasis/functions/2_gene_ranking.R"))
