@@ -41,7 +41,7 @@ sce = sce[rownames(sce) %in% markers$markers , ]
 
 sce = filter_veryRareCelltypes(sce)
 loadings = get_loadings(sce, nPC = 100)
-saveRDS(markers , file = paste0(save.dir, "loadings_t.Rds"))
+saveRDS(loadings , file = paste0(save.dir, "loadings_t.Rds"))
 
 gene.stat = rank_genes(loadings)  
 saveRDS(gene.stat , file = paste0(save.dir, "gene_ranking_t.Rds"))
@@ -69,7 +69,7 @@ mappings.all$type = "all_markers"
 mappings.all$nGenes = nrow(sce)
 
 mappings = rbind(mappings , mappings.all)
-saveRDS(gene.stat , file = paste0(save.dir, "mappings_t.Rds"))
+saveRDS(mappings , file = paste0(save.dir, "mappings_t.Rds"))
 
 
 ```
