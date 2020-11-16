@@ -1,0 +1,81 @@
+---
+title: "Generate bits for spleen."
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+# Load dependencies
+
+```{r load, message = FALSE}
+
+system = "spleen"
+root.dir = "/Users/alsu/Develop/geneBasis/"
+save.dir = paste0(root.dir , "data/main_analysis/" , system , "/")
+source(paste0(root.dir, "am_geneBasis/functions/1_get_markers.R"))
+source(paste0(root.dir, "am_geneBasis/functions/2_gene_ranking.R"))
+source(paste0(root.dir, "am_geneBasis/functions/3_mapping_functions.R"))
+sce = readRDS(paste0( root.dir, "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+
+
+```
+
+# Initial gene selection
+
+```{r gene-selection , message = FALSE}
+
+
+markers = suitable4seq_markers(sce)
+saveRDS(markers , file = paste0(save.dir, "markers_t.Rds"))
+sce = sce[rownames(sce) %in% markers$markers , ]
+
+
+```
+
+# Gene ranking
+
+```{r gene-ranking, message = FALSE}
+
+
+sce = filter_veryRareCelltypes(sce)
+loadings = get_loadings(sce, nPC = 100)
+saveRDS(markers , file = paste0(save.dir, "loadings_t.Rds"))
+
+gene.stat = rank_genes(loadings)  
+saveRDS(gene.stat , file = paste0(save.dir, "gene_ranking_t.Rds"))
+
+
+```
+
+# Get mappings
+
+```{r get-mappings, message = FALSE}
+
+
+nPC.grid = c(5, 10, 25, 50, 75 , 100)
+mappings = lapply(nPC.grid , function(nPC){
+  genes = unique(gene.stat$gene[gene.stat$nPC <= nPC])
+  current.mapping = get_mapping(genes , sce)
+  current.mapping$type = paste0("nPC_", nPC)
+  current.mapping$nGenes = length(genes)
+  return(current.mapping)
+})
+mappings = do.call(rbind , mappings)
+  
+mappings.all = get_mapping(rownames(sce) , sce)
+mappings.all$type = "all_markers"
+mappings.all$nGenes = nrow(sce)
+
+mappings = rbind(mappings , mappings.all)
+saveRDS(gene.stat , file = paste0(save.dir, "mappings_t.Rds"))
+
+
+```
+
+
+# Session Info
+
+```{r sessinf}
+sessionInfo()
+```
