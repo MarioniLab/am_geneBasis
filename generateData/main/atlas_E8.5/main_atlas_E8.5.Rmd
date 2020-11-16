@@ -10,6 +10,7 @@ output:
 
 ```{r load, message = FALSE}
 
+library(SingleCellExperiment)
 system = "atlas_E8.5"
 #root.dir = "/Users/alsu/Develop/geneBasis/"
 root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
