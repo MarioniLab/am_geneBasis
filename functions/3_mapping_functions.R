@@ -17,6 +17,8 @@ get_mapping = function(genes , sce){
   set.seed(32)
   require(BiocNeighbors)
   require(scran)
+  require(batchelor)
+  require(SingleCellExperiment)
   sce = sce[rownames(sce) %in% genes , ]
   meta = as.data.frame(colData(sce))
   batchFactor = factor(sce$sample )
