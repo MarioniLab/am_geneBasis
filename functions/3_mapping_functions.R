@@ -1,5 +1,17 @@
 # This script contains all functions needed for mapping (and plotting functions)
 
+getmode <- function(v, dist) {
+  tab = table(v)
+  #if tie, break to shortest distance
+  if(sum(tab == max(tab)) > 1){
+    tied = names(tab)[tab == max(tab)]
+    sub = dist[v %in% tied]
+    names(sub) = v[v %in% tied]
+    return(names(sub)[which.min(sub)])
+  } else {
+    return(names(tab)[which.max(tab)])
+  }
+}
 
 get_mapping = function(genes , sce){
   set.seed(32)

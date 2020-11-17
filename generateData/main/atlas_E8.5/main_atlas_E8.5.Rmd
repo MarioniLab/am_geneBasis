@@ -28,8 +28,9 @@ rownames(sce) = rowData(sce)[,1]
 ```{r gene-selection , message = FALSE}
 
 
-markers = suitable4seq_markers(sce)
-saveRDS(markers , file = paste0(save.dir, "markers_t.Rds"))
+#markers = suitable4seq_markers(sce)
+#saveRDS(markers , file = paste0(save.dir, "markers_t.Rds"))
+markers = readRDS(paste0(save.dir, "markers_t.Rds"))
 sce = sce[rownames(sce) %in% markers$markers , ]
 
 
@@ -41,12 +42,13 @@ sce = sce[rownames(sce) %in% markers$markers , ]
 
 
 sce = filter_veryRareCelltypes(sce)
-loadings = get_loadings(sce, nPC = 100)
-saveRDS(loadings , file = paste0(save.dir, "loadings_t.Rds"))
+#loadings = get_loadings(sce, nPC = 100)
+#saveRDS(loadings , file = paste0(save.dir, "loadings_t.Rds"))
+loadings = readRDS(paste0(save.dir, "loadings_t.Rds"))
 
-gene.stat = rank_genes(loadings)  
-saveRDS(gene.stat , file = paste0(save.dir, "gene_ranking_t.Rds"))
-
+#gene.stat = rank_genes(loadings)  
+#saveRDS(gene.stat , file = paste0(save.dir, "gene_ranking_t.Rds"))
+gene.stat = readRDS(paste0(save.dir, "gene_ranking_t.Rds"))
 
 ```
 
