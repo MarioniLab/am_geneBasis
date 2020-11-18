@@ -10,73 +10,110 @@ output:
 
 ```{r load, message = FALSE}
 
+
 library(SingleCellExperiment)
+library(ggplot2)
+library(ggpubr)
+
+
 system = "atlas_E8.5"
 #root.dir = "/Users/alsu/Develop/geneBasis/"
 root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
 save.dir = paste0(root.dir , "data/main_analysis/" , system , "/")
+source(paste0(root.dir, "am_geneBasis/core_functions.R"))
 source(paste0(root.dir, "am_geneBasis/functions/1_get_markers.R"))
 source(paste0(root.dir, "am_geneBasis/functions/2_gene_ranking.R"))
 source(paste0(root.dir, "am_geneBasis/functions/3_mapping_functions.R"))
+
 sce = readRDS(paste0( root.dir, "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
 rownames(sce) = rowData(sce)[,1]
+sce = filter_veryRareCelltypes(sce)
+HVGs = getHVGs(sce , dir = "cluster")
 
 ```
 
-# Initial gene selection
+# Gene selection
 
 ```{r gene-selection , message = FALSE}
 
 
-#markers = suitable4seq_markers(sce)
-#saveRDS(markers , file = paste0(save.dir, "markers_t.Rds"))
-markers = readRDS(paste0(save.dir, "markers_t.Rds"))
-sce = sce[rownames(sce) %in% markers$markers , ]
+markers = suitable4seq_markers(sce)
+current.sce = sce[rownames(sce) %in% markers$markers , ]
+loadings = get_loadings(current.sce, nPC = 100)
+gene_ranking = rank_genes(loadings)
+
+out = list(markers = markers , loadings = loadings , gene_ranking = gene_ranking)
+saveRDS(out , file = paste0(save.dir, "gene_ranking__t.Rds"))
 
 
 ```
 
-# Gene ranking
-
-```{r gene-ranking, message = FALSE}
-
-
-sce = filter_veryRareCelltypes(sce)
-#loadings = get_loadings(sce, nPC = 100)
-#saveRDS(loadings , file = paste0(save.dir, "loadings_t.Rds"))
-loadings = readRDS(paste0(save.dir, "loadings_t.Rds"))
-
-#gene.stat = rank_genes(loadings)  
-#saveRDS(gene.stat , file = paste0(save.dir, "gene_ranking_t.Rds"))
-gene.stat = readRDS(paste0(save.dir, "gene_ranking_t.Rds"))
-
-```
-
-# Get mappings
+# Mapping
 
 ```{r get-mappings, message = FALSE}
 
 
-nPC.grid = c(5, 10, 25, 50, 75 , 100)
+nPC.grid = c(5 , 10 , 25 , 50 , 75 , 100 )
 mappings = lapply(nPC.grid , function(nPC){
-  genes = unique(gene.stat$gene[gene.stat$nPC <= nPC])
+  genes = unique(gene_ranking$gene[gene_ranking$nPC <= nPC ])
   current.mapping = get_mapping(genes , sce)
   current.mapping$type = paste0("nPC_", nPC)
-  current.mapping$nGenes = length(genes)
   return(current.mapping)
 })
 mappings = do.call(rbind , mappings)
   
-mappings.all = get_mapping(rownames(sce) , sce)
-mappings.all$type = "all_markers"
-mappings.all$nGenes = nrow(sce)
+# using HVGs
+mappings.all = get_mapping(HVGs, sce)
+mappings.all$type = "all"
 
+# combine
 mappings = rbind(mappings , mappings.all)
-saveRDS(mappings , file = paste0(save.dir, "mappings_t.Rds"))
+saveRDS(mappings , file = paste0(save.dir, "mappings__t.Rds"))
 
 
 ```
 
+# PCs 
+
+```{r get-pcs, message = FALSE}
+
+
+nPC.grid = c( 5 , 10 , 25 , 50 , 75 , 100 )
+pcs = lapply(nPC.grid , function(nPC){
+  genes = unique(gene_ranking$gene[gene_ranking$nPC <= nPC ])
+  current.pcs = get_pcs(genes , sce, nPC = 50)
+  current.pcs$type = paste0("nPC_", nPC)
+  return(current.pcs)
+})
+pcs = do.call(rbind , pcs)
+
+# using HVGs
+pcs.all = get_pcs(HVGs, sce)
+pcs.all$type = "all"
+
+# save all
+pcs = rbind(pcs , pcs.all)
+saveRDS(pcs , file = paste0(save.dir, "pcs__t.Rds"))
+
+
+```
+
+# Prediction of transcriptome
+
+```{r imputing-transcriptome, message = FALSE}
+
+
+stat = lapply(unique(mappings$type) , function(type){
+  current.mapping = mappings[mappings$type == type , ]
+  current.stat = getCorrTranscriptome(current.mapping , HVGs)
+  current.stat$type = type
+  return(current.stat)
+})
+stat = do.call(rbind , stat)
+saveRDS(stat , file = paste0(save.dir, "imputationCorr__t.Rds"))
+
+
+```
 
 # Session Info
 
