@@ -49,5 +49,51 @@ get_mapping = function(genes , sce){
   return(mapping)
 }
 
+get_fraction_mapped_correctly = function(mapping){
+  tab = table(mapping$celltype , mapping$celltype.mapped) 
+  tab = sweep(tab, 1, rowSums(tab), "/" )
+  stat = lapply(rownames(stat) , function(celltype){
+    out = data.frame(celltype = celltype , frac_correctly_mapped = tab[celltype , celltype])
+  })
+  stat = do.call(rbin, stat)
+  return(stat)
+}
 
+get_mapping_robustness = function(genes, sce){
+  mapping_all = get_mapping(genes , sce)
+  stat_all = get_fraction_mapped_correctly(mapping_all)
+  colnames(stat_all) = c("celltype" , "frac_correctly_mapped.all" )
+  stat = lapply(genes , function(gene){
+    genes.2keep = setdiff(genes, gene)
+    current.mapping = get_mapping(genes.2keep , sce)
+    current.stat = get_fraction_mapped_correctly(current.mapping)
+    current.stat = merge(current.stat , stat_all , by = "celltype")
+    current.stat$frac_correctly_mapped.ratio = current.stat$frac_correctly_mapped / current.stat$frac_correctly_mapped.all
+    current.stat = current.stat[, c("celltype" , "frac_correctly_mapped.ratio")]
+    current.stat$gene = gene
+    return(current.stat)
+  })
+  stat = do.call(rbind , stat)
+  return(stat)
+}
 
+getCorrTranscriptome = function(mapping , genes){
+  current.sce = sce[rownames(sce) %in% genes , ]
+  logcounts = as.matrix(logcounts(current.sce))
+  logcounts.estimated = lapply(1:nrow(mapping), function(i){
+    cells = mapping[i , cols.cells]
+    current.logcounts = logcounts[, colnames(logcounts) %in% cells]
+    return(apply(current.logcounts , 1 , mean))
+  })
+  logcounts.estimated = do.call(cbind , logcounts.estimated)
+  colnames(logcounts.estimated) = mapping$cell
+  logcounts.real = logcounts[, colnames(logcounts) %in% mapping$cell]
+  logcounts.estimated = logcounts.estimated[, order(colnames(logcounts.estimated))]
+  logcounts.real = logcounts.real[, order(colnames(logcounts.real))]
+  stat = lapply(rownames(logcounts.real), function(gene){
+    out = data.frame(gene = gene , corr = cor(logcounts.real[gene,] , logcounts.estimated[gene,] , method = "pearson"))
+  })
+  stat = do.call(rbind, stat)
+  stat$n.genes = mapping$n.genes[1]
+  return(stat)
+}

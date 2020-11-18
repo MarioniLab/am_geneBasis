@@ -14,7 +14,6 @@ getMarkers = function(sce , pval.type = "some", test = "t", FDR.thresh = 0.01){
   require(scran)
   # get potential relevant genes
   markers <- findMarkers(sce , groups=sce$celltype, direction = "up", pval.type=pval.type, test = test, assay.type = "logcounts")
-  
   # put together
   celltypes = names(markers)
   markers = lapply(1:length(celltypes), function(i){
@@ -45,11 +44,11 @@ suitable4seq_genes = function(sce , mean.thresh = 7, max.thresh = 350){
 
 # combine all together
 suitable4seq_markers = function(sce , nCells.thresh = 5 , mean.thresh = 7, max.thresh = 350, pval.type = "some", test = "t", FDR.thresh = 0.01){
-  sce = filter_veryRareCelltypes(sce , nCells.thresh)
+  #sce = filter_veryRareCelltypes(sce , nCells.thresh)
   stat = getMarkers(sce , pval.type = "some", test , FDR.thresh = 0.01)
   markers = unique(stat$gene)
   markers = intersect(markers , suitable4seq_genes(sce , mean.thresh , max.thresh))
-  print( paste0( length(markers) , " are left for the downstream analysis (out of ", nrow(sce) , ")") )
+  print( paste0( length(markers) , " genes are selected as relevant for the downstream analysis (out of ", nrow(sce) , ")") )
   stat = stat[stat$gene %in% markers , ]
   out = list(stat = stat , markers = markers)
   return(out)
