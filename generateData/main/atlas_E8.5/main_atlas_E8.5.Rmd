@@ -95,7 +95,7 @@ pcs = lapply(nPC.grid , function(nPC){
 names(pcs) = paste0("nPC_", nPC.grid)
 
 # using HVGs
-pcs.all = get_PCs(HVGs, sce)
+pcs.all = get_PCs(HVGs, sce, nPC = 50)
 pcs.all$type = "all"
 
 # save all
