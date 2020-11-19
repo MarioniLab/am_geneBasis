@@ -91,15 +91,16 @@ pcs = lapply(nPC.grid , function(nPC){
   current.pcs$type = paste0("nPC_", nPC)
   return(current.pcs)
 })
-pcs = do.call(rbind , pcs)
+
+names(pcs) = paste0("nPC_", nPC.grid)
 
 # using HVGs
 pcs.all = get_pcs(HVGs, sce)
 pcs.all$type = "all"
 
 # save all
-pcs = rbind(pcs , pcs.all)
-saveRDS(pcs , file = paste0(save.dir, "pcs__t.Rds"))
+out = list(selection = pcs, all = pcs.all)
+saveRDS(out , file = paste0(save.dir, "pcs__t.Rds"))
 
 
 ```
