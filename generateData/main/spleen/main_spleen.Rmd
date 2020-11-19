@@ -30,27 +30,20 @@ sce = filter_veryRareCelltypes(sce)
 HVGs = getHVGs(sce , dir = "cluster")
 
 
-stat.gene_ranking = readRDS(paste0(save.dir, "gene_ranking__t.Rds"))
-markers = stat.gene_ranking$markers
-loadings = stat.gene_ranking$loadings
-gene_ranking = stat.gene_ranking$gene_ranking
-mappings = readRDS(paste0(save.dir, "mappings__t.Rds"))
-
-
 ```
 
 # Gene selection
 
 ```{r gene-selection , message = FALSE}
-# 
-# 
-# markers = suitable4seq_markers(sce)
-# current.sce = sce[rownames(sce) %in% markers$markers , ]
-# loadings = get_loadings(current.sce, nPC = 100)
-# gene_ranking = rank_genes(loadings)
-# 
-# out = list(markers = markers , loadings = loadings , gene_ranking = gene_ranking)
-# saveRDS(out , file = paste0(save.dir, "gene_ranking__t.Rds"))
+
+
+markers = suitable4seq_markers(sce)
+current.sce = sce[rownames(sce) %in% markers$markers , ]
+loadings = get_loadings(current.sce, nPC = 100)
+gene_ranking = rank_genes(loadings)
+
+out = list(markers = markers , loadings = loadings , gene_ranking = gene_ranking)
+saveRDS(out , file = paste0(save.dir, "gene_ranking__t.Rds"))
 
 
 ```
@@ -58,24 +51,24 @@ mappings = readRDS(paste0(save.dir, "mappings__t.Rds"))
 # Mapping
 
 ```{r get-mappings, message = FALSE}
-# 
-# 
-# nPC.grid = c(5 , 10 , 25 , 50 , 75 , 100 )
-# mappings = lapply(nPC.grid , function(nPC){
-#   genes = unique(gene_ranking$gene[gene_ranking$nPC <= nPC ])
-#   current.mapping = get_mapping(genes , sce)
-#   current.mapping$type = paste0("nPC_", nPC)
-#   return(current.mapping)
-# })
-# mappings = do.call(rbind , mappings)
-#   
-# # using HVGs
-# mappings.all = get_mapping(HVGs, sce)
-# mappings.all$type = "all"
-# 
-# # combine
-# mappings = rbind(mappings , mappings.all)
-# saveRDS(mappings , file = paste0(save.dir, "mappings__t.Rds"))
+
+
+nPC.grid = c(5 , 10 , 25 , 50 , 75 , 100 )
+mappings = lapply(nPC.grid , function(nPC){
+  genes = unique(gene_ranking$gene[gene_ranking$nPC <= nPC ])
+  current.mapping = get_mapping(genes , sce)
+  current.mapping$type = paste0("nPC_", nPC)
+  return(current.mapping)
+})
+mappings = do.call(rbind , mappings)
+
+# using HVGs
+mappings.all = get_mapping(HVGs, sce)
+mappings.all$type = "all"
+
+# combine
+mappings = rbind(mappings , mappings.all)
+saveRDS(mappings , file = paste0(save.dir, "mappings__t.Rds"))
 
 
 ```

@@ -22,7 +22,7 @@ get_mapping = function(genes , sce){
   sce = sce[rownames(sce) %in% genes , ]
   meta = as.data.frame(colData(sce))
   batchFactor = factor(sce$sample )
-  counts = as.matrix ( cosineNorm( logcounts(sce)) )
+  counts = as.matrix ( logcounts(sce) ) 
   
   mbpca = multiBatchPCA(counts, batch = batchFactor, d = 50)
   out = do.call(reducedMNN, mbpca)
@@ -52,10 +52,21 @@ get_mapping = function(genes , sce){
 get_fraction_mapped_correctly = function(mapping){
   tab = table(mapping$celltype , mapping$celltype.mapped) 
   tab = sweep(tab, 1, rowSums(tab), "/" )
-  stat = lapply(rownames(stat) , function(celltype){
-    out = data.frame(celltype = celltype , frac_correctly_mapped = tab[celltype , celltype])
+  tab = as.data.frame(tab)
+  colnames(tab) = c("celltype" , "celltype.mapped" , "frac")
+  
+  celltypes = as.character(unique(tab$celltype))
+  stat = lapply(celltypes, function(celltype){
+    current.tab = tab[tab$celltype == celltype , ]
+    if (celltype %in% current.tab$celltype.mapped){
+      out = data.frame(celltype = celltype , frac_correctly_mapped = current.tab$frac[current.tab$celltype.mapped == celltype])
+    }
+    else {
+      out = data.frame(celltype = celltype , frac_correctly_mapped = 0)
+    }
+    return(out)
   })
-  stat = do.call(rbin, stat)
+  stat = do.call(rbind, stat)
   return(stat)
 }
 

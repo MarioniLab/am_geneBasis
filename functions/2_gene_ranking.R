@@ -14,7 +14,7 @@ get_loadings = function(sce , nPC = nrow(sce) ){
   set.seed(32)
   require(batchelor)
   counts = as.matrix(logcounts(sce))
-  mbpca = multiBatchPCA(counts , batch = factor( sce$celltype ) , d = nPC)
+  mbpca = multiBatchPCA(counts , batch = factor( sce$sample ) , d = nPC)
   loadings = metadata(mbpca)  
   loadings = loadings$rotation
   return(loadings)
@@ -79,7 +79,7 @@ get_PCs = function(genes , sce , nPC){
   batchFactor = factor(c(as.character(current.sce$sample)))
   mbpca = multiBatchPCA(current.counts, batch = batchFactor, d = nPC)
   mbpca = do.call(rbind , mbpca)
-  mbpca = as.data.frame(mbpca)
-  mbpca = rownames_to_column(mbpca, var = "cell")
+  #mbpca = as.data.frame(mbpca)
+  #mbpca = rownames_to_column(mbpca, var = "cell")
   return(mbpca)
 }
