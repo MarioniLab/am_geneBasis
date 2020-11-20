@@ -13,10 +13,13 @@
 get_loadings = function(sce , nPC = nrow(sce) ){
   set.seed(32)
   require(batchelor)
+  require(stats)
   counts = as.matrix(logcounts(sce))
-  mbpca = multiBatchPCA(counts , batch = factor( sce$sample ) , d = nPC)
-  loadings = metadata(mbpca)  
-  loadings = loadings$rotation
+  #mbpca = multiBatchPCA(counts , batch = factor( sce$sample ) , d = nPC)
+  #loadings = metadata(mbpca)  
+  #loadings = loadings$rotation
+  pca = prcomp(t(counts) , rank. = nPC)
+  loadings = pca$rotation
   return(loadings)
 }
 

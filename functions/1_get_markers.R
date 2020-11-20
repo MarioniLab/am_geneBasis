@@ -55,4 +55,22 @@ suitable4seq_markers = function(sce , nCells.thresh = 5 , mean.thresh = 7, max.t
 }
 
 
+add_markers_posthoc = function(sce , genes , celltype.1 , celltype.2 = NULL ){
+  if (!is.null(celltype.2)){
+    current.sce = sce[, sce$celltype %in% union(celltype.1 , celltype.2)]
+  } 
+  else {
+    current.sce = sce
+  }
+  current.markers = findMarkers(current.sce, current.sce$celltype == celltype.1 , assay.type = "logcounts", direction = "up" , pval.type = "all" )
+  current.markers = as.data.frame(current.markers[[2]])
+  current.markers = current.markers[current.markers$logFC.FALSE > 0 & !rownames(current.markers) %in% genes , ]
+  current.markers = current.markers[order(current.markers$logFC.FALSE , decreasing = T),]
+  return(current.markers)
+}
 
+  
+  
+  
+  
+  

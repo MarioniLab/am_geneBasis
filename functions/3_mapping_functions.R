@@ -22,7 +22,7 @@ get_mapping = function(genes , sce){
   sce = sce[rownames(sce) %in% genes , ]
   meta = as.data.frame(colData(sce))
   batchFactor = factor(sce$sample )
-  counts = as.matrix ( logcounts(sce) ) 
+  counts = as.matrix ( cosineNorm( logcounts(sce) ) )
   
   mbpca = multiBatchPCA(counts, batch = batchFactor, d = 50)
   out = do.call(reducedMNN, mbpca)
@@ -31,7 +31,7 @@ get_mapping = function(genes , sce){
   mapping = lapply(unique(sce$sample) , function(sample){
     reference.cells = colnames(sce[,!sce$sample == sample])
     query.cells = colnames(sce[, sce$sample == sample])
-    knns = queryKNN( joint.pca[reference.cells ,], joint.pca[query.cells ,], k = 10, get.index = TRUE, get.distance = FALSE)
+    knns = queryKNN( joint.pca[reference.cells ,], joint.pca[query.cells ,], k = 5, get.index = TRUE, get.distance = FALSE)
     cells.mapped = t( apply(knns$index, 1, function(x) reference.cells[x]) )
     cells.mapped = as.data.frame( cells.mapped) 
     for (i in 1:ncol(cells.mapped)){
