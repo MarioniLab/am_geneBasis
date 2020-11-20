@@ -89,7 +89,7 @@ get_mapping_robustness = function(genes, sce){
 }
 
 getCorrTranscriptome = function(mapping , genes){
-  cols.cells = paste0("V" , c(1:10))
+  cols.cells = paste0("V" , c(1:5))
   current.sce = sce[rownames(sce) %in% genes , ]
   logcounts = as.matrix(logcounts(current.sce))
   logcounts.estimated = lapply(1:nrow(mapping), function(i){
