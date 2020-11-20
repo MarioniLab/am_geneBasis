@@ -15,11 +15,11 @@ get_loadings = function(sce , nPC = nrow(sce) ){
   require(batchelor)
   require(stats)
   counts = as.matrix(logcounts(sce))
-  #mbpca = multiBatchPCA(counts , batch = factor( sce$sample ) , d = nPC)
-  #loadings = metadata(mbpca)  
-  #loadings = loadings$rotation
-  pca = prcomp(t(counts) , rank. = nPC)
-  loadings = pca$rotation
+  mbpca = multiBatchPCA(counts , batch = factor( sce$celltype ) , d = nPC)
+  loadings = metadata(mbpca)  
+  loadings = loadings$rotation
+  #pca = prcomp(t(counts) , rank. = nPC)
+  #loadings = pca$rotation
   return(loadings)
 }
 
