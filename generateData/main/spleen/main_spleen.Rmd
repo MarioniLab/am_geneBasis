@@ -1,5 +1,5 @@
 ---
-title: "Generate bits for atlas-E8.5."
+title: "Generate relevant data for spleen."
 output:
   BiocStyle::html_document:
     code_folding: hide
@@ -12,8 +12,10 @@ output:
 
 
 library(SingleCellExperiment)
-library(ggplot2)
-library(ggpubr)
+library(batchelor)
+library(uwot)
+library(tibble)
+library(scran)
 
 
 system = "spleen"
@@ -21,182 +23,121 @@ system = "spleen"
 root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
 save.dir = paste0(root.dir , "data/main_analysis/" , system , "/")
 source(paste0(root.dir, "am_geneBasis/core_functions.R"))
-source(paste0(root.dir, "am_geneBasis/functions/1_get_markers.R"))
-source(paste0(root.dir, "am_geneBasis/functions/2_gene_ranking.R"))
-source(paste0(root.dir, "am_geneBasis/functions/3_mapping_functions.R"))
+source(paste0(root.dir, "am_geneBasis/functions/main_functions.R"))
 
 sce = readRDS(paste0( root.dir, "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
-sce = filter_veryRareCelltypes(sce)
-HVGs = getHVGs(sce , dir = "cluster")
-nPC.grid = c(5 , 10 , 25 , 50 , 75 , 100 , 150 , 200)
 
 ```
 
-# T
+# Discard highly expressed genes
 
-## Gene selection
-
-```{r gene-selection-t , message = FALSE}
+```{r discard-highly-expressed-genes, message = FALSE}
 
 
-markers = suitable4seq_markers(sce)
-current.sce = sce[rownames(sce) %in% markers$markers , ]
-loadings = get_loadings(current.sce, nPC = 200)
-gene_ranking = rank_genes(loadings)
-out = list(markers = markers , loadings = loadings , gene_ranking = gene_ranking)
-saveRDS(out , file = paste0(save.dir, "gene_ranking__t.Rds"))
+sce = get_rid_of_highly_expressed_genes(sce)
 
 
 ```
 
-## Mapping
+# Discard rare celltypes
 
-```{r get-mappings-t, message = FALSE}
+```{r discard-rare-celltypes, message = FALSE}
 
 
-mappings = lapply(nPC.grid , function(nPC){
-  genes = unique(gene_ranking$gene[gene_ranking$nPC <= nPC ])
-  current.mapping = get_mapping(genes , sce)
-  current.mapping$type = paste0("nPC_", nPC)
-  return(current.mapping)
-})
-mappings = do.call(rbind , mappings)
+rare_celltypes = detect_rare_celltypes(sce)
+saveRDS(rare_celltypes , file = paste0(save.dir, "rare_celltypes_stat.Rds"))
 
-# using HVGs
-mappings.all = get_mapping(HVGs, sce)
-mappings.all$type = "all"
-
-# combine
-mappings = rbind(mappings , mappings.all)
-saveRDS(mappings , file = paste0(save.dir, "mappings__t.Rds"))
+sce = get_rid_of_rare_celltypes(sce)
+meta = as.data.frame(colData(sce))
 
 
 ```
 
-## PCs 
+# Initial gene selection
 
-```{r get-pcs-t, message = FALSE}
+```{r initial-gene-selection, message = FALSE}
 
 
-pcs = lapply(nPC.grid , function(nPC){
-  genes = unique(gene_ranking$gene[gene_ranking$nPC <= nPC ])
-  current.pcs = get_PCs(genes , sce, nPC = 50)
-  current.pcs$type = paste0("nPC_", nPC)
-  return(current.pcs)
-})
-
-names(pcs) = paste0("nPC_", nPC.grid)
-
-# using HVGs
-pcs.all = get_PCs(HVGs, sce, nPC = 50)
-pcs.all$type = "all"
-
-# save all
-out = list(selection = pcs, all = pcs.all)
-saveRDS(out , file = paste0(save.dir, "pcs__t.Rds"))
+genes_de.stat = getMarkers( sce , test = "binom")
+saveRDS(genes_de.stat , file = paste0(save.dir, "genes_de_stat.Rds"))
+genes_de = as.character( unique( genes_de.stat$gene ) )
 
 
 ```
 
-## Prediction of transcriptome
 
-```{r imputing-transcriptome-t, message = FALSE}
+# UMAP
 
-
-stat = lapply(unique(mappings$type) , function(type){
-  current.mapping = mappings[mappings$type == type , ]
-  current.stat = getCorrTranscriptome(current.mapping , HVGs)
-  current.stat$type = type
-  return(current.stat)
-})
-stat = do.call(rbind , stat)
-saveRDS(stat , file = paste0(save.dir, "imputationCorr__t.Rds"))
+```{r umaps, message = FALSE}
 
 
-```
+sce.genes_de = sce[rownames(sce) %in% genes_de , ]
+counts.genes_de = as.matrix(logcounts(sce.genes_de))
+batchFactor = factor( c( as.character(sce.genes_de$sample) ))
+pcs.genes_de = multiBatchPCA(counts.genes_de, batch = batchFactor, d = 50)
+out = do.call(reducedMNN, pcs.genes_de)
+pcs_corrected.genes_de = out$corrected
+saveRDS(pcs_corrected.genes_de , file = paste0(save.dir, "pcs_corrected_genes_de.Rds"))
 
-# Binomial
+umap.coordinates = as.data.frame(umap(pcs_corrected.genes_de, min_dist = 0.7))
+rownames(umap.coordinates) = rownames(pcs_corrected.genes_de)
+umap.coordinates = rownames_to_column(umap.coordinates , var = "cell")
+colnames(umap.coordinates) = c("cell" , "UMAP_1" , "UMAP_2")
+meta = merge(meta , umap.coordinates , by = "cell")
+saveRDS(meta , file = paste0(save.dir, "meta_w_umaps_genes_de.Rds"))
 
-## Gene selection
-
-```{r gene-selection-binom , message = FALSE}
-
-
-markers = suitable4seq_markers(sce , test = "binom")
-current.sce = sce[rownames(sce) %in% markers$markers , ]
-loadings = get_loadings(current.sce, nPC = 200)
-gene_ranking = rank_genes(loadings)
-out = list(markers = markers , loadings = loadings , gene_ranking = gene_ranking)
-saveRDS(out , file = paste0(save.dir, "gene_ranking__binom.Rds"))
 
 
 ```
 
-## Mapping
+# Mapping
 
-```{r get-mappings-binom, message = FALSE}
+```{r mapping-de-genes, message = FALSE}
 
 
-mappings = lapply(nPC.grid , function(nPC){
-  genes = unique(gene_ranking$gene[gene_ranking$nPC <= nPC ])
-  current.mapping = get_mapping(genes , sce)
-  current.mapping$type = paste0("nPC_", nPC)
-  return(current.mapping)
-})
-mappings = do.call(rbind , mappings)
-
-# using HVGs
-mappings.all = get_mapping(HVGs, sce)
-mappings.all$type = "all"
-
-# combine
-mappings = rbind(mappings , mappings.all)
-saveRDS(mappings , file = paste0(save.dir, "mappings__binom.Rds"))
+mapping.genes_de = get_mapping(genes_de , sce)
+saveRDS(mapping.genes_de , file = paste0(save.dir, "mapping_genes_de.Rds"))
 
 
 ```
 
-## PCs 
 
-```{r get-pcs-binom, message = FALSE}
+# Loadings
+
+```{r get-loadings, message = FALSE}
 
 
-pcs = lapply(nPC.grid , function(nPC){
-  genes = unique(gene_ranking$gene[gene_ranking$nPC <= nPC ])
-  current.pcs = get_PCs(genes , sce, nPC = 50)
-  current.pcs$type = paste0("nPC_", nPC)
-  return(current.pcs)
-})
+loadings_celltype.stat = get_loadings(sce , genes_de , "celltype")
+saveRDS(loadings_celltype.stat , file = paste0(save.dir, "loadings_celltype_stat.Rds"))
+  
+loadings_none.stat = get_loadings(sce , genes_de , "none")
+saveRDS(loadings_none.stat , file = paste0(save.dir, "loadings_none_stat.Rds"))
 
-names(pcs) = paste0("nPC_", nPC.grid)
+```
 
-# using HVGs
-pcs.all = get_PCs(HVGs, sce, nPC = 50)
-pcs.all$type = "all"
+# Graph structure
 
-# save all
-out = list(selection = pcs, all = pcs.all)
-saveRDS(out , file = paste0(save.dir, "pcs__binom.Rds"))
+```{r graph-genes-de, message = FALSE}
+
+
+graph.genes_de = get_graph(genes_de , sce)
+saveRDS(graph.genes_de , file = paste0(save.dir, "graph_genes_de.Rds"))
 
 
 ```
 
-## Prediction of transcriptome
 
-```{r imputing-transcriptome-binom, message = FALSE}
+# Prediction of transcriptome
+
+```{r prediction-transcriptome-genes-de, message = FALSE}
 
 
-stat = lapply(unique(mappings$type) , function(type){
-  current.mapping = mappings[mappings$type == type , ]
-  current.stat = getCorrTranscriptome(current.mapping , HVGs)
-  current.stat$type = type
-  return(current.stat)
-})
-stat = do.call(rbind , stat)
-saveRDS(stat , file = paste0(save.dir, "imputationCorr__binom.Rds"))
+corr_transcriptome.genes_de = getCorrTranscriptome(mapping.genes_de , genes_de)
+saveRDS(corr_transcriptome.genes_de , file = paste0(save.dir, "corr_transcriptome_genes_de.Rds"))
 
 
 ```
+
 # Session Info
 
 ```{r sessinf}
