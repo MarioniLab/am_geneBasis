@@ -46,8 +46,8 @@ sce.spleen = sce.spleen[, sce.spleen$sample %in% c(2,3,4)]
 
 #sce = get_rid_of_highly_expressed_genes(sce)
 
-stat.per_ct = lapply(unique(sce$celltype), function(celltype){
-  logcounts = logcounts(sce)[, sce$celltype == celltype]
+stat.per_ct = lapply(unique(sce.spleen$celltype), function(celltype){
+  logcounts = logcounts(sce.spleen)[, sce.spleen$celltype == celltype]
   current.stat = data.frame(q50 = apply(logcounts , 1 , function(x) quantile(x, 0.5)),
                             q75 = apply(logcounts , 1 , function(x) quantile(x, 0.75)),
                             gene = rownames(logcounts))
