@@ -88,7 +88,7 @@ saveRDS(loadings_none_thresh_q50.stat , file = paste0(save.dir, "loadings_none_t
 
 # Loadings for genes with q75 = 0 in majority of celltypes
 
-```{r loadings-median-cut, message = FALSE}
+```{r loadings-q75-cut, message = FALSE}
 
 
 genes.2keep = as.character( stat$gene[stat$n_ct.higher_q75 < 0.5] )
