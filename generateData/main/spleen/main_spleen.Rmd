@@ -1,5 +1,5 @@
 ---
-title: "Generate relevant data for spleen."
+title: "Generate relevant data for kidney."
 output:
   BiocStyle::html_document:
     code_folding: hide
@@ -15,9 +15,9 @@ library(SingleCellExperiment)
 library(batchelor)
 library(uwot)
 library(tibble)
-library(dplyr)
 library(scran)
-
+library(plyr)
+library(dplyr)
 
 system = "spleen"
 #root.dir = "/Users/alsu/Develop/geneBasis/"
@@ -27,33 +27,19 @@ source(paste0(root.dir, "am_geneBasis/core_functions.R"))
 source(paste0(root.dir, "am_geneBasis/functions/main_functions.R"))
 
 sce = readRDS(paste0( root.dir, "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
-sce = sce[, sce$sample %in% c(2,3,4)]
 
 
 ```
 
-# Discard highly expressed genes
+<!-- # Discard highly expressed genes -->
 
-```{r discard-highly-expressed-genes, message = FALSE}
-
-
-#sce = get_rid_of_highly_expressed_genes(sce)
-
-stat.per_ct = lapply(unique(sce$celltype), function(celltype){
-  logcounts = logcounts(sce)[, sce$celltype == celltype]
-  current.stat = data.frame(median = apply(logcounts , 1 , function(x) quantile(x, 0.5)),
-                            gene = rownames(logcounts))
-  return(current.stat)
-})
-stat.per_ct = do.call(rbind , stat.per_ct)
-stat = as.data.frame( stat.per_ct %>% group_by(gene) %>%
-                                         dplyr::summarise(n.ct = mean(median > 0) )) 
-
-genes.2keep = as.character( stat$gene[stat$n.ct < 0.5] )
-sce = sce[genes.2keep , ]
+<!-- ```{r discard-highly-expressed-genes, message = FALSE} -->
 
 
-```
+<!-- sce = get_rid_of_highly_expressed_genes(sce) -->
+
+
+<!-- ``` -->
 
 # Discard rare celltypes
 
@@ -64,10 +50,40 @@ rare_celltypes = detect_rare_celltypes(sce)
 saveRDS(rare_celltypes , file = paste0(save.dir, "rare_celltypes_stat.Rds"))
 
 sce = get_rid_of_rare_celltypes(sce)
-meta = as.data.frame(colData(sce))
 
 
 ```
+
+
+# Discard highly and unspecifically (per celltype) expressed genes
+
+```{r discard-highly-expressed-genes, message = FALSE}
+
+
+stat = lapply(unique(sce$celltype) , function(celltype){
+  print(celltype)
+  logcounts = as.matrix( logcounts(sce[, sce$celltype == celltype]) )
+  current.stat = apply(logcounts , 1 , function(x) quantile(x , .75))
+  current.stat = data.frame(gene = names(current.stat) , q75 = current.stat , celltype = celltype)
+})
+stat = do.call(rbind , stat)
+stat = as.data.frame( stat %>% group_by(gene) %>%
+                                         dplyr::summarise(max_q75 = max(q75) , 
+                                                          frac_q75_positive = mean(q75 > 0)))
+
+
+# keep only lowly expressed and specific cts
+thresh.n_ct = 0.5
+thresh.max_q75 = 20
+genes = stat$gene[stat$max_q75 < thresh.max_q75 & stat$frac_q75_positive < thresh.n_ct]
+sce = sce[genes , ]
+meta = as.data.frame(colData(sce))
+
+
+
+```
+
+
 
 # Initial gene selection
 
@@ -81,6 +97,20 @@ genes_de = as.character( unique( genes_de.stat$gene ) )
 
 ```
 
+
+# Loadings
+
+```{r get-loadings, message = FALSE}
+
+
+loadings_celltype.stat = get_loadings(sce , genes_de , "celltype")
+saveRDS(loadings_celltype.stat , file = paste0(save.dir, "loadings_celltype_stat.Rds"))
+  
+loadings_none.stat = get_loadings(sce , genes_de , "none")
+saveRDS(loadings_none.stat , file = paste0(save.dir, "loadings_none_stat.Rds"))
+
+
+```
 
 # UMAP
 
@@ -106,53 +136,41 @@ saveRDS(meta , file = paste0(save.dir, "meta_w_umaps_genes_de.Rds"))
 
 ```
 
-# Mapping
+# BULK
 
-```{r mapping-de-genes, message = FALSE}
+<!-- ## Mapping -->
 
-
-mapping.genes_de = get_mapping(genes_de , sce)
-saveRDS(mapping.genes_de , file = paste0(save.dir, "mapping_genes_de.Rds"))
+<!-- ```{r mapping-de-genes, message = FALSE} -->
 
 
-```
+<!-- mapping.genes_de = get_mapping(genes_de , sce) -->
+<!-- saveRDS(mapping.genes_de , file = paste0(save.dir, "mapping_genes_de.Rds")) -->
 
 
-# Loadings
+<!-- ``` -->
 
-```{r get-loadings, message = FALSE}
+<!-- ## Graph structure -->
 
-
-loadings_celltype.stat = get_loadings(sce , genes_de , "celltype")
-saveRDS(loadings_celltype.stat , file = paste0(save.dir, "loadings_celltype_stat.Rds"))
-  
-loadings_none.stat = get_loadings(sce , genes_de , "none")
-saveRDS(loadings_none.stat , file = paste0(save.dir, "loadings_none_stat.Rds"))
-
-```
-
-# Graph structure
-
-```{r graph-genes-de, message = FALSE}
+<!-- ```{r graph-genes-de, message = FALSE} -->
 
 
-graph.genes_de = get_graph(genes_de , sce)
-saveRDS(graph.genes_de , file = paste0(save.dir, "graph_genes_de.Rds"))
+<!-- graph.genes_de = get_graph(genes_de , sce) -->
+<!-- saveRDS(graph.genes_de , file = paste0(save.dir, "graph_genes_de.Rds")) -->
 
 
-```
+<!-- ``` -->
 
 
-# Prediction of transcriptome
+<!-- ## Prediction of transcriptome -->
 
-```{r prediction-transcriptome-genes-de, message = FALSE}
-
-
-corr_transcriptome.genes_de = getCorrTranscriptome(mapping.genes_de , genes_de)
-saveRDS(corr_transcriptome.genes_de , file = paste0(save.dir, "corr_transcriptome_genes_de.Rds"))
+<!-- ```{r prediction-transcriptome-genes-de, message = FALSE} -->
 
 
-```
+<!-- corr_transcriptome.genes_de = getCorrTranscriptome(mapping.genes_de , genes_de) -->
+<!-- saveRDS(corr_transcriptome.genes_de , file = paste0(save.dir, "corr_transcriptome_genes_de.Rds")) -->
+
+
+<!-- ``` -->
 
 # Session Info
 
