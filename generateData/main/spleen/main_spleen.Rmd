@@ -75,8 +75,8 @@ stat = as.data.frame( stat %>% group_by(gene) %>%
 # keep only lowly expressed and specific cts
 thresh.n_ct = 0.5
 thresh.max_q75 = 20
-genes = stat$gene[stat$max_q75 < thresh.max_q75 & stat$frac_q75_positive < thresh.n_ct]
-sce = sce[genes , ]
+genes = as.character( stat$gene[stat$max_q75 < thresh.max_q75 & stat$frac_q75_positive < thresh.n_ct] )
+sce = sce[rownames(sce) %in% genes , ]
 meta = as.data.frame(colData(sce))
 
 
