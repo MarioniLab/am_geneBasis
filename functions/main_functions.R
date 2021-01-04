@@ -49,7 +49,12 @@ detect_rare_celltypes = function(sce , nCells.thresh = 10 , FDR.thresh = 0.05){
 
 get_rid_of_rare_celltypes = function(sce , nCells.thresh = 10 , FDR.thresh = 0.01){
   rare_celltypes.stat = detect_rare_celltypes(sce , nCells.thresh , FDR.thresh)
-  sce.filtered = sce[, !sce$celltype %in% unique( rare_celltypes.stat$celltypes$celltype )]
+  if (!is.null(rare_celltypes.stat$celltypes)){
+    sce.filtered = sce[, !sce$celltype %in% unique( rare_celltypes.stat$celltypes$celltype )]
+  }
+  else {
+    sce.filtered = sce
+  }
   return(sce.filtered)
 }
 
