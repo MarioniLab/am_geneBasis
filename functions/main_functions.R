@@ -21,24 +21,29 @@ detect_rare_celltypes = function(sce , nCells.thresh = 10 , FDR.thresh = 0.05){
   stat.celltype = table(sce$celltype)
   rare_celltypes = stat.celltype[stat.celltype < nCells.thresh]
   rare_celltypes = as.data.frame(rare_celltypes)
-  colnames(rare_celltypes) = c("celltype" , "n.cells")
   
-  markers.rare_celltypes = lapply(as.character( rare_celltypes$celltype ), function(celltype){
-    current.sce = sce
-    current.sce$celltype.bool = current.sce$celltype == celltype
-    if (stat.celltype[celltype] > 1){
-      markers <- scran::findMarkers(current.sce , groups=current.sce$celltype.bool, direction = "up", test = "t", assay.type = "logcounts")
-      markers = as.data.frame( markers$`TRUE` )
-      markers = markers[markers$FDR < FDR.thresh , ]
-      if (nrow(markers) > 0){
-        markers = markers[order(markers$logFC.FALSE , decreasing = T) ,]
-        markers$celltype = celltype
-        return(markers)
+  if (nrow(rare_celltypes) > 0){
+    colnames(rare_celltypes) = c("celltype" , "n.cells")
+    markers.rare_celltypes = lapply(as.character( rare_celltypes$celltype ), function(celltype){
+      current.sce = sce
+      current.sce$celltype.bool = current.sce$celltype == celltype
+      if (stat.celltype[celltype] > 1){
+        markers <- scran::findMarkers(current.sce , groups=current.sce$celltype.bool, direction = "up", test = "t", assay.type = "logcounts")
+        markers = as.data.frame( markers$`TRUE` )
+        markers = markers[markers$FDR < FDR.thresh , ]
+        if (nrow(markers) > 0){
+          markers = markers[order(markers$logFC.FALSE , decreasing = T) ,]
+          markers$celltype = celltype
+          return(markers)
+        }
       }
-    }
-  })
-  markers.rare_celltypes = do.call(rbind , markers.rare_celltypes)
-  out = list(celltypes = rare_celltypes , markers = markers.rare_celltypes)
+    })
+    markers.rare_celltypes = do.call(rbind , markers.rare_celltypes)
+    out = list(celltypes = rare_celltypes , markers = markers.rare_celltypes)
+  }
+  else {
+    out = list(celltypes = NULL , markers = NULL)
+  }
   return(out)
 }
 
