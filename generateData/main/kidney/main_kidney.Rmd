@@ -61,7 +61,6 @@ sce = get_rid_of_rare_celltypes(sce)
 
 
 stat = lapply(unique(sce$celltype) , function(celltype){
-  print(celltype)
   logcounts = as.matrix( logcounts(sce[, sce$celltype == celltype]) )
   current.stat = apply(logcounts , 1 , function(x) quantile(x , .75))
   current.stat = data.frame(gene = names(current.stat) , q75 = current.stat , celltype = celltype)
@@ -75,14 +74,13 @@ stat = as.data.frame( stat %>% group_by(gene) %>%
 # keep only lowly expressed and specific cts
 thresh.n_ct = 0.5
 thresh.max_q75 = 20
-genes = stat$gene[stat$max_q75 < thresh.max_q75 & stat$frac_q75_positive < thresh.n_ct]
-sce = sce[genes , ]
+genes = as.character( stat$gene[stat$max_q75 < thresh.max_q75 & stat$frac_q75_positive < thresh.n_ct] )
+sce = sce[rownames(sce) %in% genes , ]
 meta = as.data.frame(colData(sce))
 
 
 
 ```
-
 
 
 # Initial gene selection
