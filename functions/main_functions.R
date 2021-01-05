@@ -138,11 +138,13 @@ get_loadings = function(sce , genes , type){
     mbpca = multiBatchPCA(counts , batch = factor( current.sce$celltype ) , get.variance = T , d = nrow(counts))
     loadings = metadata(mbpca)  
     mbpca = do.call(rbind , mbpca)
-    out = list(pc = mbpca , loadings = loadings$rotation , var.explained = loadings$var.explained)
+    #out = list(pc = mbpca , loadings = loadings$rotation , var.explained = loadings$var.explained)
+    out = list(loadings = loadings$rotation)
   } 
   else if (type == "none") {
     pca = prcomp(t(counts) , rank. = nrow(counts))
-    out = list(pc = pca$x , loadings = pca$rotation , var.explained = pca$sdev)
+    #out = list(pc = pca$x , loadings = pca$rotation , var.explained = pca$sdev)
+    out = list(loadings = pca$rotation)
   }
   return(out)
 }
