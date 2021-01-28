@@ -42,11 +42,11 @@ source(paste0(root.dir, "am_geneBasis/core_functions.R"))
 ```{r load-counts, message = FALSE}
 
 
-counts = read.table(paste0(root.dir, "data/spleen/raw/raw_counts.txt"), sep = " ", header = F)
+counts = read.table(paste0(root.dir, "data/scRNA_datasets/spleen/raw/raw_counts.txt"), sep = " ", header = F)
 colnames(counts) = c("gene.num" , "cell.num" , "counts")
-rownames.counts = read.table(paste0(root.dir, "data/spleen/raw/rownames.txt"), sep = "\n", header = F) 
+rownames.counts = read.table(paste0(root.dir, "data/scRNA_datasets/spleen/raw/rownames.txt"), sep = "\n", header = F) 
 rownames.counts = data.frame(gene.num = c(1:nrow(rownames.counts)) , gene =  rownames.counts$V1 )
-colnames.counts = read.table(paste0(root.dir, "data/spleen/raw/colnames.txt"), sep = "\n", header = F)
+colnames.counts = read.table(paste0(root.dir, "data/scRNA_datasets/spleen/raw/colnames.txt"), sep = "\n", header = F)
 colnames.counts = data.frame(cell.num = c(1:nrow(colnames.counts) ) , cell = colnames.counts$V1 )
 
 counts = merge(counts , rownames.counts , by = "gene.num", all.x = T, all.y = F)
@@ -76,9 +76,9 @@ counts = counts[, order(colnames(counts))]
 
 ```{r load-meta, message = FALSE}
 
-cells = read.table(paste0(root.dir, "data/spleen/raw/colnames.txt"), sep = "\n", header = F)
-celltypes = read.table(paste0(root.dir, "data/spleen/metadata/annotations.txt"), sep = "\n", header = F)
-samples =  read.table(paste0(root.dir, "data/spleen/metadata/batch.txt"), sep = "\n", header = F)
+cells = read.table(paste0(root.dir, "data/scRNA_datasets/spleen/raw/colnames.txt"), sep = "\n", header = F)
+celltypes = read.table(paste0(root.dir, "data/scRNA_datasets/spleen/metadata/annotations.txt"), sep = "\n", header = F)
+samples =  read.table(paste0(root.dir, "data/scRNA_datasets/spleen/metadata/batch.txt"), sep = "\n", header = F)
 meta = data.frame(cell = cells$V1, sample = samples$V1 , celltype = celltypes$V1)
 meta = meta[order(meta$cell),]
 
