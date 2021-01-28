@@ -106,7 +106,7 @@ sce = do.call(cbind, sce)
 sce$cell = as.character(sce$cell)
 sce$celltype = as.character(sce$celltype)
 sce$sample = as.character(sce$sample)
-saveRDS(sce, file = paste0(root.dir, "data/spleen/sce_spleen_norm.Rds"))
+saveRDS(sce, file = paste0(root.dir, "data/scRNA_datasets/spleen/sce_spleen_norm.Rds"))
 
 
 
