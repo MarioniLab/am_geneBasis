@@ -30,48 +30,12 @@ library(tibble)
 library(plyr)
 set.seed(32)
 
-#root.dir = "/Users/alsu/Develop/geneBasis/"
 root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
 source(paste0(root.dir, "am_geneBasis/core_functions.R"))
 
 
 ```
 
-# Read logcounts
-
-```{r load-logcounts, message = FALSE}
-
-
-
-logcounts = read.table(paste0(root.dir, "data/spleen/norm/SCT_normalized.txt"), sep = " ", header = F)
-colnames(logcounts) = c("gene.num" , "cell.num" , "logcounts")
-rownames.logcounts = read.table(paste0(root.dir, "data/spleen/norm/rownames.txt"), sep = "\n", header = F) 
-rownames.logcounts = data.frame(gene.num = c(1:nrow(rownames.logcounts)) , gene =  rownames.logcounts$V1 )
-colnames.logcounts = read.table(paste0(root.dir, "data/spleen/norm/colnames.txt"), sep = "\n", header = F)
-colnames.logcounts = data.frame(cell.num = c(1:nrow(colnames.logcounts) ) , cell = colnames.logcounts$V1 )
- 
-
-logcounts = merge(logcounts , rownames.logcounts , by = "gene.num", all.x = T, all.y = F)
-logcounts = merge(logcounts , colnames.logcounts , by = "cell.num", all.x = T, all.y = F)
-logcounts = logcounts[, c("gene" , "cell" , "logcounts")]
-
-
-logcounts = dcast(logcounts, gene ~ cell)
-logcounts[is.na(logcounts)] <- 0
-
-rownames(logcounts) <- logcounts$gene
-logcounts = logcounts[,2:ncol(logcounts)]
-
-logcounts = logcounts[order(rownames(logcounts)),]
-logcounts = logcounts[, order(colnames(logcounts))]
-
-logcounts = data.matrix(logcounts , rownames.force = NA)
-logcounts <- as(logcounts, "dgTMatrix") 
-
- 
-
-
-```
 
 # Read counts
 
@@ -99,21 +63,14 @@ counts = data.matrix(counts , rownames.force = NA)
 counts <- as(counts, "dgTMatrix") 
 
 
-
-# only keep counts for which we also have logcounts
-genes = intersect(rownames(logcounts) , rownames(counts))
-cells = intersect(colnames(logcounts), colnames(counts))
-counts = counts[rownames(counts) %in% genes, colnames(counts) %in% cells]
-logcounts = logcounts[rownames(logcounts) %in% genes, colnames(logcounts) %in% cells]
-
+genes = rownames(counts)
+cells = colnames(counts)
 counts = counts[order(rownames(counts)),]
 counts = counts[, order(colnames(counts))]
 
-logcounts = logcounts[order(rownames(logcounts)),]
-logcounts = logcounts[, order(colnames(logcounts))]
-
 
 ```
+
 
 # Metadata
 
@@ -128,25 +85,34 @@ meta = meta[order(meta$cell),]
 
 ```
 
+# Add logcounts
 
-# Combine together
+```{r add-logcounts, message = FALSE}
 
-```{r combine, message = FALSE}
 
-sce = SingleCellExperiment(list(counts=counts),
-     colData=DataFrame(meta))
-assay(sce , "logcounts") <- logcounts
+
+batchFactor = factor(meta$sample)
+sce = lapply(unique(batchFactor) , function(current.batch){
+  idx = which(batchFactor == current.batch)
+  current.sce = SingleCellExperiment(assays = list("counts" = counts[,idx]), colData = meta[idx,])
+  clusters <- quickCluster(current.sce, method="igraph", use.ranks=TRUE, d=50, min.mean=0.1)
+  current.sce <- computeSumFactors(current.sce, clusters=clusters)
+  return(current.sce)
+})
+sce = do.call(multiBatchNorm , sce )
+sce = do.call(cbind, sce)
+
 
 sce$cell = as.character(sce$cell)
 sce$celltype = as.character(sce$celltype)
 sce$sample = as.character(sce$sample)
+saveRDS(sce, file = paste0(root.dir, "data/spleen/sce_spleen_norm.Rds"))
 
-saveRDS(counts, file = paste0(root.dir, "data/spleen/counts_spleen.Rds"))
-saveRDS(logcounts, file = paste0(root.dir, "data/spleen/logcounts_spleen.Rds"))
-saveRDS(sce, file = paste0(root.dir, "data/spleen/sce_spleen.Rds"))
+
 
 
 ```
+
 
 #Session Info
 
