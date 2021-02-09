@@ -39,3 +39,7 @@ for current_lambda in lambdas:
     with open(save_file, 'w') as f:
         for item in genes:
             f.write("%s\n" % item)
+
+
+
+echo "source /nfs/research1/marioni/alsu/miniconda3/bin/activate scmer && python3 /nfs/research1/marioni/alsu/geneBasis/am_geneBasis/scmer/mouse_embryo/scmer_test.py" | bsub -o /nfs/research1/marioni/alsu/test.out -e /nfs/research1/marioni/alsu/test.err           
