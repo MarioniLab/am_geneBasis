@@ -28,7 +28,7 @@ library(SingleCellExperiment)
 library(dplyr)
 library(tibble)
 library(plyr)
-library(Seurat)
+#library(Seurat)
 set.seed(32)
 
 #root.dir = "/Users/alsu/Develop/geneBasis/"
