@@ -22,7 +22,7 @@ data.index.name = "Cell"
 samples = data['sample'].unique()
 # create nGenes grid
 nGenes = [25, 50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300]
-obs = current_data[['sample', 'celltype']]
+obs = data[['sample', 'celltype']]
 data.drop(['sample', 'celltype'], axis=1, inplace=True)
 adata = sc.AnnData(data)
 for i in obs.columns:
