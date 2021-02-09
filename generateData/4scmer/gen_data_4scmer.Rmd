@@ -17,7 +17,8 @@ set.seed(32)
 root.dir = "/nfs/research1/marioni/alsu/geneBasis/data/"
 
 # change for the relevant sce
-sce = readRDS(paste0(root.dir , "scRNA_datasets/atlas_E8.5/sce_atlas_E8.5.Rds"))
+#sce = readRDS(paste0(root.dir , "scRNA_datasets/atlas_E8.5/sce_atlas_E8.5.Rds"))
+sce = readRDS(paste0(root.dir , "scRNA_datasets/spleen/sce_spleen_norm.Rds"))
 
 # save to csv to run for SCMER
 celltypes = unique(sce$celltype)
@@ -25,7 +26,7 @@ celltypes.num = sapply(sce$celltype , function(x) which(x == celltypes))
 counts = as.matrix( counts(sce) )
 counts.df = data.frame( rbind(sce$sample, as.numeric(celltypes.num) , counts) )
 rownames(counts.df) = c("sample", "celltype" , rownames(sce))
-write.csv(counts.df, file = paste0(root.dir, "4scmer/mouse_embryo/mouse_embryo.csv") , row.names = TRUE)
+write.csv(counts.df, file = paste0(root.dir, "4scmer/spleen/spleen.csv") , row.names = TRUE)
 
 
 ```
