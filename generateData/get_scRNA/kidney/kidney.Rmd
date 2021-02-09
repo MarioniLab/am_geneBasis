@@ -1,0 +1,112 @@
+---
+title: "Generating useable dataset for kidney."
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+
+
+
+```{r load, message = FALSE}
+# load libraries we are going to use
+
+
+library(Matrix)
+library(scran)
+library(scater)
+library(batchelor)
+library(knitr)
+library(pheatmap)
+library(reshape2)
+library(edgeR)
+library(BiocSingular)
+library(BiocParallel)
+library(BiocNeighbors)
+library(SingleCellExperiment)
+library(dplyr)
+library(tibble)
+library(plyr)
+library(Seurat)
+set.seed(32)
+
+#root.dir = "/Users/alsu/Develop/geneBasis/"
+root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
+source(paste0(root.dir, "am_geneBasis/core_functions.R"))
+
+
+```
+
+# Read seurat file
+
+```{r get-sce, message = FALSE}
+
+# 
+# sce = readRDS(paste0(root.dir , "data/scRNA_datasets/kidney/kidney_abbrev.rds"))
+# sce = as.SingleCellExperiment(sce)
+# 
+# counts = counts(sce)
+# logcounts = logcounts(sce)
+# meta = as.data.frame(colData(sce))
+# meta = rownames_to_column(meta, var = "cell")
+# meta$sample = meta$batch
+# meta = meta[, c("cell" , "sample")]
+# 
+# # add celltypes
+# celltypes = read.table(paste0(root.dir , "data/scRNA_datasets/kidney/meta_celltypes.tab") , header = T , sep = "\t")
+# colnames(celltypes) = c("cell" , "celltype")
+# meta = merge(meta , celltypes , by = "cell")
+# meta = meta[!is.na(meta$celltype) , ]
+# 
+# # delete nans
+# cells = meta$cell
+# counts = counts[,cells]
+# logcounts = logcounts[,cells]
+# 
+# 
+# # combine together
+# sce <- SingleCellExperiment(list(counts=counts) , 
+#                             colData = meta)
+# assay(sce , "logcounts") <- logcounts
+# saveRDS(sce, file = paste0(root.dir, "data/scRNA_datasets/kidney/sce_kidney.Rds"))
+#  
+
+
+```
+
+# Add logcounts
+
+```{r add-logcounts, message = FALSE}
+
+
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/kidney/sce_kidney.Rds"))
+
+counts = counts(sce)
+meta = as.data.frame(colData(sce))
+
+batchFactor = factor(meta$sample)
+sce = lapply(unique(batchFactor) , function(current.batch){
+  idx = which(batchFactor == current.batch)
+  current.sce = SingleCellExperiment(assays = list("counts" = counts[,idx]), colData = meta[idx,])
+  clusters <- quickCluster(current.sce, method="igraph", use.ranks=TRUE, d=50, min.mean=0.1)
+  current.sce <- computeSumFactors(current.sce, clusters=clusters)
+  return(current.sce)
+})
+sce = do.call(multiBatchNorm , sce )
+sce = do.call(cbind, sce)
+
+sce$cell = as.character(sce$cell)
+sce$celltype = as.character(sce$celltype)
+sce$sample = as.character(sce$sample)
+saveRDS(sce, file = paste0(root.dir, "data/scRNA_datasets/kidney/sce_kidney_norm.Rds"))
+
+
+
+```
+
+#Session Info
+
+```{r sessinf}
+sessionInfo()
+```
