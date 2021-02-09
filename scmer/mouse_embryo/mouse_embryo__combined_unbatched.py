@@ -47,4 +47,4 @@ for current_nGenes in nGenes:
     save_file = save_dir + 'nGenes_' + str(len(genes)) + '.txt'
     with open(save_file, 'w') as f:
         for item in genes:
-        f.write("%s\n" % item)
+            f.write("%s\n" % item)
