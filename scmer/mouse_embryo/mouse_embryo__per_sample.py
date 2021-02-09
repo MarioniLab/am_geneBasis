@@ -21,7 +21,7 @@ data.index.name = "Cell"
 # split by samples
 samples = data['sample'].unique()
 # create nGenes grid
-nGenes = [25, 50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300]
+lambdas = [1e-4 , 2e-4, 4e-4 , 6e-4 , 8e-4, 1e-3, 1.5e-3, 2e-3 , 2.5e-3, 3e-3 , 4e-3]
 # run for each sample separately
 for current_sample in samples:
     current_data = data[data["sample"] == current_sample]
@@ -40,10 +40,10 @@ for current_sample in samples:
     sc.tl.pca(adata, svd_solver='arpack')
     sc.pp.neighbors(adata, n_neighbors=10, n_pcs=20)
     sc.tl.umap(adata)
-    for current_nGenes in nGenes:
-        model = scmer.UmapL1.tune(target_n_features=current_nGenes, n_pcs=40, perplexity=100., X=adata.X)
-        selected_adata = model.transform(adata)
-        genes = selected_adata.var_names.to_list()
+    for current_lambda in lambdas:
+        model = scmer.UmapL1(lasso=current_lambda, ridge=0., n_pcs=40, perplexity=100., use_beta_in_Q=True, n_threads=5, pca_seed=2020)
+        model.fit(adata.X, batches=adata.obs['sample'].values)
+        genes = adata.var_names[model.get_mask()].tolist()
         save_dir = root_dir + 'scmer_res/mouse_embryo/per_sample/sample_' + str(current_sample) + '/'
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
