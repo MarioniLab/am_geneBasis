@@ -18,10 +18,8 @@ data.columns = data.iloc[0]
 data = data[1:]
 data.index.name = "Cell"
 
-# split by samples
-samples = data['sample'].unique()
-# create nGenes grid
-nGenes = [25, 50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300]
+# create lambdas grid
+lambdas = [1e-4 , 2e-4, 4e-4 , 6e-4 , 8e-4, 1e-3, 1.5e-3, 2e-3 , 2.5e-3, 3e-3 , 4e-3]
 obs = data[['sample', 'celltype']]
 data.drop(['sample', 'celltype'], axis=1, inplace=True)
 adata = sc.AnnData(data)
@@ -38,9 +36,9 @@ sc.tl.pca(adata, svd_solver='arpack')
 sc.pp.neighbors(adata, n_neighbors=10, n_pcs=20)
 sc.tl.umap(adata)
 for current_nGenes in nGenes:
-    model = scmer.UmapL1.tune(target_n_features=current_nGenes, n_pcs=40, perplexity=100., X=adata.X)
-    selected_adata = model.transform(adata)
-    genes = selected_adata.var_names.to_list()
+    model = scmer.UmapL1(lasso=current_lambda, ridge=0., n_pcs=40, perplexity=100., use_beta_in_Q=True, n_threads=5, pca_seed=2020)
+    model.fit(adata.X)
+    genes = adata.var_names[model.get_mask()].tolist()
     save_dir = root_dir + 'scmer_res/spleen/combined_unbatched/'
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
