@@ -35,7 +35,7 @@ sc.pp.scale(adata, max_value=10)
 sc.tl.pca(adata, svd_solver='arpack')
 sc.pp.neighbors(adata, n_neighbors=10, n_pcs=20)
 sc.tl.umap(adata)
-for current_nGenes in nGenes:
+for current_lambda in lambdas:
     model = scmer.UmapL1(lasso=current_lambda, ridge=0., n_pcs=40, perplexity=100., use_beta_in_Q=True, n_threads=5, pca_seed=2020)
     model.fit(adata.X)
     genes = adata.var_names[model.get_mask()].tolist()
