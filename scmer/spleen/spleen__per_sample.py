@@ -21,7 +21,7 @@ data.index.name = "Cell"
 # split by samples
 samples = data['sample'].unique()
 # create nGenes grid
-lambdas = [1e-4 , 2e-4, 4e-4 , 6e-4 , 8e-4, 1e-3, 1.5e-3, 2e-3 , 2.5e-3, 3e-3 , 4e-3]
+lambdas = [1e-4 , 1.8e-4, 1.6e-4, 1.5e-4, 1.4e-4, 1.3e-4, 1.2e-4, 2e-4, 4e-4 , 6e-4 , 8e-4, 1e-3, 1.5e-3, 2e-3 , 2.5e-3, 3e-3 , 4e-3]
 # run for each sample separately
 for current_sample in samples:
     current_data = data[data["sample"] == current_sample]
@@ -41,7 +41,7 @@ for current_sample in samples:
     sc.pp.neighbors(adata, n_neighbors=10, n_pcs=20)
     sc.tl.umap(adata)
     for current_lambda in lambdas:
-        model = scmer.UmapL1(lasso=current_lambda, ridge=0., n_pcs=40, perplexity=100., use_beta_in_Q=True, n_threads=5, pca_seed=2020)
+        model = scmer.UmapL1(lasso=current_lambda, ridge=0., n_pcs=40, perplexity=100., use_beta_in_Q=True, n_threads=11, pca_seed=2020)
         model.fit(adata.X, batches=adata.obs['sample'].values)
         genes = adata.var_names[model.get_mask()].tolist()
         save_dir = root_dir + 'scmer_res/spleen/per_sample/sample_' + str(current_sample) + '/'
