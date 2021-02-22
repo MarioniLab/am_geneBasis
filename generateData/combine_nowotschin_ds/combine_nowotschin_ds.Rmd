@@ -29,7 +29,7 @@ root.dir = "/nfs/research1/marioni/alsu/"
 
 ```{r get-meta}
 
-df = read.csv(paste0( root.dir , "External/Nowotschin_gut/sc_endoderm_all_cells_metadata.csv", header = TRUE, row.names = 1))
+df = read.csv(paste0( root.dir , "External/Nowotschin_gut/sc_endoderm_all_cells_metadata.csv"), header = TRUE, row.names = 1)
 
 clusterGroups = c(
   "10" = "Thyroid",
