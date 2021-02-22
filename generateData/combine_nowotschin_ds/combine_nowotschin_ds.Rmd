@@ -82,7 +82,7 @@ sce$Sample <- gsub("_.*", "", colnames(sce))
 now_samplesToKeep = unique(colData(sce)[!is.na(sce$AP_pseudo),"Sample"])
 sce = sce[, sce$Sample %in% now_samplesToKeep]
 sce = logNormCounts(sce)
-saveRDS(sce , file = paste(root.dir , "External/Nowotschin_gut/sce.Rds"))
+saveRDS(sce , file = paste0(root.dir , "External/Nowotschin_gut/sce.Rds"))
 
 
 
