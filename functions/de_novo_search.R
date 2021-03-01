@@ -15,7 +15,7 @@ add_logcounts = function(sce , batch){
     sce = bplapply(unq.batches , function(current.batch){
       idx = which(meta[ , batch ] == current.batch)
       current.sce = SingleCellExperiment(assays = list("counts" = counts[,idx]), colData = meta[idx,])
-      reducedDims(current.sce , "UMAP") = umaps[idx,]
+      reducedDims(current.sce) = list( UMAP = umaps[idx,] )
       clusters <- quickCluster(current.sce, method="igraph", use.ranks=TRUE, d=50, min.mean=0.1)
       current.sce <- computeSumFactors(current.sce, clusters=clusters)
       return(current.sce)
@@ -24,7 +24,7 @@ add_logcounts = function(sce , batch){
   }
   else {
     sce = SingleCellExperiment(assays = list("counts" = counts), colData = meta)
-    reducedDims(current.sce , "UMAP") = umaps
+    reducedDims(current.sce) = list( UMAP = umaps )
     clusters = quickCluster(sce, method="igraph", use.ranks=TRUE, d=50, min.mean=0.1)
     sce = computeSumFactors(sce, clusters=clusters)
     sce = LogNormCounts(sce)

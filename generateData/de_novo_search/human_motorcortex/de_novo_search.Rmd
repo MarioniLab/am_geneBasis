@@ -47,7 +47,7 @@ source(paste0(root.dir, "am_geneBasis/functions/de_novo_search.R"))
 
 ```{r load-data}
 
-batch = "dataset"
+batch = "donor_id"
 sce = readRDS( paste0( root.dir , "data/scRNA_datasets/human_motorcortex/human_motorcortex.rds"))
 if (!"logcounts" %in% names(assays(sce))){
   sce = add_logcounts(sce , batch)
