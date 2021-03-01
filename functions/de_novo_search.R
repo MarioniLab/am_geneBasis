@@ -1,5 +1,39 @@
 # This script contains all functions to run search for genes that explain variation
 
+
+add_logcounts = function(sce , batch){
+  require(SingleCellExperiment)
+  require(scuttle)
+  require(batchelor)
+  meta = as.data.frame(colData(sce))
+  counts = counts(sce)
+  umaps = reducedDim(sce , "UMAP")
+  
+  # add logcounts
+  if (!is.null(batch)){
+    unq.batches = unique(meta[, batch])
+    sce = bplapply(unq.batches , function(current.batch){
+      idx = which(meta[ , batch ] == current.batch)
+      current.sce = SingleCellExperiment(assays = list("counts" = counts[,idx]), colData = meta[idx,])
+      reducedDims(current.sce , "UMAP") = umaps[idx,]
+      clusters <- quickCluster(current.sce, method="igraph", use.ranks=TRUE, d=50, min.mean=0.1)
+      current.sce <- computeSumFactors(current.sce, clusters=clusters)
+      return(current.sce)
+    } , BPPARAM = mcparam)
+    sce <- do.call(multiBatchNorm , sce )
+  }
+  else {
+    sce = SingleCellExperiment(assays = list("counts" = counts), colData = meta)
+    reducedDims(current.sce , "UMAP") = umaps
+    clusters = quickCluster(sce, method="igraph", use.ranks=TRUE, d=50, min.mean=0.1)
+    sce = computeSumFactors(sce, clusters=clusters)
+    sce = LogNormCounts(sce)
+  }
+  return(sce)
+}
+
+
+
 retain_only_hvgs = function(sce, n = NULL, var.thresh = 0){
   require(scran)
   dec.sce <- modelGeneVar(sce)
