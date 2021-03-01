@@ -21,6 +21,7 @@ add_logcounts = function(sce , batch){
       return(current.sce)
     } , BPPARAM = mcparam)
     sce <- do.call(multiBatchNorm , sce )
+    sce = do.call(cbind , sce)
   }
   else {
     sce = SingleCellExperiment(assays = list("counts" = counts), colData = meta)
