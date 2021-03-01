@@ -59,17 +59,23 @@ batch = "sample"
 ```{r get-hvgs-and-denoise}
 
 
-sce = retain_only_hvgs(sce , var.thresh = 0)
-# denoise logcounts
-logcounts_denoised = denoise_logcounts(sce, batch = batch, n.neigh = 10, nPC = 100)
-sce_denoised = SingleCellExperiment(list(counts=counts(sce) , 
-                                logcounts = logcounts_denoised) , 
-                           colData = colData(sce) , rowData = rowData(sce))
-rownames(sce_denoised) = rowData(sce_denoised)[,2]
-tab = table(rownames(sce_denoised))
-genes.unq = names(tab)[tab == 1]
-sce_denoised = sce_denoised[genes.unq , ]
-saveRDS(sce_denoised , file = paste0(root.dir , "data/scRNA_datasets/atlas_E8.5/sce_atlas_E8.5__denoised.Rds"))
+if (!(file.exists( paste0(root.dir , "data/scRNA_datasets/atlas_E8.5/sce_atlas_E8.5__denoised.Rds")))){
+  sce = retain_only_hvgs(sce , var.thresh = 0)
+  # denoise logcounts
+  logcounts_denoised = denoise_logcounts(sce, batch = batch, n.neigh = 10, nPC = 100)
+  sce_denoised = SingleCellExperiment(list(counts=counts(sce) , 
+                                  logcounts = logcounts_denoised) , 
+                             colData = colData(sce) , rowData = rowData(sce))
+  rownames(sce_denoised) = rowData(sce_denoised)[,2]
+  tab = table(rownames(sce_denoised))
+  genes.unq = names(tab)[tab == 1]
+  sce_denoised = sce_denoised[genes.unq , ]
+  saveRDS(sce_denoised , file = paste0(root.dir , "data/scRNA_datasets/atlas_E8.5/sce_atlas_E8.5__denoised.Rds"))
+} else {
+  sce = retain_only_hvgs(sce , var.thresh = 0)
+  sce_denoised = readRDS( paste0(root.dir , "data/scRNA_datasets/atlas_E8.5/sce_atlas_E8.5__denoised.Rds") )
+}
+
 
 
 ```
