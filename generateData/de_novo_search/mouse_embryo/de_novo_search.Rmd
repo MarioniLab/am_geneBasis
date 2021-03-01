@@ -77,7 +77,6 @@ if (!(file.exists( paste0(root.dir , "data/scRNA_datasets/atlas_E8.5/sce_atlas_E
 }
 
 
-
 ```
 
 # Get correlation-all and loadings squared
@@ -95,6 +94,8 @@ corr_stat_all = corr_stat_all[corr_stat_all$corr.all > corr.thresh , ]
 # add squared loadings
 loadings.squared = get_loadings_squared(sce_denoised)
 corr_stat_all = merge(corr_stat_all , loadings.squared , all.x = T , all.y = F)
+
+saveRDS(corr_stat_all , file = paste0(root.dir , "data/scRNA_datasets/atlas_E8.5/corr_stat_all.Rds"))
 
 
 ```
@@ -118,7 +119,7 @@ min.corr = 0
 
 
 while(min.corr < min.corr.thresh ){
-  corr_stat_genes = suppressWarnings( get_corr_transcriptome_per_gene(sce_denoised , assay = "logcounts" , genes = genes_all , batch = NULL, n.neigh = 5 , nPC = length(genes_all) - 1 , genes.predict = genes_keep , method = "spearman"))
+  corr_stat_genes = suppressWarnings( get_corr_transcriptome_per_gene(sce_denoised , assay = "logcounts" , genes = genes_all , batch = batch, n.neigh = 5 , nPC = length(genes_all) - 1 , genes.predict = genes_keep , method = "spearman"))
   corr_stat_genes = corr_stat_genes[!corr_stat_genes$gene %in% genes_all , ]
   
   corr_stat_genes$corr[is.na(corr_stat_genes$corr)] = eps
