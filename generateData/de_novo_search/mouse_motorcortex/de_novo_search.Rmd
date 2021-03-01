@@ -103,7 +103,7 @@ corr_stat_all = merge(corr_stat_all , loadings.squared , all.x = T , all.y = F)
 min.corr.thresh = 0.95
 genes_keep = as.character( corr_stat_all$gene )
 corr_stat_all = corr_stat_all[order(corr_stat_all$corr.all , decreasing = T) , ]
-genes_base = corr_stat_all.selected$gene[1:3]
+genes_base = corr_stat_all$gene[1:3]
 genes_all = genes_base
 genes = list()
 corr_stat = list()
@@ -147,7 +147,7 @@ saveRDS(out , file = paste0(root.dir , "data/gene_basis/mouse_motorcortex/mouse_
 min.corr.thresh = 0.95
 genes_keep = as.character( corr_stat_all$gene )
 corr_stat_all = corr_stat_all[order(corr_stat_all$loading.squared , decreasing = T) , ]
-genes_base = corr_stat_all.selected$gene[1:3]
+genes_base = corr_stat_all$gene[1:3]
 genes_all = genes_base
 genes = list()
 corr_stat = list()
