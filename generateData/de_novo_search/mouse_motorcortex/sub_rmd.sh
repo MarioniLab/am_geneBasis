@@ -9,7 +9,7 @@ script_name=gs_mou_motor
 
 #CHOOSE PARAMETERS
 #RAM in megabytes
-memory=300000
+memory=450000
 r_command="rusage[mem=${memory}]"
 #num_processors
 nproc=7
