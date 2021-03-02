@@ -110,8 +110,8 @@ saveRDS(corr_stat_all , file = paste0(root.dir , "data/scRNA_datasets/atlas_E8.5
 min.corr.thresh = 0.95
 genes_keep = as.character( corr_stat_all$gene )
 corr_stat_all = corr_stat_all[order(corr_stat_all$corr.all , decreasing = T) , ]
-genes_base = corr_stat_all$gene[1:3]
-genes_all = genes_base
+genes_base = as.character( corr_stat_all$gene[1:3] )
+genes_all = as.character( genes_base )
 genes = list()
 corr_stat = list()
 eps = 0.00001
@@ -154,8 +154,8 @@ saveRDS(out , file = paste0(root.dir , "data/gene_basis/mouse_embryo/mouse_embry
 min.corr.thresh = 0.95
 genes_keep = as.character( corr_stat_all$gene )
 corr_stat_all = corr_stat_all[order(corr_stat_all$loading.squared , decreasing = T) , ]
-genes_base = corr_stat_all$gene[1:3]
-genes_all = genes_base
+genes_base = as.character( corr_stat_all$gene[1:3] )
+genes_all = as.character( genes_base )
 genes = list()
 corr_stat = list()
 eps = 0.00001

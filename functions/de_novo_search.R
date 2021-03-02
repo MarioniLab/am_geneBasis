@@ -57,7 +57,7 @@ get_mapping = function(sce , assay = "logcounts" , genes = rownames(sce), batch 
   meta = as.data.frame(colData(current.sce))
   if (!is.null(batch)) {
     batchFactor = factor(meta[, colnames(meta) == batch])
-    pcs = suppressWarnings( multiBatchPCA(counts, batch = batchFactor, d = nPC ) )
+    pcs = suppressWarnings( multiBatchPCA(counts, batch = batchFactor, d = nPC , BPPARAM = mcparam) )
     pcs = suppressWarnings( do.call(reducedMNN, pcs) )
     pcs = pcs$corrected
   } else {
@@ -103,11 +103,11 @@ get_corr_transcriptome_per_gene = function(sce , assay = "logcounts", genes , ba
                                            method = "pearson"){
   neighs = get_mapping(sce , assay = assay , genes = genes, batch = batch , n.neigh = n.neigh , nPC = nPC)
   counts_predict = as.matrix(assay(sce[genes.predict , ] , assay))
-  stat_predict = lapply(1:ncol(neighs) , function(j){
+  stat_predict = bplapply(1:ncol(neighs) , function(j){
     cells = neighs[,j]
     current.stat_predict = counts_predict[, cells]
     return(current.stat_predict)
-  })
+  }, BPPARAM = mcparam)
   stat_predict = Reduce("+", stat_predict) / length(stat_predict)
   stat_real = counts_predict[, rownames(neighs)]
   corr = lapply(1:nrow(counts_predict) , function(i){
@@ -127,9 +127,6 @@ get_loadings_squared = function(sce){
   loadings.squared = data.frame( gene = rownames(loadings) , loading.squared = apply(loadings , 1 , function(x) sum(x^2)))
   return(loadings.squared)
 }
-
-
-
 
 
 get_mapping_2_external_dataset = function(sce_reference , sce_query , cluster_id , genes, nPC = 100, n.neigh = 5){
