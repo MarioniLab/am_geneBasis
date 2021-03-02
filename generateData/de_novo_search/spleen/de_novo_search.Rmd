@@ -67,16 +67,24 @@ if (!"logcounts" %in% names(assays(sce))){
 
 sce = retain_only_hvgs(sce , var.thresh = 0)
 
+meta = as.data.frame(colData(sce))
+unq.batches = unique(meta[, batch])
 # if denoised logcounts are not saved yet - run denoised logcounts and save
 if (!(file.exists( paste0(root.dir , "data/scRNA_datasets/" , system , "/" , system , "__denoised.Rds") ) ) ){
-  # denoise logcounts
-  logcounts_denoised = denoise_logcounts(sce, batch = batch, n.neigh = 10, nPC = 100)
-  sce_denoised = SingleCellExperiment(list(counts=counts(sce) , 
-                                  logcounts = logcounts_denoised) , 
-                             colData = colData(sce) )
+  logcounts_denoised = bplapply(unq.batches , function(current.batch){
+    print(current.batch)
+    idx = which(meta[,batch] == current.batch)
+    current.sce = sce[, idx]
+    current.logcounts_denoised = denoise_logcounts(current.sce, batch = NULL, n.neigh = 10, nPC = 100)
+    current.sce_denoised = SingleCellExperiment(list(counts=counts(current.sce) , 
+                                  logcounts = current.logcounts_denoised) , 
+                             colData = colData(current.sce) )
+    return(current.sce_denoised)
+  }, BPPARAM = mcparam)
+  sce_denoised = do.call(cbind , logcounts_denoised)
   saveRDS(sce_denoised , file = paste0(root.dir , "data/scRNA_datasets/" , system , "/" , system , "__denoised.Rds"))
 } else{
-  sce_denoised = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/" , system , "__denoised.Rds") )
+  sce_denoised = readRDS( paste0(root.dir , "data/scRNA_datasets/" , system , "/" , system , "__denoised.Rds") )
 }
   
 
@@ -88,18 +96,24 @@ if (!(file.exists( paste0(root.dir , "data/scRNA_datasets/" , system , "/" , sys
 
 
 corr.thresh = 0.75
-corr_stat_all = get_corr_transcriptome_per_gene(sce_denoised , assay = "logcounts", genes = rownames(sce_denoised), batch = batch ,
-                                           n.neigh = 5 , nPC = 100 , genes.predict = rownames(sce_denoised) , method = "spearman")
-corr_stat_all = corr_stat_all[!is.na(corr_stat_all$corr) , ]
-colnames(corr_stat_all) = c("gene" , "corr.all")
-corr_stat_all = corr_stat_all[corr_stat_all$corr.all > corr.thresh , ]
-print(nrow(corr_stat_all))
 
-# add squared loadings
-loadings.squared = get_loadings_squared(sce_denoised)
-corr_stat_all = merge(corr_stat_all , loadings.squared , all.x = T , all.y = F)
+meta = as.data.frame(colData(sce_denoised))
+unq.batches = unique(meta[, batch])
 
-saveRDS(corr_stat_all , file = paste0(root.dir , "data/scRNA_datasets/" , system , "/corr_stat_all.Rds"))
+corr_stat_all = bplapply(unq.batches , function(current.batch){
+  print(current.batch)
+  idx = which(meta[, batch] == current.batch)
+  current.sce = sce_denoised[, idx]
+  current.corr_stat_all = suppressWarnings ( get_corr_transcriptome_per_gene(current.sce , assay = "logcounts", genes = rownames(current.sce), batch = NULL, n.neigh = 5 , nPC = 100 , genes.predict = rownames(current.sce) , method = "spearman") )
+  current.corr_stat_all = current.corr_stat_all[!is.na(current.corr_stat_all$corr) , ]
+  colnames(current.corr_stat_all) = c("gene" , "corr.all")
+  current.corr_stat_all = current.corr_stat_all[current.corr_stat_all$corr.all > corr.thresh , ]
+  
+  current.corr_stat_all$batch = current.batch
+  return(current.corr_stat_all)
+} , BPPARAM = mcparam)
+corr_stat_all = do.call(rbind , corr_stat_all)
+saveRDS( corr_stat_all , file = paste0(root.dir , "data/scRNA_datasets/" , system , "/" , system , "corr_stat_all.Rds"))
 
 
 ```
@@ -111,95 +125,60 @@ saveRDS(corr_stat_all , file = paste0(root.dir , "data/scRNA_datasets/" , system
 ```{r get-genes-basis-min-corr}
 
 
-min.corr.thresh = 0.95
-genes_keep = as.character( corr_stat_all$gene )
-corr_stat_all = corr_stat_all[order(corr_stat_all$corr.all , decreasing = T) , ]
-genes_base = as.character( corr_stat_all$gene[1:3] )
-genes_all = as.character( genes_base )
-genes = list()
-corr_stat = list()
+meta = as.data.frame(colData(sce_denoised))
+unq.batches = unique(meta[, batch])
 eps = 0.00001
-min.corr = 0
 
 
-while(min.corr < min.corr.thresh ){
-  corr_stat_genes = suppressWarnings( get_corr_transcriptome_per_gene(sce_denoised , assay = "logcounts" , genes = genes_all , batch = batch, n.neigh = 5 , nPC = length(genes_all) - 1 , genes.predict = genes_keep , method = "spearman"))
-  corr_stat_genes = corr_stat_genes[!corr_stat_genes$gene %in% genes_all , ]
-  
-  corr_stat_genes$corr[is.na(corr_stat_genes$corr)] = eps
-  corr_stat_genes$corr[corr_stat_genes$corr <= 0] = eps
-  
-  corr_stat_genes = merge(corr_stat_genes , corr_stat_all , all.x = T , all.y = F)
-  corr_stat_genes$corr.ratio = corr_stat_genes$corr/corr_stat_genes$corr.all
-  
-  min.corr = min(corr_stat_genes$corr.ratio)
-  idx = which(corr_stat_genes$corr.ratio == min.corr)
-  gene = corr_stat_genes$gene[idx[1]]
-  genes_all = c(genes_all , gene)
-  genes[[length(genes) + 1 ]] = genes_all
-  corr_stat_genes$n_genes = length(genes_all)
-  corr_stat[[length(corr_stat) + 1]] = min.corr
-}
-
-min_corr_stat = data.frame(n_genes = c(4:length(genes_all)) , min_corr = unlist(corr_stat) , gene = genes_all[4:length(genes_all)])
-min_corr_stat = rbind(data.frame(n_genes = 1:3 , min_corr = c(0,0,0) , gene = genes_all[1:3]) , min_corr_stat)
-out = list(genes = genes_all , min_corr_stat = min_corr_stat)
-saveRDS(out , file = paste0(root.dir , "data/gene_basis/" , system  , "/" , system , "__minCorr_selection.Rds"))
+min.corr.thresh.grid = c( 0.9 , 0.95 )
 
 
-
-```
-
-##  Using highest loading approach
-
-```{r get-genes-basis-highest-loading}
-
-
-min.corr.thresh = 0.95
-genes_keep = as.character( corr_stat_all$gene )
-corr_stat_all = corr_stat_all[order(corr_stat_all$loading.squared , decreasing = T) , ]
-genes_base = as.character( corr_stat_all$gene[1:3] )
-genes_all = as.character( genes_base )
-genes = list()
-corr_stat = list()
-eps = 0.00001
-min.corr = 0
-
-
-while(min.corr < min.corr.thresh ){
-  corr_stat_genes = suppressWarnings( get_corr_transcriptome_per_gene(sce_denoised , assay = "logcounts" , genes = genes_all , batch = batch, n.neigh = 5 , nPC = length(genes_all) - 1 , genes.predict = genes_keep , method = "spearman"))
-  corr_stat_genes = corr_stat_genes[!corr_stat_genes$gene %in% genes_all , ]
-  
-  corr_stat_genes$corr[is.na(corr_stat_genes$corr)] = eps
-  corr_stat_genes$corr[corr_stat_genes$corr <= 0] = eps
-  
-  corr_stat_genes = merge(corr_stat_genes , corr_stat_all , all.x = T , all.y = F)
-  corr_stat_genes$corr.ratio = corr_stat_genes$corr/corr_stat_genes$corr.all
-  
-  # select genes
-  corr_stat_genes = corr_stat_genes[corr_stat_genes$corr.ratio < min.corr.thresh , ]
-  if (nrow(corr_stat_genes) > 0){
+genes_stat = lapply(min.corr.thresh.grid , function(min.corr.thresh){
+  current.genes_stat = list()
+  for (idx.batch in c(1:length(unq.batches))){
+    print(unq.batches[idx.batch])
+    print(idx.batch)
+    idx = which(meta[, batch] %in% unq.batches[idx.batch])
+    current.sce = sce_denoised[, idx]
+    current.corr_stat_all = corr_stat_all[corr_stat_all$batch == unq.batches[idx.batch] , ]
+    current.corr_stat_all = current.corr_stat_all[order(current.corr_stat_all$corr.all , decreasing = T) , ]
+    current.genes_keep = as.character( current.corr_stat_all$gene )
+    if (idx.batch == 1){
+      genes_all = as.character( current.corr_stat_all$gene[1:3] )
+    }
+    min.corr = 0
+    while(min.corr < min.corr.thresh ){
+      corr_stat_genes = suppressWarnings( get_corr_transcriptome_per_gene(current.sce , assay = "logcounts" , genes = genes_all , batch = NULL, n.neigh = 5 , nPC = length(genes_all) - 1 , genes.predict = current.genes_keep , method = "spearman"))
+      corr_stat_genes = corr_stat_genes[!corr_stat_genes$gene %in% genes_all , ]
     
-    min.corr = min(corr_stat_genes$corr.ratio)
-    idx = which(corr_stat_genes$loading.squared == max(corr_stat_genes$loading.squared))
-    gene = corr_stat_genes$gene[idx[1]]
+      corr_stat_genes$corr[is.na(corr_stat_genes$corr)] = eps
+      corr_stat_genes$corr[corr_stat_genes$corr <= 0] = eps
     
-    # update the output
-    genes_all = c(genes_all , gene)
-    genes[[length(genes) + 1 ]] = genes_all
-    corr_stat_genes$n_genes = length(genes_all)
-    corr_stat[[length(corr_stat) + 1]] = min.corr
+      corr_stat_genes = merge(corr_stat_genes , current.corr_stat_all , all.x = T , all.y = F)
+      corr_stat_genes$corr.ratio = corr_stat_genes$corr/corr_stat_genes$corr.all
+    
+      min.corr = min(corr_stat_genes$corr.ratio)
+      if (min.corr >= min.corr.thresh){
+        break
+        print("sample done")
+      } else {
+        idx = which(corr_stat_genes$corr.ratio == min.corr)
+        gene = corr_stat_genes$gene[idx[1]]
+        genes_all = c(genes_all , gene)
+        print(min.corr)
+        print(gene)
+        n = length(current.genes_stat)
+        current.genes_stat[[n+1]] = data.frame(gene = gene , corr.all = corr_stat_genes$corr.all[corr_stat_genes$gene == gene] , 
+                                       corr.ratio = corr_stat_genes$corr.ratio[corr_stat_genes$gene == gene] , batch = unq.batches[idx.batch])
+      }
+    }
   }
-  else {
-    break
-  }
-}
+  current.genes_stat = do.call(rbind , current.genes_stat)
+  return(current.genes_stat)
+})
+names(genes_stat) = paste0("corr_thresh" , min.corr.thresh.grid)
+saveRDS(genes_stat , file = paste0(root.dir , "data/gene_basis/" , system  , "/" , system , "__minCorr_selection.Rds"))
 
-
-min_corr_stat = data.frame(n_genes = c(4:length(genes_all)) , min_corr = unlist(corr_stat) , gene = genes_all[4:length(genes_all)])
-min_corr_stat = rbind(data.frame(n_genes = 1:3 , min_corr = c(0,0,0) , gene = genes_all[1:3]) , min_corr_stat)
-out = list(genes = genes_all , min_corr_stat = min_corr_stat)
-saveRDS(out , file = paste0(root.dir , "data/gene_basis/" , system  , "/" , system , "__maxLoading_selection.Rds"))
 
 
 ```
