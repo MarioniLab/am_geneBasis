@@ -113,8 +113,7 @@ corr_stat_all = bplapply(unq.batches , function(current.batch){
   return(current.corr_stat_all)
 } , BPPARAM = mcparam)
 corr_stat_all = do.call(rbind , corr_stat_all)
-saveRDS( corr_stat_all , file = paste0(root.dir , "data/scRNA_datasets/" , system , "/" , system , "corr_stat_all.Rds"))
-
+saveRDS( corr_stat_all , file = paste0(root.dir , "data/scRNA_datasets/" , system , "/" , system , "__corr_stat_all.Rds"))
 
 ```
 
@@ -147,8 +146,9 @@ genes_stat = lapply(min.corr.thresh.grid , function(min.corr.thresh){
       genes_all = as.character( current.corr_stat_all$gene[1:3] )
     }
     min.corr = 0
-    while(min.corr < min.corr.thresh ){
-      corr_stat_genes = suppressWarnings( get_corr_transcriptome_per_gene(current.sce , assay = "logcounts" , genes = genes_all , batch = NULL, n.neigh = 5 , nPC = length(genes_all) - 1 , genes.predict = current.genes_keep , method = "spearman"))
+    while( min.corr < min.corr.thresh ){
+      corr_stat_genes = suppressWarnings( get_corr_transcriptome_per_gene(current.sce , assay = "logcounts" , genes = genes_all , batch = NULL, n.neigh = 5 , nPC = min( length(genes_all) - 1 , ncol(current.sce) - 1), genes.predict = current.genes_keep , method = "spearman"))
+      
       corr_stat_genes = corr_stat_genes[!corr_stat_genes$gene %in% genes_all , ]
     
       corr_stat_genes$corr[is.na(corr_stat_genes$corr)] = eps
