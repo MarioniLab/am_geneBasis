@@ -1,0 +1,132 @@
+---
+title: "Gene selection."
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+
+#Introduction & method
+
+
+```{r load, message = FALSE}
+# load libraries we are going to use
+
+library(Matrix)
+library(scran)
+library(scater)
+library(batchelor)
+library(knitr)
+library(reshape2)
+library(edgeR)
+library(ggplot2)
+library(BiocSingular)
+library(BiocParallel)
+library(BiocNeighbors)
+library(SingleCellExperiment)
+library(dplyr)
+ncores = 5
+mcparam = MulticoreParam(workers = ncores)
+register(mcparam)
+set.seed(32)
+
+
+#root.dir = "/Users/alsu/Develop/geneBasis/"
+root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
+source(paste0(root.dir , "am_geneBasis/functions/main_functions.R"))
+
+
+system = "melanoma"
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+meta = as.data.frame(colData(sce))
+
+# get rid of spike-ins
+sce = sce[!grepl("ERCC", rownames(sce)) , ]
+
+
+```
+
+# Add denoised and cosine normalized logcounts
+
+```{r predict-transcriptome , message = FALSE}
+
+
+sce = retain_only_hvgs(sce , var.thresh = 0)
+logcounts.denoised = denoise_logcounts(sce, batch = "sample", n.neigh = 10, nPC = 50)
+assay(sce , "logcounts.denoised") = logcounts.denoised
+assay(sce , "cosine.logcounts") = cosineNorm( assay(sce , "logcounts") )
+assay(sce , "cosine.logcounts.denoised") = cosineNorm( assay(sce , "logcounts.denoised") )
+saveRDS(sce , paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_denoised_" , system , ".Rds"))
+
+```
+
+# Calculate basiline L1-norm
+
+Based on graph using all genes
+
+```{r calc-baseline, message = FALSE}
+
+
+n.neigh = 5
+nPC = 50
+
+dist_cosine.logcounts = suppressWarnings( get_distr_dist(sce, genes = rownames(sce), assay = "cosine.logcounts", batch = "sample" , n.neigh = n.neigh , nPC = nPC , genes.predict = rownames(sce) , type = "dist") )
+colnames(dist_cosine.logcounts) = c("gene" , "dist.all")
+
+dist_cosine.logcounts.denoised = suppressWarnings( get_distr_dist(sce, genes = rownames(sce), assay = "cosine.logcounts.denoised", batch = "sample" , n.neigh = n.neigh , nPC = nPC , genes.predict = rownames(sce) , type = "dist") )
+colnames(dist_cosine.logcounts.denoised) = c("gene" , "dist.all")
+
+
+```
+
+
+# Iterative gene search
+
+```{r iterative-gene-search, message = FALSE}
+
+
+
+add_genes = function(sce , genes_base , assay = "logcounts", n_genes_total , batch , type = "denoised"){
+  eps = 0.00001
+  genes_all = genes_base
+  
+  while(length(genes_all) < n_genes_total){
+    stat_genes = suppressWarnings( get_distr_dist(sce , genes = genes_all , assay = assay , batch = batch, n.neigh = 5 , nPC = NULL , genes.predict = rownames(sce) , type = "dist") )
+       
+    stat_genes = stat_genes[!stat_genes$gene %in% genes_all , ] 
+    if (type == "denoised"){
+      stat_genes = merge( stat_genes , dist_cosine.logcounts.denoised )
+    }
+    else if (type == "raw"){
+      stat_genes = merge( stat_genes , dist_cosine.logcounts )
+    }  
+    stat_genes$dist.ratio = stat_genes$dist - stat_genes$dist.all 
+    idx = which(stat_genes$dist.ratio == max(stat_genes$dist.ratio))
+    gene = stat_genes$gene[idx[1]]
+    print(gene)
+    genes_all = c(genes_all , gene)
+  }
+  out = list(genes = genes_all)
+  return(out)
+}
+
+
+genes_stat = bplapply(1:5 , function(i){
+  genes_base = sample(rownames(sce) , 2)
+  genes.denoised = add_genes(sce, genes_base = genes_base, assay = "cosine.logcounts.denoised", n_genes_total = 250, batch = "sample", type = "denoised")
+  genes.raw = add_genes(sce, genes_base = genes_base, assay = "cosine.logcounts", n_genes_total = 250, batch = "sample", type = "raw")
+  out = list(denoised = genes.denoised , raw = genes.raw)
+  return(out)
+}, BPPARAM = mcparam)
+saveRDS(genes_stat , paste0(root.dir , "data/gene_selection/" , system , "/gene_selection_" , system , ".Rds"))
+
+
+
+```
+
+#Session Info
+
+```{r sessinf}
+sessionInfo()
+```
