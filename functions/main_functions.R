@@ -235,6 +235,7 @@ get_mapping = function(sce , assay = "logcounts" , genes = rownames(sce), batch 
     meta = as.data.frame(colData(sce))
     batchFactor = factor(meta[, colnames(meta) == batch])
     neighs = lapply(unique(batchFactor) , function(current.batch){
+      print(current.batch)
       idx = which(batchFactor == current.batch)
       current.sce = sce[, idx]
       current.neighs = get_mapping_single_batch(current.sce , assay = assay , genes = genes, n.neigh = n.neigh, nPC = nPC , get.dist = get.dist)
@@ -263,15 +264,16 @@ get_mapping = function(sce , assay = "logcounts" , genes = rownames(sce), batch 
 
 
 denoise_logcounts = function(sce, batch = "sample", n.neigh = 3, nPC = 50){
+  require(abind)
   neighs = get_mapping(sce , assay = "logcounts", genes = rownames(sce), batch = batch, n.neigh = n.neigh, nPC = nPC)
   logcounts_real = as.matrix(logcounts(sce))
-  logcounts_denoised = lapply(1:nrow(neighs) , function(i){
-    cells = as.character(neighs[i ,])
+  logcounts_denoised = lapply(1:n.neigh , function(i){
+    cells = as.character( neighs[,i] )
     current.counts = logcounts_real[, cells]
-    current.counts = apply(current.counts , 1 , median)
     return(current.counts)
   })
-  logcounts_denoised = do.call(cbind , logcounts_denoised)
+  logcounts_denoised = do.call(abind, c(logcounts_denoised, list(along=3)))
+  logcounts_denoised = apply(logcounts_denoised, 1:2, median)
   colnames(logcounts_denoised) = colnames(sce)
   return(logcounts_denoised)
 }
