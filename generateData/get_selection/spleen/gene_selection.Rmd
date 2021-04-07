@@ -52,13 +52,17 @@ sce = sce[!grepl("ERCC", rownames(sce)) , ]
 ```{r predict-transcriptome , message = FALSE}
 
 
-sce = retain_only_hvgs(sce , var.thresh = 0)
-logcounts.denoised = denoise_logcounts(sce, batch = "sample", n.neigh = 10, nPC = 50)
-assay(sce , "logcounts.denoised") = logcounts.denoised
-assay(sce , "cosine.logcounts") = cosineNorm( assay(sce , "logcounts") )
-assay(sce , "cosine.logcounts.denoised") = cosineNorm( assay(sce , "logcounts.denoised") )
-saveRDS(sce , paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_denoised_" , system , ".Rds"))
-
+if (file.exists(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_denoised_" , system , ".Rds"))){
+  sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_denoised_" , system , ".Rds"))
+} else {
+  sce = retain_only_hvgs(sce , var.thresh = 0)
+  logcounts.denoised = denoise_logcounts(sce, batch = "sample", n.neigh = 10, nPC = 50)
+  assay(sce , "logcounts.denoised") = logcounts.denoised
+  assay(sce , "cosine.logcounts") = cosineNorm( assay(sce , "logcounts") )
+  assay(sce , "cosine.logcounts.denoised") = cosineNorm( assay(sce , "logcounts.denoised") )
+  saveRDS(sce , paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_denoised_" , system , ".Rds"))
+}
+  
 ```
 
 # Calculate basiline L1-norm
@@ -112,7 +116,8 @@ add_genes = function(sce , genes_base , assay = "logcounts", n_genes_total , bat
 }
 
 
-genes_stat = bplapply(1:5 , function(i){
+genes_stat = bplapply(c(1:5) , function(i){
+  print("Started")
   genes_base = sample(rownames(sce) , 2)
   genes.denoised = add_genes(sce, genes_base = genes_base, assay = "cosine.logcounts.denoised", n_genes_total = 250, batch = "sample", type = "denoised")
   genes.raw = add_genes(sce, genes_base = genes_base, assay = "cosine.logcounts", n_genes_total = 250, batch = "sample", type = "raw")
