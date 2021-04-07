@@ -96,6 +96,7 @@ add_genes = function(sce , genes_base , assay = "logcounts", n_genes_total , bat
   genes_all = genes_base
   
   while(length(genes_all) < n_genes_total){
+    print("one")
     stat_genes = suppressWarnings( get_distr_dist(sce , genes = genes_all , assay = assay , batch = batch, n.neigh = 5 , nPC = NULL , genes.predict = rownames(sce) , type = "dist") )
        
     stat_genes = stat_genes[!stat_genes$gene %in% genes_all , ] 
@@ -105,26 +106,29 @@ add_genes = function(sce , genes_base , assay = "logcounts", n_genes_total , bat
     else if (type == "raw"){
       stat_genes = merge( stat_genes , dist_cosine.logcounts )
     }  
+    print("two")
     stat_genes$dist.ratio = stat_genes$dist - stat_genes$dist.all 
     idx = which(stat_genes$dist.ratio == max(stat_genes$dist.ratio))
     gene = stat_genes$gene[idx[1]]
     print(gene)
-    genes_all = c(genes_all , gene)
+    print("three")
+    genes_all = c(genes_all , as.character(gene))
   }
-  out = list(genes = genes_all)
+  out = genes_all
   return(out)
 }
 
 
-genes_stat = lapply(c(1:5) , function(i){
-  print("Started")
-  genes_base = sample(rownames(sce) , 2)
-  genes.denoised = add_genes(sce, genes_base = genes_base, assay = "cosine.logcounts.denoised", n_genes_total = 250, batch = "sample", type = "denoised")
-  genes.raw = add_genes(sce, genes_base = genes_base, assay = "cosine.logcounts", n_genes_total = 250, batch = "sample", type = "raw")
-  out = list(denoised = genes.denoised , raw = genes.raw)
-  return(out)
-})
-saveRDS(genes_stat , paste0(root.dir , "data/gene_selection/" , system , "/gene_selection_" , system , ".Rds"))
+
+print("Started")
+genes_base = sample(rownames(sce) , 2)
+genes.denoised = add_genes(sce, genes_base = genes_base, assay = "cosine.logcounts.denoised", n_genes_total = 5, batch = "sample", type = "denoised")
+genes.raw = add_genes(sce, genes_base = genes_base, assay = "cosine.logcounts", n_genes_total = 5, batch = "sample", type = "raw")
+out = list(denoised = genes.denoised , raw = genes.raw)
+#return(out)
+
+
+saveRDS(out , paste0(root.dir , "data/gene_selection/" , system , "/gene_selection_" , system , ".Rds"))
 
 
 
