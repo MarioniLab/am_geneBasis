@@ -41,8 +41,6 @@ system = "melanoma"
 sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
 meta = as.data.frame(colData(sce))
 
-# get rid of spike-ins
-sce = sce[!grepl("ERCC", rownames(sce)) , ]
 
 
 ```
