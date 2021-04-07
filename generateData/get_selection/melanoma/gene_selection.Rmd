@@ -49,16 +49,20 @@ sce = sce[!grepl("ERCC", rownames(sce)) , ]
 
 # Add denoised and cosine normalized logcounts
 
-```{r predict-transcriptome , message = FALSE}
+```{r denoise , message = FALSE}
 
 
-sce = retain_only_hvgs(sce , var.thresh = 0)
-logcounts.denoised = denoise_logcounts(sce, batch = "sample", n.neigh = 10, nPC = 50)
-assay(sce , "logcounts.denoised") = logcounts.denoised
-assay(sce , "cosine.logcounts") = cosineNorm( assay(sce , "logcounts") )
-assay(sce , "cosine.logcounts.denoised") = cosineNorm( assay(sce , "logcounts.denoised") )
-saveRDS(sce , paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_denoised_" , system , ".Rds"))
-
+if (file.exists(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_denoised_" , system , ".Rds"))){
+  sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_denoised_" , system , ".Rds"))
+} else {
+  sce = retain_only_hvgs(sce , var.thresh = 0)
+  logcounts.denoised = denoise_logcounts(sce, batch = "sample", n.neigh = 10, nPC = 50)
+  assay(sce , "logcounts.denoised") = logcounts.denoised
+  assay(sce , "cosine.logcounts") = cosineNorm( assay(sce , "logcounts") )
+  assay(sce , "cosine.logcounts.denoised") = cosineNorm( assay(sce , "logcounts.denoised") )
+  saveRDS(sce , paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_denoised_" , system , ".Rds"))
+}
+  
 ```
 
 # Calculate basiline L1-norm
@@ -104,15 +108,13 @@ add_genes = function(sce , genes_base , assay = "logcounts", n_genes_total , bat
     stat_genes$dist.ratio = stat_genes$dist - stat_genes$dist.all 
     idx = which(stat_genes$dist.ratio == max(stat_genes$dist.ratio))
     gene = stat_genes$gene[idx[1]]
-    print(gene)
-    genes_all = c(genes_all , gene)
+    genes_all = c(genes_all , as.character(gene))
   }
-  out = list(genes = genes_all)
+  out = genes_all
   return(out)
 }
 
-
-genes_stat = bplapply(1:5 , function(i){
+genes_stat = bplapply(c(1:5) , function(i){
   genes_base = sample(rownames(sce) , 2)
   genes.denoised = add_genes(sce, genes_base = genes_base, assay = "cosine.logcounts.denoised", n_genes_total = 250, batch = "sample", type = "denoised")
   genes.raw = add_genes(sce, genes_base = genes_base, assay = "cosine.logcounts", n_genes_total = 250, batch = "sample", type = "raw")

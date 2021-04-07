@@ -96,7 +96,6 @@ add_genes = function(sce , genes_base , assay = "logcounts", n_genes_total , bat
   genes_all = genes_base
   
   while(length(genes_all) < n_genes_total){
-    print("one")
     stat_genes = suppressWarnings( get_distr_dist(sce , genes = genes_all , assay = assay , batch = batch, n.neigh = 5 , nPC = NULL , genes.predict = rownames(sce) , type = "dist") )
        
     stat_genes = stat_genes[!stat_genes$gene %in% genes_all , ] 
@@ -106,21 +105,15 @@ add_genes = function(sce , genes_base , assay = "logcounts", n_genes_total , bat
     else if (type == "raw"){
       stat_genes = merge( stat_genes , dist_cosine.logcounts )
     }  
-    print("two")
     stat_genes$dist.ratio = stat_genes$dist - stat_genes$dist.all 
     idx = which(stat_genes$dist.ratio == max(stat_genes$dist.ratio))
     gene = stat_genes$gene[idx[1]]
-    print(gene)
-    print("three")
     genes_all = c(genes_all , as.character(gene))
   }
   out = genes_all
   return(out)
 }
 
-
-
-print("Started")
 genes_stat = bplapply(c(1:5) , function(i){
   genes_base = sample(rownames(sce) , 2)
   genes.denoised = add_genes(sce, genes_base = genes_base, assay = "cosine.logcounts.denoised", n_genes_total = 250, batch = "sample", type = "denoised")
