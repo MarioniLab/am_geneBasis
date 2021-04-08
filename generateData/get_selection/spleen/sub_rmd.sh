@@ -9,7 +9,7 @@ script_name=genes_spl
 
 #CHOOSE PARAMETERS
 #RAM in megabytes
-memory=300000
+memory=600000
 r_command="rusage[mem=${memory}]"
 #num_processors
 nproc=5
