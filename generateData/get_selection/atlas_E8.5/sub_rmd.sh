@@ -9,10 +9,10 @@ script_name=genes_emb
 
 #CHOOSE PARAMETERS
 #RAM in megabytes
-memory=600000
+memory=700000
 r_command="rusage[mem=${memory}]"
 #num_processors
-nproc=10
+nproc=12
 
 smg=/nfs/research1/marioni/alsu/singularity/R1.simg
 script=/nfs/research1/marioni/alsu/geneBasis/am_geneBasis/generateData/get_selection/atlas_E8.5/run_rmd.R

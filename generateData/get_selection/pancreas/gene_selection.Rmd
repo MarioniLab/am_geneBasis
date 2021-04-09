@@ -123,7 +123,7 @@ pars = do.call(rbind , pars)
 
 genes_stat = bplapply(c(1:nrow(pars)) , function(i){
   genes_base = sample(rownames(sce) , 2)
-  genes = add_genes(sce , stat = NULL, genes_base = genes_base, assay = pars$assay[i], n_genes_total = 250, batch = "sample", type = pars$type[i], ratio.type = pars$ratio.type[i])
+  genes = add_genes(sce , stat = NULL, genes_base = genes_base, assay = pars$assay[i], n_genes_total = 150, batch = "sample", type = pars$type[i], ratio.type = pars$ratio.type[i])
   saveRDS(genes , paste0(root.dir , "data/gene_selection/" , system , "/" , pars$assay[i] , "_" , pars$type[i] , "_" , pars$ratio.type[i], "_", pars$run[i], ".Rds"))
   return(genes)
 }, BPPARAM = mcparam)
