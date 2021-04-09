@@ -127,14 +127,14 @@ get_markers = function(sce , test = "binom", FDR.thresh = 0.01){
   # requires there is a column called celltype and assay called logcounts
   require(scran)
   # get potential relevant genes
-  markers <- scran::findMarkers(sce , groups=sce$celltype, direction = "up", pval.type="some", test = test, assay.type = "logcounts")
+  markers <- scran::findMarkers(sce , groups=sce$celltype, direction = "up", pval.type="all", test = test, assay.type = "logcounts")
   # put together
   celltypes = names(markers)
   markers = lapply(1:length(celltypes), function(i){
     current.markers = as.data.frame(markers[[i]])
     current.markers = current.markers[!is.na(current.markers$FDR) & current.markers$FDR < FDR.thresh , ]
     if (nrow(current.markers) > 0){
-      out = data.frame( celltype = celltypes[i], gene = rownames(current.markers))
+      out = data.frame( celltype = celltypes[i], gene = rownames(current.markers) )
       return(out)
     }
   })
@@ -144,16 +144,16 @@ get_markers = function(sce , test = "binom", FDR.thresh = 0.01){
 
 
 get_fraction_mapped_correctly = function(mapping){
-  tab = table(mapping$celltype , mapping$celltype.mapped)
+  tab = table(mapping$celltype , mapping$mapped_celltype)
   tab = sweep(tab, 1, rowSums(tab), "/" )
   tab = as.data.frame(tab)
-  colnames(tab) = c("celltype" , "celltype.mapped" , "frac")
+  colnames(tab) = c("celltype" , "mapped_celltype" , "frac")
 
   celltypes = as.character(unique(tab$celltype))
   stat = lapply(celltypes, function(celltype){
     current.tab = tab[tab$celltype == celltype , ]
-    if (celltype %in% current.tab$celltype.mapped){
-      out = data.frame(celltype = celltype , frac_correctly_mapped = current.tab$frac[current.tab$celltype.mapped == celltype])
+    if (celltype %in% current.tab$mapped_celltype){
+      out = data.frame(celltype = celltype , frac_correctly_mapped = current.tab$frac[current.tab$mapped_celltype == celltype])
     }
     else {
       out = data.frame(celltype = celltype , frac_correctly_mapped = 0)
@@ -206,36 +206,67 @@ get_mapping_single_batch = function(sce , assay = "logcounts" , genes = rownames
   else {
     counts = t(counts)
   }
-  
   reference_cells = colnames(current.sce)
   query_cells = colnames(current.sce)
   
+  knns = queryKNN( counts[reference_cells ,], counts[query_cells ,], k = (n.neigh+1), get.index = TRUE, get.distance = get.dist)
+  cells_mapped = t( apply(knns$index, 1, function(x) reference_cells[x[2:(n.neigh+1)]]) )
+  rownames(cells_mapped) = query_cells
+  if (!get.dist){
+    out = cells_mapped
+  }
   if (get.dist){
-    knns = queryKNN( counts[reference_cells ,], counts[query_cells ,], k = (n.neigh+1), get.index = TRUE, get.distance = T)
-    cells_mapped = t( apply(knns$index, 1, function(x) reference_cells[x[2:(n.neigh+1)]]) )
-    rownames(cells_mapped) = query_cells
     distances = knns$distance[, 2:(n.neigh+1)]
     rownames(distances) = query_cells
     out = list(cells_mapped = cells_mapped , distances = distances)
-  } else {
-    knns = queryKNN( counts[reference_cells ,], counts[query_cells ,], k = (n.neigh+1), get.index = TRUE )
-    cells_mapped = t( apply(knns$index, 1, function(x) reference_cells[x[2:(n.neigh+1)]]) )
-    rownames(cells_mapped) = query_cells
-    out = cells_mapped
   }
   return(out)
 }
 
 
-get_mapping = function(sce , assay = "logcounts" , genes = rownames(sce), batch = "sample", n.neigh = 3, nPC = 50 , get.dist = F){
+get_mapping_many_batches = function(sce , assay = "logcounts" , genes = rownames(sce), batch = "sample", n.neigh = 3, nPC = 50 , get.dist = F){
+  current.sce = sce[genes , ]
+  counts = as.matrix( assay(current.sce , assay) )
+  meta = as.data.frame(colData(current.sce))
+  batchFactor = factor(meta[, colnames(meta) == batch])
+  if (!is.null(nPC)){
+    counts = multiBatchPCA(counts , batch = batchFactor , d = nPC)
+    counts = do.call(reducedMNN , counts)
+    counts = counts$corrected
+  } else {
+    counts = fastMNN(counts , batch = batchFactor , d = NA)
+    counts = reducedDim(counts , "corrected")
+  }
+  reference_cells = colnames(current.sce)
+  query_cells = colnames(current.sce)
+  knns = queryKNN( counts[reference_cells ,], counts[query_cells ,], k = (n.neigh+1), get.index = TRUE, get.distance = get.dist)
+  cells_mapped = t( apply(knns$index, 1, function(x) reference_cells[x[2:(n.neigh+1)]]) )
+  rownames(cells_mapped) = query_cells
+  if (!get.dist){
+    out = cells_mapped
+  }
+  if (get.dist){
+    distances = knns$distance[, 2:(n.neigh+1)]
+    rownames(distances) = query_cells
+    out = list(cells_mapped = cells_mapped , distances = distances)
+  }
+  return(out)
+}
+
+
+
+
+get_mapping = function(sce , assay = "logcounts" , genes = rownames(sce), batch = "sample", n.neigh = 3, nPC = 50 , get.dist = F, type = "per batch"){
   if (is.null(batch)){
     out = get_mapping_single_batch(sce , assay = assay , genes = genes, n.neigh = n.neigh, nPC = nPC , get.dist = get.dist)
   }
-  else {
+  else if (type == "together") {
+    out = get_mapping_many_batches(sce , assay = assay , genes = genes, batch = batch , n.neigh = n.neigh, nPC = nPC , get.dist = get.dist)
+  }
+  else if (type == "per batch") {
     meta = as.data.frame(colData(sce))
     batchFactor = factor(meta[, colnames(meta) == batch])
     neighs = lapply(unique(batchFactor) , function(current.batch){
-      print(current.batch)
       idx = which(batchFactor == current.batch)
       current.sce = sce[, idx]
       current.neighs = get_mapping_single_batch(current.sce , assay = assay , genes = genes, n.neigh = n.neigh, nPC = nPC , get.dist = get.dist)
@@ -260,6 +291,7 @@ get_mapping = function(sce , assay = "logcounts" , genes = rownames(sce), batch 
   }
   return(out)
 }
+
 
 
 
@@ -342,15 +374,39 @@ get_distr_dist = function(sce , genes , assay = "logcounts" , batch = "sample" ,
       out$corr[is.na(out$corr)] = eps
       out$corr[out$corr < eps] = eps
     }
-    else if (type == "dist"){
-      out = data.frame(gene = rownames(counts_predict)[i] , dist = as.numeric(dist(rbind(stat_real[i,] , stat_predict[i,]) , method = "manhattan")))
-      out$dist[out$dist < eps] = eps
+    else if (type == "dist.l1"){
+      out = data.frame(gene = rownames(counts_predict)[i] , dist.l1 = as.numeric(dist(rbind(stat_real[i,] , stat_predict[i,]) , method = "manhattan")))
+      out$dist.l1[out$dist.l1 < eps] = eps
+    }
+    else if (type == "dist.l2"){
+      out = data.frame(gene = rownames(counts_predict)[i] , dist.l2 = as.numeric(dist(rbind(stat_real[i,] , stat_predict[i,]) , method = "euclidean")))
+      out$dist.l2[out$dist.l2 < eps] = eps
     }
     return(out)
   }) 
   stat = do.call(rbind , stat)
   return(stat)
 }
+
+
+
+get_expr_real_and_neighbors = function(sce , genes , assay = "logcounts" , batch = "sample" , 
+                                       n.neigh = 10 , nPC = 50 , genes.predict = rownames(sce)){
+  eps = 0.00001
+  neighs = get_mapping(sce , assay = "logcounts" , genes = genes, batch = batch , n.neigh = n.neigh , nPC = nPC)
+  counts_predict = as.matrix(assay(sce[genes.predict , ] , assay))
+  
+  stat_predict = lapply(1:ncol(neighs) , function(j){
+    cells = neighs[,j]
+    current.stat_predict = counts_predict[, cells]
+    return(current.stat_predict)
+  })
+  stat_predict = Reduce("+", stat_predict) / length(stat_predict)
+  stat_real = counts_predict[, rownames(neighs)]
+  out = list(real = stat_real , predict = stat_predict)
+  return(out)
+}
+
 
 
 get_cells_not_mapped_well = function(sce , stat_predict.all , genes.selection , assay = "logcounts" , batch = "sample" , 

@@ -26,7 +26,7 @@ library(BiocParallel)
 library(BiocNeighbors)
 library(SingleCellExperiment)
 library(dplyr)
-ncores = 5
+ncores = 10
 mcparam = MulticoreParam(workers = ncores)
 register(mcparam)
 set.seed(32)
@@ -40,6 +40,7 @@ source(paste0(root.dir , "am_geneBasis/functions/main_functions.R"))
 system = "spleen"
 sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
 meta = as.data.frame(colData(sce))
+
 
 
 ```
@@ -62,47 +63,31 @@ if (file.exists(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_denois
   
 ```
 
-# Calculate basiline L1-norm
-
-Based on graph using all genes
-
-```{r calc-baseline, message = FALSE}
-
-
-n.neigh = 5
-nPC = 50
-
-dist_cosine.logcounts = suppressWarnings( get_distr_dist(sce, genes = rownames(sce), assay = "cosine.logcounts", batch = "sample" , n.neigh = n.neigh , nPC = nPC , genes.predict = rownames(sce) , type = "dist") )
-colnames(dist_cosine.logcounts) = c("gene" , "dist.all")
-
-dist_cosine.logcounts.denoised = suppressWarnings( get_distr_dist(sce, genes = rownames(sce), assay = "cosine.logcounts.denoised", batch = "sample" , n.neigh = n.neigh , nPC = nPC , genes.predict = rownames(sce) , type = "dist") )
-colnames(dist_cosine.logcounts.denoised) = c("gene" , "dist.all")
-
-
-```
-
 
 # Iterative gene search
 
 ```{r iterative-gene-search, message = FALSE}
 
 
-
-add_genes = function(sce , genes_base , assay = "logcounts", n_genes_total , batch , type = "denoised"){
+add_genes = function(sce , stat = NULL, genes_base , assay = "logcounts", n_genes_total , batch , type , ratio.type){
   eps = 0.00001
-  genes_all = genes_base
   
+  if (is.null(stat)){
+    stat = suppressWarnings( get_distr_dist(sce, genes = rownames(sce), assay = assay, batch = batch , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , type = type) )
+    colnames(stat) = c("gene" , "dist.all")
+  }
+  genes_all = genes_base
   while(length(genes_all) < n_genes_total){
-    stat_genes = suppressWarnings( get_distr_dist(sce , genes = genes_all , assay = assay , batch = batch, n.neigh = 5 , nPC = NULL , genes.predict = rownames(sce) , type = "dist") )
-       
+    stat_genes = suppressWarnings( get_distr_dist(sce , genes = genes_all , assay = assay , batch = batch, n.neigh = 5 , nPC = NULL , genes.predict = rownames(sce) , type = type) )
+    colnames(stat_genes) = c("gene" , "dist")   
     stat_genes = stat_genes[!stat_genes$gene %in% genes_all , ] 
-    if (type == "denoised"){
-      stat_genes = merge( stat_genes , dist_cosine.logcounts.denoised )
+    stat_genes = merge(stat_genes , stat)
+    if (ratio.type == "div"){
+      stat_genes$dist.ratio = stat_genes$dist / stat_genes$dist.all 
     }
-    else if (type == "raw"){
-      stat_genes = merge( stat_genes , dist_cosine.logcounts )
+    else if (ratio.type == "sub"){
+      stat_genes$dist.ratio = stat_genes$dist - stat_genes$dist.all 
     }  
-    stat_genes$dist.ratio = stat_genes$dist - stat_genes$dist.all 
     idx = which(stat_genes$dist.ratio == max(stat_genes$dist.ratio))
     gene = stat_genes$gene[idx[1]]
     genes_all = c(genes_all , as.character(gene))
@@ -111,14 +96,38 @@ add_genes = function(sce , genes_base , assay = "logcounts", n_genes_total , bat
   return(out)
 }
 
-genes_stat = bplapply(c(1:5) , function(i){
+
+assays = c("logcounts" , "logcounts.denoised")
+types = c("dist.l1" , "dist.l2")
+ratio.types = c("sub" , "div")
+runs = c(1:3)
+pars = lapply(assays , function(assay){
+  pars.per_assay = lapply(types , function(type){
+    pars.per_type = lapply(ratio.types , function(ratio.type){
+      pars.per_ratio.type = lapply(runs , function(run){
+        out = data.frame(assay = assay , type = type , ratio.type = ratio.type, run = run)
+        return(out)
+      })
+      pars.per_ratio.type = do.call(rbind , pars.per_ratio.type)
+      return(pars.per_ratio.type)
+    })
+    pars.per_type = do.call(rbind , pars.per_type)
+    return(pars.per_type)
+  }) 
+  pars.per_assay = do.call(rbind , pars.per_assay)
+  return(pars.per_assay)
+})
+pars = do.call(rbind , pars)
+
+
+
+genes_stat = bplapply(c(1:nrow(pars)) , function(i){
   genes_base = sample(rownames(sce) , 2)
-  genes.denoised = add_genes(sce, genes_base = genes_base, assay = "cosine.logcounts.denoised", n_genes_total = 250, batch = "sample", type = "denoised")
-  genes.raw = add_genes(sce, genes_base = genes_base, assay = "cosine.logcounts", n_genes_total = 250, batch = "sample", type = "raw")
-  out = list(denoised = genes.denoised , raw = genes.raw)
-  return(out)
+  genes = add_genes(sce , stat = NULL, genes_base = genes_base, assay = pars$assay[i], n_genes_total = 250, batch = "sample", type = pars$type[i], ratio.type = pars$ratio.type[i])
+  saveRDS(genes , paste0(root.dir , "data/gene_selection/" , system , "/" , pars$assay[i] , "_" , pars$type[i] , "_" , pars$ratio.type[i], "_", pars$run[i], ".Rds"))
+  return(genes)
 }, BPPARAM = mcparam)
-saveRDS(genes_stat , paste0(root.dir , "data/gene_selection/" , system , "/gene_selection_" , system , ".Rds"))
+
 
 
 
