@@ -140,7 +140,7 @@ get_umaps = function(genes){
       ggtitle(gene)
     return(p)
   })
-  p <- ggarrange(plotlist = plots , ncol = length(genes))
+  p <- ggarrange(plotlist = plots , ncol = 5, nrow = 5)
   return(p)
 }
 
@@ -151,7 +151,7 @@ plots = lapply(1:nrow(gene_selections.anno) , function(i){
     if (!dir.exists(paste0(figures.dir , "umaps/" , gene_selections.anno$descr[i] , "_" , gene_selections.anno$run[i]))){
       dir.create( paste0(figures.dir , "umaps/" , gene_selections.anno$descr[i] , "_" , gene_selections.anno$run[i]) )
     }
-    ggsave(filename = paste0(figures.dir , "umaps/" , gene_selections.anno$descr[i] , "_" , gene_selections.anno$run[i] , "/", n_genes , ".png"), plot = p, width = 20, height = 7)
+    ggsave(filename = paste0(figures.dir , "umaps/" , gene_selections.anno$descr[i] , "_" , gene_selections.anno$run[i] , "/", n_genes , ".png"), plot = p, width = 10, height = 10)
     return(NA)
   })
   return(NA)
