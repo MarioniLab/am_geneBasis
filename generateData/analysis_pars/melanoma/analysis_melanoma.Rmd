@@ -146,7 +146,7 @@ get_umaps = function(genes){
 
 plots = lapply(1:nrow(gene_selections.anno) , function(i){
   plots.per_selection = lapply(n_genes.grid , function(n_genes){
-    current.genes = gene_selections[[i]][n_genes-24:n_genes]
+    current.genes = gene_selections[[i]][(n_genes-24):n_genes]
     p = get_umaps(current.genes)
     if (!dir.exists(paste0(figures.dir , "umaps/" , gene_selections.anno$descr[i] , "_" , gene_selections.anno$run[i]))){
       dir.create( paste0(figures.dir , "umaps/" , gene_selections.anno$descr[i] , "_" , gene_selections.anno$run[i]) )
