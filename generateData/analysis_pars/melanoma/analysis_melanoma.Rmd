@@ -10,7 +10,7 @@ output:
 
 ```{r load, message = FALSE}
 
-
+library(knitr)
 library(SingleCellExperiment)
 library(ggplot2)
 library(ggpubr)
