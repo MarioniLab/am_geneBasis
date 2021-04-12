@@ -197,30 +197,41 @@ get_mapping_single_batch = function(sce , assay = "logcounts" , genes = rownames
   current.sce = sce[genes , ]
   counts = as.matrix( assay(current.sce , assay) )
   meta = as.data.frame(colData(current.sce))
-
-  if (!is.null(nPC)){
-    pcs = prcomp_irlba(t(counts) , n = min(nPC, (nrow(counts)-1) ))
-    counts = pcs$x
-    rownames(counts) = colnames(current.sce)
-  }
-  else {
-    counts = t(counts)
-  }
-  reference_cells = colnames(current.sce)
-  query_cells = colnames(current.sce)
-  
-  knns = queryKNN( counts[reference_cells ,], counts[query_cells ,], k = (n.neigh+1), get.index = TRUE, get.distance = get.dist)
-  cells_mapped = t( apply(knns$index, 1, function(x) reference_cells[x[2:(n.neigh+1)]]) )
-  rownames(cells_mapped) = query_cells
-  if (!get.dist){
-    out = cells_mapped
-  }
-  if (get.dist){
-    distances = knns$distance[, 2:(n.neigh+1)]
-    rownames(distances) = query_cells
-    out = list(cells_mapped = cells_mapped , distances = distances)
-  }
-  return(out)
+  res = tryCatch(
+    {
+      if (!is.null(nPC)){
+        pcs = prcomp_irlba(t(counts) , n = min(nPC, (nrow(counts)-1) ))
+        counts = pcs$x
+        rownames(counts) = colnames(current.sce)
+      }
+      else {
+        counts = t(counts)
+      }
+      reference_cells = colnames(current.sce)
+      query_cells = colnames(current.sce)
+      
+      if (n.neigh == "all"){
+        n.neigh = length(reference_cells) - 1
+      }
+      knns = queryKNN( counts[reference_cells ,], counts[query_cells ,], k = (n.neigh+1), get.index = TRUE, get.distance = get.dist)
+      cells_mapped = t( apply(knns$index, 1, function(x) reference_cells[x[2:(n.neigh+1)]]) )
+      rownames(cells_mapped) = query_cells
+      if (!get.dist){
+        out = cells_mapped
+      }
+      if (get.dist){
+        distances = knns$distance[, 2:(n.neigh+1)]
+        rownames(distances) = query_cells
+        out = list(cells_mapped = cells_mapped , distances = distances)
+      }
+      return(out)
+    },
+    error = function(dump){
+      message("Features you selected can not be used for pca")
+      return(NULL)
+    }
+  )
+  return(res)
 }
 
 
@@ -229,28 +240,41 @@ get_mapping_many_batches = function(sce , assay = "logcounts" , genes = rownames
   counts = as.matrix( assay(current.sce , assay) )
   meta = as.data.frame(colData(current.sce))
   batchFactor = factor(meta[, colnames(meta) == batch])
-  if (!is.null(nPC)){
-    counts = multiBatchPCA(counts , batch = batchFactor , d = nPC)
-    counts = do.call(reducedMNN , counts)
-    counts = counts$corrected
-  } else {
-    counts = fastMNN(counts , batch = batchFactor , d = NA)
-    counts = reducedDim(counts , "corrected")
-  }
-  reference_cells = colnames(current.sce)
-  query_cells = colnames(current.sce)
-  knns = queryKNN( counts[reference_cells ,], counts[query_cells ,], k = (n.neigh+1), get.index = TRUE, get.distance = get.dist)
-  cells_mapped = t( apply(knns$index, 1, function(x) reference_cells[x[2:(n.neigh+1)]]) )
-  rownames(cells_mapped) = query_cells
-  if (!get.dist){
-    out = cells_mapped
-  }
-  if (get.dist){
-    distances = knns$distance[, 2:(n.neigh+1)]
-    rownames(distances) = query_cells
-    out = list(cells_mapped = cells_mapped , distances = distances)
-  }
-  return(out)
+  res = tryCatch(
+    {
+      if (!is.null(nPC)){
+        counts = multiBatchPCA(counts , batch = batchFactor , d = nPC)
+        counts = do.call(reducedMNN , counts)
+        counts = counts$corrected
+      } else {
+        counts = fastMNN(counts , batch = batchFactor , d = NA)
+        counts = reducedDim(counts , "corrected")
+      }
+      reference_cells = colnames(current.sce)
+      query_cells = colnames(current.sce)
+      
+      if (n.neigh == "all"){
+        n.neigh = length(reference_cells) - 1
+      }
+      knns = queryKNN( counts[reference_cells ,], counts[query_cells ,], k = (n.neigh+1), get.index = TRUE, get.distance = get.dist)
+      cells_mapped = t( apply(knns$index, 1, function(x) reference_cells[x[2:(n.neigh+1)]]) )
+      rownames(cells_mapped) = query_cells
+      if (!get.dist){
+        out = cells_mapped
+      }
+      if (get.dist){
+        distances = knns$distance[, 2:(n.neigh+1)]
+        rownames(distances) = query_cells
+        out = list(cells_mapped = cells_mapped , distances = distances)
+      }
+      return(out)
+    },
+    error = function(dump){
+      message("Features you use are insufficient to perform batch correction via fastMNN")
+      return(NULL)
+    }
+  )
+  return(res)
 }
 
 
@@ -313,25 +337,30 @@ denoise_logcounts = function(sce, batch = "sample", n.neigh = 3, nPC = 50){
 
 get_corr_transcriptome_per_gene = function(sce , genes , assay = "logcounts" , batch = "sample" , 
                                            n.neigh = 10 , nPC = 50 , genes.predict = rownames(sce) ,
-                                           method = "pearson"){
-  neighs = get_mapping(sce , assay = "logcounts" , genes = genes, batch = batch , n.neigh = n.neigh , nPC = nPC)
-  counts_predict = as.matrix(assay(sce[genes.predict , ] , assay))
-  
-  stat_predict = lapply(1:ncol(neighs) , function(j){
-    cells = neighs[,j]
-    current.stat_predict = counts_predict[, cells]
-    return(current.stat_predict)
-  })
-  stat_predict = Reduce("+", stat_predict) / length(stat_predict)
-  
-  stat_real = counts_predict[, rownames(neighs)]
-  
-  corr = lapply(1:nrow(counts_predict) , function(i){
-    out = data.frame(gene = rownames(counts_predict)[i] , corr = cor(stat_real[i,] , stat_predict[i,] , method = method))
-    return(out)
-  }) 
-  corr = do.call(rbind , corr)
-  return(corr)
+                                           method = "pearson", type = "per batch"){
+  neighs = get_mapping(sce , assay = "logcounts" , genes = genes, batch = batch , n.neigh = n.neigh , nPC = nPC , get.dist = F , type = type)
+  if (!is.null(neighs)){
+    counts_predict = as.matrix(assay(sce[genes.predict , ] , assay))
+    
+    stat_predict = lapply(1:ncol(neighs) , function(j){
+      cells = neighs[,j]
+      current.stat_predict = counts_predict[, cells]
+      return(current.stat_predict)
+    })
+    stat_predict = Reduce("+", stat_predict) / length(stat_predict)
+    
+    stat_real = counts_predict[, rownames(neighs)]
+    
+    corr = lapply(1:nrow(counts_predict) , function(i){
+      out = data.frame(gene = rownames(counts_predict)[i] , corr = cor(stat_real[i,] , stat_predict[i,] , method = method))
+      return(out)
+    }) 
+    corr = do.call(rbind , corr)
+    return(corr)
+  }
+  else {
+    return(NULL)
+  }
 }
 
 
@@ -444,8 +473,6 @@ get_cells_not_mapped_well = function(sce , stat_predict.all , genes.selection , 
 
 
 
-
-
 get_moran_score = function(sce , genes , nPC = 50 , assay = "logcounts" , genes.predict = rownames(sce) ){
   
   snn.graph = as.matrix( as_adjacency_matrix( buildSNNGraph(assay(sce[genes , ], "logcounts") , d = nPC)) ) 
@@ -518,33 +545,39 @@ get_preservation_score = function(sce , assay = "logcounts" , genes.all = rownam
 }
 
 
-get_preservation_score_simple = function(sce , assay = "logcounts" , genes.all = rownames(sce) , 
+get_preservation_score_simple = function(sce , neighs.all = NULL , assay = "logcounts" , genes.all = rownames(sce) , 
                                   genes.compare , batch = "sample", n.neigh = 5 , nPC.all = 50 , nPC.compare = 200 ){
-  neighs.compare = get_mapping(sce , assay = assay , genes = genes.compare, batch = batch, n.neigh = n.neigh, nPC = nPC.compare)
-  neighs.all = get_mapping(sce , assay = assay, genes = genes.all, batch = batch, n.neigh = (ncol(sce)-1), nPC = nPC.all , get.dist = T)
-  
-  neighs.all.cells_mapped = neighs.all$cells_mapped
-  neighs.all.distances = neighs.all$distances
-  n.cells = ncol(sce)
-  
-  score = lapply(1:nrow(neighs.compare) , function(i){
-    cells = neighs.all.cells_mapped[i,]
-    idx_all = c(1:n.neigh)
-    idx_compare = which(cells %in% neighs.compare[i,] )
+  neighs.compare = get_mapping(sce , assay = assay , genes = genes.compare, batch = batch, n.neigh = n.neigh, nPC = nPC.compare , type = "together")
+  if (!is.null(neighs.compare)){
+    if (is.null(neighs.all)){
+      neighs.all = get_mapping(sce , assay = assay, genes = genes.all, batch = batch, n.neigh = "all", nPC = nPC.all , get.dist = T , type = "together")
+    }
+    neighs.all.cells_mapped = neighs.all$cells_mapped
+    neighs.all.distances = neighs.all$distances
+    n.cells = ncol(sce)
     
-    dist_all = neighs.all.distances[i, idx_all]
-    dist_compare = neighs.all.distances[i, idx_compare]
-    
-    current.bandwidth = mean(neighs.all.distances[i, ])
-    dist_all = exp(-1*dist_all/current.bandwidth)
-    dist_compare = exp(-1*dist_compare/current.bandwidth)
-    current.score = mean(dist_compare)/mean(dist_all)
-    out = data.frame(score = current.score )
-    return(out)
-  })
-  score = do.call(rbind , score)
-  score$cell = rownames(neighs.compare)
-  return(score)
+    score = lapply(1:nrow(neighs.compare) , function(i){
+      cells = neighs.all.cells_mapped[i,]
+      idx_all = c(1:n.neigh)
+      idx_compare = which(cells %in% neighs.compare[i,] )
+      
+      dist_all = neighs.all.distances[i, idx_all]
+      dist_compare = neighs.all.distances[i, idx_compare]
+      
+      current.bandwidth = mean(neighs.all.distances[i, ])
+      dist_all = exp(-1*dist_all/current.bandwidth)
+      dist_compare = exp(-1*dist_compare/current.bandwidth)
+      current.score = mean(dist_compare)/mean(dist_all)
+      out = data.frame(score = current.score )
+      return(out)
+    })
+    score = do.call(rbind , score)
+    score$cell = rownames(neighs.compare)
+    return(score)
+  }
+  else {
+    return(NULL)
+  }
 }
 
 
