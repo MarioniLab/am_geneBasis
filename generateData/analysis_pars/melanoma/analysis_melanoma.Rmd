@@ -30,7 +30,7 @@ library(uwot)
 library(stringr)
 library(BiocSingular)
 library(BiocParallel)
-ncores = 6
+ncores = 4
 mcparam = MulticoreParam(workers = ncores)
 register(mcparam)
 

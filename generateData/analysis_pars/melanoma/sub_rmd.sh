@@ -9,15 +9,15 @@ script_name=anl_mel
 
 #CHOOSE PARAMETERS
 #RAM in megabytes
-memory=150000
+memory=200000
 r_command="rusage[mem=${memory}]"
 #num_processors
-nproc=6
+nproc=4
 
 smg=/nfs/research1/marioni/alsu/singularity/R1.simg
 script=/nfs/research1/marioni/alsu/geneBasis/am_geneBasis/generateData/analysis_pars/melanoma/run_rmd.R
 
 bsub -q research-rh74 -e ${err_folder}/${script_name} \
 -o ${out_folder}/${script_name} \
--M $memory -R $r_command -n $nproc -J ${script_name} \
+-M $memory -R $r_command -n -P bigmem $nproc -J ${script_name} \
 "singularity exec $smg Rscript $script"
