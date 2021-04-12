@@ -64,25 +64,8 @@ gene_selections.anno$descr = paste0(gene_selections.anno$assay , "_" , gene_sele
 
 # get meta w/umaps
 meta = as.data.frame(colData(sce))
-if (!( "cell" %in% colnames(meta) )){
-  meta = rownames_to_column(meta , var = "cell")
-}
-if (system == "atlas_E8.5"){
-  umaps = as.data.frame( reducedDim(sce , "umap") )
-  if (!( "cell" %in% colnames(umaps) )){
-    umaps = rownames_to_column(umaps , var = "cell")
-  }
-} else {
-  umaps = as.data.frame( reducedDim(sce , "UMAP"))
-  colnames(umaps)[which(colnames(umaps) == "x")] = "V1"
-  colnames(umaps)[which(colnames(umaps) == "y")] = "V2"
-  if (!( "cell" %in% colnames(umaps) )){
-    umaps = rownames_to_column(umaps , var = "cell")
-  }
-}
-meta = merge(meta, umaps)
 meta$sample = factor(meta$sample)
-meta$celltype = factor(meta$celltype)
+meta$celltype = factor(meta$cellltype)
 
 n_genes.grid = seq(25,150,25)
 
