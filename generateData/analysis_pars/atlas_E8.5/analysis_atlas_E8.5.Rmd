@@ -1,0 +1,347 @@
+---
+title: "Pipeline to assess gene selection for melanoma"
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+# Load dependencies
+
+```{r load, message = FALSE}
+
+library(knitr)
+library(SingleCellExperiment)
+library(ggplot2)
+library(ggpubr)
+
+library(viridis)
+library(batchelor)
+library(stats)
+library(BiocNeighbors)
+library(tibble)
+library(reshape2)
+library(plyr)
+library(dplyr)
+library(scran)
+library(batchelor)
+library(stringr)
+library(BiocSingular)
+library(BiocParallel)
+library(BiocStyle)
+ncores = 4
+mcparam = MulticoreParam(workers = ncores)
+register(mcparam)
+
+#root.dir = "/Users/alsu/Develop/geneBasis/"
+root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
+source(paste0(root.dir, "am_geneBasis/functions/main_functions.R"))
+source(paste0(root.dir, "am_geneBasis/functions/visualization_functions.R"))
+
+system = "atlas_E8.5"
+figures.dir = paste0(root.dir , "figures/main/" , system, "/")
+
+# read sce 
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_denoised_" , system , ".Rds"))
+
+# read gene selection
+gene_selections.files = list.files(path=paste0(root.dir , "data/gene_selection/" , system , "/"))
+gene_selections = lapply(gene_selections.files , function(current.file){
+  out = readRDS(paste0(root.dir , "data/gene_selection/" , system , "/" , current.file))
+  return(out)
+})
+gene_selections.anno = lapply(1:length(gene_selections.files) , function(i){
+  current.file = gene_selections.files[i]
+  current.str = str_remove(current.file , ".Rds")
+  current.str = str_split(current.str , "_")
+  out = data.frame(id = i, assay = current.str[[1]][1] , type = current.str[[1]][2] , ratio.type = current.str[[1]][3] , run = current.str[[1]][4])
+  return(out)
+})
+gene_selections.anno = do.call(rbind , gene_selections.anno)
+gene_selections.anno$descr = paste0(gene_selections.anno$assay , "_" , gene_selections.anno$type , "_" , gene_selections.anno$ratio.type )
+  
+  
+
+# get meta w/umaps
+meta = as.data.frame(colData(sce))
+if (!( "cell" %in% colnames(meta) )){
+  meta = rownames_to_column(meta , var = "cell")
+}
+if (system == "atlas_E8.5"){
+  umaps = as.data.frame( reducedDim(sce , "umap") )
+  if (!( "cell" %in% colnames(umaps) )){
+    umaps = rownames_to_column(umaps , var = "cell")
+  }
+} else {
+  umaps = as.data.frame( reducedDim(sce , "UMAP"))
+  colnames(umaps)[which(colnames(umaps) == "x")] = "V1"
+  colnames(umaps)[which(colnames(umaps) == "y")] = "V2"
+  if (!( "cell" %in% colnames(umaps) )){
+    umaps = rownames_to_column(umaps , var = "cell")
+  }
+}
+meta = merge(meta, umaps)
+meta$sample = factor(meta$sample)
+meta$celltype = factor(meta$celltype)
+
+n_genes.grid = seq(25,150,25)
+
+
+```
+
+
+
+## Get overall stat on genes: corr, dist (L1 and L2), mean and frac expressed
+
+Calculated on logcounts-denoised (~ matters for correlation)
+
+```{r get-general-stat, message = FALSE}
+
+
+nPC = 50
+assay = "logcounts.denoised"
+
+dist.l2_stat_all = suppressWarnings( get_distr_dist(sce, genes = rownames(sce), assay = assay , batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , type = "dist.l2") )
+
+dist.l1_stat_all = suppressWarnings( get_distr_dist(sce, genes = rownames(sce), assay = assay , batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , type = "dist.l1") )
+
+corr_stat_all = suppressWarnings( get_distr_dist(sce, genes = rownames(sce), assay = assay , batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , type = "corr") )
+
+mean_stat = apply(assay(sce , assay) , 1 , mean)
+mean_stat = data.frame(gene = names(mean_stat) , mean.logcounts = mean_stat)
+
+frac.expressed_stat = apply(assay(sce , assay) , 1 , function(x) mean(x > 0))
+frac.expressed_stat = data.frame(gene = names(frac.expressed_stat) , frac.expressed = frac.expressed_stat)
+
+
+# merge
+stat_all = merge(mean_stat , frac.expressed_stat)
+stat_all = merge(stat_all , dist.l2_stat_all)
+stat_all = merge(stat_all , dist.l1_stat_all)
+stat_all = merge(stat_all , corr_stat_all)
+saveRDS(stat_all , file = paste0(root.dir , "data/main_analysis/" , system , "/general_stat.Rds"))
+
+
+```
+
+## How do the parameters distribute for selections
+
+```{r plot-general-stat, message = FALSE}
+
+  
+stat_selections = bplapply(1:nrow(gene_selections.anno) , function(i){
+  current.stat = stat_all[stat_all$gene %in% gene_selections[[i]][1:100] , ]
+  current.stat$id = i
+  current.stat = merge(current.stat , gene_selections.anno , all.x = T , all.y = F)
+  return(current.stat)  
+}, BPPARAM = mcparam)
+stat_selections = do.call(rbind , stat_selections)
+
+
+
+
+```
+
+# Do my selections contain strong markers
+
+```{r get-marker-stat, message = FALSE}
+
+
+markers = get_markers(sce , test = "t")
+stat_selections = merge(stat_selections , markers, all.x = T , all.y = F)
+stat_selections$celltype[is.na(stat_selections$celltype)] = "not_marker"
+saveRDS(stat_selections , file = paste0(root.dir , "data/main_analysis/" , system , "/general_stat_selections.Rds"))
+
+
+marker_stat_selections = as.data.frame( stat_selections %>% group_by(assay , type , ratio.type , run , descr , celltype) %>%
+  dplyr::summarise(n = n()) )
+marker_stat_selections = marker_stat_selections[!marker_stat_selections$celltype == "not_marker" , ]
+
+
+
+```
+
+# Quantitative assessment of selections overall
+
+## Get celltype mapping
+
+```{r get-celltype-mapping, message = FALSE}
+
+
+get_celltypes_stat = function(sce , genes , batch = "sample", n.neigh = 5 , nPC = NULL, type = "together"){
+  neighs = suppressWarnings( get_mapping(sce , assay = "logcounts" , genes = genes, batch = batch, n.neigh = n.neigh, nPC = nPC , get.dist = F , type = type))
+  if (!is.null(neighs)){
+    meta = as.data.frame(colData(sce))
+    current.mapping = data.frame(cell = rownames(neighs) , 
+                               celltype = sapply(1:nrow(neighs) , function(i) meta$celltype[meta$cell == rownames(neighs)[i]]) , 
+                               mapped_celltype = sapply(1:nrow(neighs), function(i) getmode(meta$celltype[match(neighs[i,] , meta$cell)] , 1:n.neigh) ))
+    current.stat = get_fraction_mapped_correctly(current.mapping)
+    return(current.stat)
+  } 
+  else {
+    return(NULL)
+  }
+}
+
+stat_mapping_celltypes = bplapply(1:nrow(gene_selections.anno), function(i){
+  stat.per_selection = lapply(n_genes.grid , function(n_genes){
+    current.stat = get_celltypes_stat( sce , genes = gene_selections[[i]][1:n_genes] , batch = "sample", nPC = 50 )
+    if (!is.null(current.stat)){
+      current.stat$n_genes = n_genes
+      current.stat$id = i
+      current.stat = merge(current.stat , gene_selections.anno , all.x = T , all.y = F)
+      return(current.stat)
+    }
+    else {
+      return(NULL)
+    }
+  })
+  stat.per_selection = do.call(rbind , stat.per_selection)
+  return(stat.per_selection)
+}, BPPARAM = mcparam)
+stat_mapping_celltypes = do.call(rbind , stat_mapping_celltypes)
+saveRDS(stat_mapping_celltypes , file = paste0(root.dir , "data/main_analysis/" , system , "/stat_celltypes.Rds"))
+
+
+
+
+```
+
+
+
+## Cell score
+
+```{r get-cell-score, message = FALSE}
+
+
+
+neighs.all = get_mapping(sce , assay = "logcounts", genes = rownames(sce), batch = "sample", n.neigh = "all", nPC = 50 , get.dist = T , type = "together")
+
+stat_cell_score.nPC_50 = bplapply(1:nrow(gene_selections.anno), function(i){
+  stat.per_selection = lapply(n_genes.grid , function(n_genes){
+    print(n_genes)
+    current.stat = suppressWarnings( get_preservation_score_simple(sce , neighs.all = neighs.all , assay = "logcounts" , genes.all = rownames(sce) , 
+                                  genes.compare = gene_selections[[i]][1:n_genes], batch = "sample", n.neigh = 5 , nPC.all = 50 , nPC.compare = 50 ) )
+   if (!is.null(current.stat)){
+      current.stat$n_genes = n_genes
+      current.stat$id = i
+      current.stat$nPC = 50
+      current.stat = merge(current.stat , gene_selections.anno , all.x = T , all.y = F)
+      return(current.stat)
+    }
+    else {
+      return(NULL)
+    }
+  })
+  stat.per_selection = do.call(rbind , stat.per_selection)
+  return(stat.per_selection)
+}, BPPARAM = mcparam)
+stat_cell_score.nPC_50 = do.call(rbind , stat_cell_score.nPC_50)
+
+# all genes
+stat_cell_score.nPC_all = bplapply(1:nrow(gene_selections.anno), function(i){
+  stat.per_selection = lapply(n_genes.grid , function(n_genes){
+    print(n_genes)
+    current.stat = suppressWarnings( get_preservation_score_simple(sce , neighs.all = neighs.all , assay = "logcounts" , genes.all = rownames(sce) , 
+                                  genes.compare = gene_selections[[i]][1:n_genes], batch = "sample", n.neigh = 5 , nPC.all = 50 , nPC.compare = NULL ) )
+   if (!is.null(current.stat)){
+      current.stat$n_genes = n_genes
+      current.stat$id = i
+      current.stat$nPC = "all"
+      current.stat = merge(current.stat , gene_selections.anno , all.x = T , all.y = F)
+      return(current.stat)
+    }
+    else {
+      return(NULL)
+    }
+  })
+  stat.per_selection = do.call(rbind , stat.per_selection)
+  return(stat.per_selection)
+}, BPPARAM = mcparam)
+stat_cell_score.nPC_all = do.call(rbind , stat_cell_score.nPC_all)
+
+# merge
+stat_cell_score = rbind(stat_cell_score.nPC_50 , stat_cell_score.nPC_all)
+saveRDS(stat_cell_score , file = paste0(root.dir , "data/main_analysis/" , system , "/stat_cell_score.Rds"))
+
+
+
+
+```
+
+
+# Gene score
+
+```{r get-gene-score, message = FALSE}
+
+
+stat_gene_score.nPC_50 = bplapply(1:nrow(gene_selections.anno), function(i){
+  stat.per_selection = lapply(n_genes.grid , function(n_genes){
+    print(n_genes)
+    current.stat = suppressWarnings( get_distr_dist(sce, genes = gene_selections[[i]][1:n_genes], assay = "logcounts.denoised" , batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , type = "corr") ) 
+   if (!is.null(current.stat)){
+      current.stat$n_genes = n_genes
+      current.stat$id = i
+      current.stat$nPC = 50
+      current.stat = merge(current.stat , gene_selections.anno , all.x = T , all.y = F)
+      return(current.stat)
+    }
+    else {
+      return(NULL)
+    }
+  })
+  stat.per_selection = do.call(rbind , stat.per_selection)
+  return(stat.per_selection)
+}, BPPARAM = mcparam)
+stat_gene_score.nPC_50 = do.call(rbind , stat_gene_score.nPC_50)
+
+
+
+stat_gene_score.nPC_all = bplapply(1:nrow(gene_selections.anno), function(i){
+  stat.per_selection = lapply(n_genes.grid , function(n_genes){
+    current.stat = suppressWarnings( get_distr_dist(sce, genes = gene_selections[[i]][1:n_genes], assay = "logcounts.denoised" , batch = "sample" , n.neigh = 5 , nPC = NULL , genes.predict = rownames(sce) , type = "corr") ) 
+   if (!is.null(current.stat)){
+      current.stat$n_genes = n_genes
+      current.stat$id = i
+      current.stat$nPC = "all"
+      current.stat = merge(current.stat , gene_selections.anno , all.x = T , all.y = F)
+      return(current.stat)
+    }
+    else {
+      return(NULL)
+    }
+  })
+  stat.per_selection = do.call(rbind , stat.per_selection)
+  return(stat.per_selection)
+}, BPPARAM = mcparam)
+stat_gene_score.nPC_all = do.call(rbind , stat_gene_score.nPC_all)
+
+
+# merge
+stat_gene_score = rbind(stat_gene_score.nPC_50 , stat_gene_score.nPC_all)
+colnames(stat_all)[which(colnames(stat_all) == "corr")] = "corr.all"
+eps = 0.0001
+stat_all$corr.all[is.na(stat_all$corr.all)] = eps
+stat_all$corr.all[stat_all$corr.all < eps] = eps
+
+stat_gene_score$corr[is.na(stat_gene_score$corr)] = eps
+stat_gene_score$corr[stat_gene_score$corr < eps] = eps
+stat_gene_score = merge(stat_gene_score , stat_all)
+stat_gene_score$corr.rario = stat_gene_score$corr/stat_gene_score$corr.all
+
+saveRDS(stat_gene_score , file = paste0(root.dir , "data/main_analysis/" , system , "/stat_gene_score.Rds"))
+
+
+
+
+```
+
+
+
+
+
+# Session Info
+
+```{r sessinf}
+sessionInfo()
+```
