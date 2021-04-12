@@ -14,6 +14,7 @@ library(knitr)
 library(SingleCellExperiment)
 library(ggplot2)
 library(ggpubr)
+
 library(viridis)
 library(batchelor)
 library(stats)
@@ -115,7 +116,7 @@ p2 = ggplot(meta , aes(x = V1 , y = V2 , col = celltype)) +
   theme_classic()
 p = ggarrange(p1,p2,ncol=2)
 p
-ggsave(filename = paste0(figures.dir, "umaps_overall" ,".png"), plot = p, width = 10, height = 6)
+#ggsave(filename = paste0(figures.dir, "umaps_overall" ,".png"), plot = p, width = 10, height = 6)
 
 
 ```
@@ -126,36 +127,36 @@ ggsave(filename = paste0(figures.dir, "umaps_overall" ,".png"), plot = p, width 
 
 ```{r plot-umaps, message = FALSE}
 
-
-get_umaps = function(genes){
-  plots = lapply(genes , function(gene){
-    counts = data.frame(cell = colnames(sce) , counts = as.numeric(assay(sce , "logcounts.denoised")[gene , ]))
-    current.meta = merge(meta , counts)
-    current.meta = current.meta[order(current.meta$counts) , ]
-    p <- ggplot(current.meta , aes(x = V1 , y = V2 , col = counts)) +
-      geom_point(size=.5) +
-      scale_color_gradient(low = "azure3" , high = "darkgreen") + 
-      theme_classic() +
-      theme(legend.position="none") +
-      ggtitle(gene)
-    return(p)
-  })
-  p <- ggarrange(plotlist = plots , ncol = 5, nrow = 5)
-  return(p)
-}
-
-plots = lapply(1:nrow(gene_selections.anno) , function(i){
-  plots.per_selection = lapply(n_genes.grid , function(n_genes){
-    current.genes = gene_selections[[i]][(n_genes-24):n_genes]
-    p = get_umaps(current.genes)
-    if (!dir.exists(paste0(figures.dir , "umaps/" , gene_selections.anno$descr[i] , "_" , gene_selections.anno$run[i]))){
-      dir.create( paste0(figures.dir , "umaps/" , gene_selections.anno$descr[i] , "_" , gene_selections.anno$run[i]) )
-    }
-    ggsave(filename = paste0(figures.dir , "umaps/" , gene_selections.anno$descr[i] , "_" , gene_selections.anno$run[i] , "/", n_genes , ".png"), plot = p, width = 10, height = 10)
-    return(NA)
-  })
-  return(NA)
-})
+# 
+# get_umaps = function(genes){
+#   plots = lapply(genes , function(gene){
+#     counts = data.frame(cell = colnames(sce) , counts = as.numeric(assay(sce , "logcounts.denoised")[gene , ]))
+#     current.meta = merge(meta , counts)
+#     current.meta = current.meta[order(current.meta$counts) , ]
+#     p <- ggplot(current.meta , aes(x = V1 , y = V2 , col = counts)) +
+#       geom_point(size=.5) +
+#       scale_color_gradient(low = "azure3" , high = "darkgreen") + 
+#       theme_classic() +
+#       theme(legend.position="none") +
+#       ggtitle(gene)
+#     return(p)
+#   })
+#   p <- ggarrange(plotlist = plots , ncol = 5, nrow = 5)
+#   return(p)
+# }
+# 
+# plots = lapply(1:nrow(gene_selections.anno) , function(i){
+#   plots.per_selection = lapply(n_genes.grid , function(n_genes){
+#     current.genes = gene_selections[[i]][(n_genes-24):n_genes]
+#     p = get_umaps(current.genes)
+#     if (!dir.exists(paste0(figures.dir , "umaps/" , gene_selections.anno$descr[i] , "_" , gene_selections.anno$run[i]))){
+#       dir.create( paste0(figures.dir , "umaps/" , gene_selections.anno$descr[i] , "_" , gene_selections.anno$run[i]) )
+#     }
+#     ggsave(filename = paste0(figures.dir , "umaps/" , gene_selections.anno$descr[i] , "_" , gene_selections.anno$run[i] , "/", n_genes , ".png"), plot = p, width = 10, height = 10)
+#     return(NA)
+#   })
+#   return(NA)
+# })
 
 
 
@@ -225,7 +226,7 @@ vars = setdiff( colnames(stat_all) , "gene" )
 plots = lapply(vars , function(var){
   p = get_general_stat_plot(var)
   print(p)
-  ggsave(filename = paste0(figures.dir, "general_stat/" , var ,".png"), plot = p, width = 8, height = 5)
+  #ggsave(filename = paste0(figures.dir, "general_stat/" , var ,".png"), plot = p, width = 8, height = 5)
   return(p)
 })
 
@@ -256,7 +257,7 @@ p = ggplot(marker_stat_selections , aes(x = descr, y = n , fill = celltype)) +
   theme_classic() + 
   theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) 
 p
-ggsave(filename = paste0(figures.dir, "marker_distr.png"), plot = p, width = 12, height = 6)
+#ggsave(filename = paste0(figures.dir, "marker_distr.png"), plot = p, width = 12, height = 6)
 
 
 
@@ -310,9 +311,7 @@ p = ggplot(stat_mapping_celltypes , aes(x = factor(n_genes) , y = frac_correctly
   facet_wrap(~run, nrow = 3) + 
   theme_classic()
 p
-ggsave(filename = paste0(figures.dir, "celltype_mapping_overall.png"), plot = p, width = 20, height = 6)
-
-
+#ggsave(filename = paste0(figures.dir, "celltype_mapping_overall.png"), plot = p, width = 17, height = 6)
 
 
 
@@ -417,7 +416,7 @@ p2 = ggplot(stat_cell_score[stat_cell_score$nPC == "all" , ] , aes(x = factor(n_
   theme_classic()
 p = ggarrange(p1,p2, common.legend = T)
 p
-ggsave(filename = paste0(figures.dir, "cell_score.png"), plot = p, width = 15, height = 6)
+#ggsave(filename = paste0(figures.dir, "cell_score.png"), plot = p, width = 15, height = 6)
 
 
 
@@ -504,7 +503,7 @@ p2 = ggplot(stat_gene_score[stat_gene_score$nPC == "all" , ] , aes(x = factor(n_
   theme_classic()
 p = ggarrange(p1,p2, common.legend = T)
 p
-ggsave(filename = paste0(figures.dir, "gene_score.png"), plot = p, width = 15, height = 6)
+#ggsave(filename = paste0(figures.dir, "gene_score.png"), plot = p, width = 15, height = 6)
 
 
 
