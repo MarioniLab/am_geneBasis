@@ -9,10 +9,10 @@ script_name=anl_spl
 
 #CHOOSE PARAMETERS
 #RAM in megabytes
-memory=300000
+memory=400000
 r_command="rusage[mem=${memory}]"
 #num_processors
-nproc=4
+nproc=6
 
 smg=/nfs/research1/marioni/alsu/singularity/R1.simg
 script=/nfs/research1/marioni/alsu/geneBasis/am_geneBasis/generateData/analysis_pars/spleen/run_rmd.R
