@@ -129,7 +129,7 @@ ggsave(filename = paste0(figures.dir, "umaps_overall" ,".png"), plot = p, width 
 
 get_umaps = function(genes){
   plots = lapply(genes , function(gene){
-    counts = data.frame(cell = colnames(sce) , counts = as.numeric(assay(sce_denoised , "logcounts.denoised")[gene , ]))
+    counts = data.frame(cell = colnames(sce) , counts = as.numeric(assay(sce , "logcounts.denoised")[gene , ]))
     current.meta = merge(meta , counts)
     current.meta = current.meta[order(current.meta$counts) , ]
     p <- ggplot(current.meta , aes(x = V1 , y = V2 , col = counts)) +
