@@ -111,7 +111,7 @@ p1 = ggplot(meta , aes(x = V1 , y = V2 , col = sample)) +
   theme_classic()
 p2 = ggplot(meta , aes(x = V1 , y = V2 , col = celltype)) + 
   geom_point(size=.75) +
-  scale_color_manual(values = celltype_cols)
+  scale_color_manual(values = celltype_cols) +
   theme_classic()
 p = ggarrange(p1,p2,ncol=2)
 p
