@@ -63,9 +63,10 @@ gene_selections.anno$descr = paste0(gene_selections.anno$assay , "_" , gene_sele
   
 
 # get meta w/umaps
+sce$celltype = sce$cellltype
 meta = as.data.frame(colData(sce))
 meta$sample = factor(meta$sample)
-meta$celltype = factor(meta$cellltype)
+meta$celltype = factor(meta$celltype)
 
 n_genes.grid = seq(25,150,25)
 
@@ -80,29 +81,31 @@ Calculated on logcounts-denoised (~ matters for correlation)
 
 ```{r get-general-stat, message = FALSE}
 
+# 
+# nPC = 50
+# assay = "logcounts.denoised"
+# 
+# dist.l2_stat_all = suppressWarnings( get_distr_dist(sce, genes = rownames(sce), assay = assay , batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , type = "dist.l2") )
+# 
+# dist.l1_stat_all = suppressWarnings( get_distr_dist(sce, genes = rownames(sce), assay = assay , batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , type = "dist.l1") )
+# 
+# corr_stat_all = suppressWarnings( get_distr_dist(sce, genes = rownames(sce), assay = assay , batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , type = "corr") )
+# 
+# mean_stat = apply(assay(sce , assay) , 1 , mean)
+# mean_stat = data.frame(gene = names(mean_stat) , mean.logcounts = mean_stat)
+# 
+# frac.expressed_stat = apply(assay(sce , assay) , 1 , function(x) mean(x > 0))
+# frac.expressed_stat = data.frame(gene = names(frac.expressed_stat) , frac.expressed = frac.expressed_stat)
+# 
+# 
+# # merge
+# stat_all = merge(mean_stat , frac.expressed_stat)
+# stat_all = merge(stat_all , dist.l2_stat_all)
+# stat_all = merge(stat_all , dist.l1_stat_all)
+# stat_all = merge(stat_all , corr_stat_all)
+# saveRDS(stat_all , file = paste0(root.dir , "data/main_analysis/" , system , "/general_stat.Rds"))
 
-nPC = 50
-assay = "logcounts.denoised"
-
-dist.l2_stat_all = suppressWarnings( get_distr_dist(sce, genes = rownames(sce), assay = assay , batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , type = "dist.l2") )
-
-dist.l1_stat_all = suppressWarnings( get_distr_dist(sce, genes = rownames(sce), assay = assay , batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , type = "dist.l1") )
-
-corr_stat_all = suppressWarnings( get_distr_dist(sce, genes = rownames(sce), assay = assay , batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , type = "corr") )
-
-mean_stat = apply(assay(sce , assay) , 1 , mean)
-mean_stat = data.frame(gene = names(mean_stat) , mean.logcounts = mean_stat)
-
-frac.expressed_stat = apply(assay(sce , assay) , 1 , function(x) mean(x > 0))
-frac.expressed_stat = data.frame(gene = names(frac.expressed_stat) , frac.expressed = frac.expressed_stat)
-
-
-# merge
-stat_all = merge(mean_stat , frac.expressed_stat)
-stat_all = merge(stat_all , dist.l2_stat_all)
-stat_all = merge(stat_all , dist.l1_stat_all)
-stat_all = merge(stat_all , corr_stat_all)
-saveRDS(stat_all , file = paste0(root.dir , "data/main_analysis/" , system , "/general_stat.Rds"))
+stat_all = readRDS(file = paste0(root.dir , "data/main_analysis/" , system , "/general_stat.Rds"))
 
 
 ```
