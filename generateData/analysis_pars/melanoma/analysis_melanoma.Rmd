@@ -35,7 +35,7 @@ register(mcparam)
 #root.dir = "/Users/alsu/Develop/geneBasis/"
 root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
 source(paste0(root.dir, "am_geneBasis/functions/main_functions.R"))
-source(paste0(root.dir, "am_geneBasis/visualization_functions.R"))
+source(paste0(root.dir, "am_geneBasis/functions/visualization_functions.R"))
 
 system = "melanoma"
 figures.dir = paste0(root.dir , "figures/main/" , system, "/")
@@ -225,7 +225,7 @@ vars = setdiff( colnames(stat_all) , "gene" )
 plots = lapply(vars , function(var){
   p = get_general_stat_plot(var)
   print(p)
-  ggsave(filename = paste0(figures.dir, "general_stat/" , var ,".png"), plot = p, width = 8, height = 6)
+  ggsave(filename = paste0(figures.dir, "general_stat/" , var ,".png"), plot = p, width = 8, height = 5)
   return(p)
 })
 
