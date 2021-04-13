@@ -167,11 +167,10 @@ get_fraction_mapped_correctly = function(mapping){
 
 retain_only_hvgs = function(sce, n = NULL, var.thresh = 0){
   dec.sce <- modelGeneVar(sce)
-  if (is.null(n)){
-    hvg.genes = getTopHVGs(dec.sce, var.threshold = var.thresh)
-  } else {
+  hvg.genes = getTopHVGs(dec.sce, var.threshold = var.thresh)
+  if (!is.null(n) & n < length(hvg.genes)){
     hvg.genes = getTopHVGs(dec.sce, n = n)
-  }
+  } 
   print(paste0(length(hvg.genes) , " genes retained (out of " , nrow(sce) , ")"))
   sce = sce[hvg.genes,]
   
@@ -319,19 +318,52 @@ get_mapping = function(sce , assay = "logcounts" , genes = rownames(sce), batch 
 
 
 
-denoise_logcounts = function(sce, batch = "sample", n.neigh = 3, nPC = 50){
+denoise_logcounts = function(sce, batch = "sample", n.neigh = 10, nPC = 50, n.cores = 1){
   require(abind)
-  neighs = get_mapping(sce , assay = "logcounts", genes = rownames(sce), batch = batch, n.neigh = n.neigh, nPC = nPC)
-  logcounts_real = as.matrix(logcounts(sce))
-  logcounts_denoised = lapply(1:n.neigh , function(i){
-    cells = as.character( neighs[,i] )
-    current.counts = logcounts_real[, cells]
-    return(current.counts)
-  })
-  logcounts_denoised = do.call(abind, c(logcounts_denoised, list(along=3)))
-  logcounts_denoised = apply(logcounts_denoised, 1:2, median)
-  colnames(logcounts_denoised) = colnames(sce)
-  return(logcounts_denoised)
+  require(BiocSingular)
+  require(BiocParallel)
+  require(BiocNeighbors)
+  
+  mcparam = MulticoreParam(workers = n.cores)
+  register(mcparam)
+  set.seed(32)
+  
+  if (!is.null(batch)){
+    meta = as.data.frame(colData(sce))
+    batchFactor = factor(meta[, colnames(meta) == batch])
+    logcounts_denoised = bplapply(unique(batchFactor) , function(current.batch){
+      idx = which(batchFactor == current.batch)
+      current.sce = sce[, idx]
+      current.neighs = get_mapping_single_batch(current.sce , assay = "logcounts", genes = rownames(sce), n.neigh = n.neigh, nPC = nPC, get.dist = F)
+      current.logcounts_real = as.matrix(logcounts(current.sce))
+      current.logcounts_denoised = lapply(1:n.neigh , function(i){
+        cells = as.character( current.neighs[,i] )
+        current.counts = current.logcounts_real[, cells]
+        return(current.counts)
+      })
+      current.logcounts_denoised = do.call(abind, c(current.logcounts_denoised, list(along=3)))
+      current.logcounts_denoised = apply(current.logcounts_denoised, 1:2, median)
+      colnames(current.logcounts_denoised) = colnames(current.sce)
+      return(current.logcounts_denoised)
+    }, BPPARAM = mcparam)
+    logcounts_denoised = do.call(cbind , logcounts_denoised)
+    logcounts_denoised = logcounts_denoised[, match(colnames(logcounts_denoised), colnames(sce))]
+    return(logcounts_denoised)
+  }
+  else {
+    current.neighs = get_mapping_single_batch(sce , assay = "logcounts", genes = rownames(sce), n.neigh = n.neigh, nPC = nPC, get.dist = F)
+    current.logcounts_real = as.matrix(logcounts(current.sce))
+    current.logcounts_denoised = lapply(1:n.neigh , function(i){
+      cells = as.character( current.neighs[,i] )
+      current.counts = current.logcounts_real[, cells]
+      return(current.counts)
+    })
+    current.logcounts_denoised = do.call(abind, c(current.logcounts_denoised, list(along=3)))
+    current.logcounts_denoised = apply(current.logcounts_denoised, 1:2, median)
+    colnames(current.logcounts_denoised) = colnames(current.sce)
+    current.logcounts_denoised = current.logcounts_denoised[, match(colnames(current.logcounts_denoised), colnames(sce))]
+    return(current.logcounts_denoised)
+  }
 }
 
 
