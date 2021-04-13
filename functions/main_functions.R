@@ -318,13 +318,13 @@ get_mapping = function(sce , assay = "logcounts" , genes = rownames(sce), batch 
 
 
 
-denoise_logcounts = function(sce, batch = "sample", n.neigh = 10, nPC = 50, n.cores = 1){
+denoise_logcounts = function(sce, batch = "sample", n.neigh = 10, nPC = 50, ncores = 1){
   require(abind)
   require(BiocSingular)
   require(BiocParallel)
   require(BiocNeighbors)
   
-  mcparam = MulticoreParam(workers = n.cores)
+  mcparam = MulticoreParam(workers = ncores)
   register(mcparam)
   set.seed(32)
   
