@@ -1,0 +1,26 @@
+---
+title: "Generating useable dataset for kidney."
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+
+
+
+```{r load, message = FALSE}
+# load libraries we are going to use
+
+
+library(Matrix)
+library(scran)
+library(stats)
+
+```
+
+#Session Info
+
+```{r sessinf}
+sessionInfo()
+```
