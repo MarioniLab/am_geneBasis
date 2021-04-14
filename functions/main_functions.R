@@ -297,17 +297,17 @@ get_mapping = function(sce , assay = "logcounts" , genes = rownames(sce), batch 
     })
     if (!get.dist){
       cells_mapped = do.call(rbind , neighs)
-      cells_mapped = cells_mapped[ order(match(rownames(cells_mapped), colnames(sce))), ]
+      cells_mapped = cells_mapped[ order(match(colnames(sce), rownames(cells_mapped))), ]
       out = cells_mapped
     }
     else {
       distances = lapply(neighs , function(current.neighs) return(current.neighs$distances))
       distances = do.call(rbind , distances)
-      distances = distances[ order(match(rownames(distances), colnames(sce))), ]
+      distances = distances[ order(match(colnames(sce), rownames(distances))), ]
       
       cells_mapped = lapply(neighs , function(current.neighs) return(current.neighs$cells_mapped))
       cells_mapped = do.call(rbind , neighs$cells_mapped)
-      cells_mapped = cells_mapped[ order(match(rownames(cells_mapped), colnames(sce))), ]
+      cells_mapped = cells_mapped[ order(match(colnames(sce), rownames(cells_mapped))), ]
       
       out = list(cells_mapped = cells_mapped , distances = distances)
     }
@@ -347,7 +347,7 @@ denoise_logcounts = function(sce, batch = "sample", n.neigh = 10, nPC = 50, ncor
       return(current.logcounts_denoised)
     }, BPPARAM = mcparam)
     logcounts_denoised = do.call(cbind , logcounts_denoised)
-    logcounts_denoised = logcounts_denoised[, match(colnames(logcounts_denoised), colnames(sce))]
+    logcounts_denoised = logcounts_denoised[, match(colnames(sce), colnames(logcounts_denoised))]
     return(logcounts_denoised)
   }
   else {
@@ -361,7 +361,7 @@ denoise_logcounts = function(sce, batch = "sample", n.neigh = 10, nPC = 50, ncor
     current.logcounts_denoised = do.call(abind, c(current.logcounts_denoised, list(along=3)))
     current.logcounts_denoised = apply(current.logcounts_denoised, 1:2, median)
     colnames(current.logcounts_denoised) = colnames(current.sce)
-    current.logcounts_denoised = current.logcounts_denoised[, match(colnames(current.logcounts_denoised), colnames(sce))]
+    current.logcounts_denoised = current.logcounts_denoised[, match(colnames(sce), colnames(current.logcounts_denoised))]
     return(current.logcounts_denoised)
   }
 }
