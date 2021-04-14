@@ -88,7 +88,7 @@ add_genes = function(sce , stat = NULL, genes_base , assay = "logcounts", n_gene
 
 
 assays = c("logcounts" , "logcounts.denoised" , "normed.logcounts" , "normed.logcounts.denoised")
-types = c("dist.l1" , "dist.l2" , "KS")
+types = c("dist.l1" , "dist.l2")
 runs = c(1:2)
 n_genes_total = 150
 pars = lapply(assays , function(assay){
