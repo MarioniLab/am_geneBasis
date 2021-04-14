@@ -417,7 +417,7 @@ get_distr_dist = function(sce , genes , assay = "logcounts" , batch = "sample" ,
     if (type == "KS"){
       #out = data.frame(gene = rownames(counts_predict)[i] , ks.dist = ks.dist(stat_real[i,] , stat_predict[i,]))
       ks.dist = ks.test(stat_real[i,] , stat_predict[i,])
-      ks.dist = as.numeric(stat_real[i,] , stat_predict[i,]$statistic)
+      ks.dist = as.numeric(ks.dist$statistic)
       out = data.frame(gene = rownames(counts_predict)[i] , ks.dist = ks.dist)
       out = out[ , c("gene" , "ks.dist.D")]
       colnames(out) = c("gene" , "ks")
