@@ -27,6 +27,7 @@ library(BiocNeighbors)
 library(SingleCellExperiment)
 library(dplyr)
 library(BiocStyle)
+library(stats)
 ncores = 5
 mcparam = MulticoreParam(workers = ncores)
 register(mcparam)
@@ -43,10 +44,49 @@ sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_denoised
 meta = as.data.frame(colData(sce))
 
 
-
 ```
 
+# Add z-scale and cosine normed 
 
+```{r add-diff-normalisations, message = FALSE}
+
+
+add_z_norm = function(sce , assay , batch = "sample"){
+  counts = assay(sce , assay)
+  if (is.null(batch)){
+    counts_normed = t(apply(counts, 1 , function(x) scale(x)))
+    idx = which(is.na(counts_normed))
+    counts_normed[idx] = 0
+    colnames(counts_normed) = colnames(counts)
+  }
+  else {
+    meta = as.data.frame(colData(sce))
+    batchFactor = factor(meta[, colnames(meta) == batch])
+    counts_normed = lapply(unique(batchFactor) , function(current.batch){
+      idx = which(batchFactor == current.batch)
+      current.counts = counts[, idx]
+      current.counts_normed = t(apply(current.counts, 1 , function(x) scale(x)))
+      idx = which(is.na(current.counts_normed))
+      current.counts_normed[idx] = 0
+      colnames(current.counts_normed) = colnames(current.counts)
+
+      return(current.counts_normed)
+    })
+    counts_normed = do.call(cbind , counts_normed)
+    counts_normed = counts_normed[, match(colnames(sce) , colnames(counts_normed))]
+  }
+  return(counts_normed)
+}
+
+
+assay(sce , "z.logcounts") = add_z_norm(sce , assay = "logcounts" , batch = "sample")
+assay(sce , "cosine.logcounts") = cosineNorm(assay(sce , "logcounts"))
+assay(sce , "z.logcounts.denoised") = add_z_norm(sce , assay = "logcounts.denoised" , batch = "sample")
+assay(sce , "cosine.logcounts.denoised") = cosineNorm(assay(sce , "logcounts.denoised"))
+
+
+
+```
 
 # Iterative gene search
 
@@ -87,8 +127,8 @@ add_genes = function(sce , stat = NULL, genes_base , assay = "logcounts", n_gene
 }
 
 
-assays = c("logcounts" , "logcounts.denoised" , "normed.logcounts" , "normed.logcounts.denoised")
-types = c("dist.l1" , "dist.l2" )
+assays = c("logcounts" , "logcounts.denoised" , "z.logcounts" , "z.logcounts.denoised" , "cosine.logcounts" , "cosine.logcounts.denoised")
+types = c("dist.l1" , "dist.l2" , "KS")
 runs = c(1:2)
 n_genes_total = 150
 pars = lapply(assays , function(assay){
