@@ -55,7 +55,7 @@ logcounts.denoised = denoise_logcounts(sce, batch = "sample", n.neigh = 10, nPC 
 
 # combine together
 sce_denoised = SingleCellExperiment(assays = list("logcounts" = logcounts(sce), 
-                                                  "logcounts.denoised" = logcounts.denoised), colData = colData(sce), rowdata = rowData(sce))  
+                                                  "logcounts.denoised" = logcounts.denoised), colData = colData(sce))  
 reducedDims(sce_denoised) = reducedDims(sce)  
 
   
