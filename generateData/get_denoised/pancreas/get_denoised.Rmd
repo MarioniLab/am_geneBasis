@@ -66,38 +66,38 @@ reducedDims(sce_denoised) = reducedDims(sce)
 
 ```{r add-z-score, message = FALSE}
 
-
-add_z_norm = function(sce , assay , batch = "sample"){
-  counts = assay(sce , assay)
-  if (is.null(batch)){
-    counts_normed = t(apply(counts, 1 , function(x) scale(x)))
-    idx = which(is.na(counts_normed))
-    counts_normed[idx] = 0
-    colnames(counts_normed) = colnames(counts)
-  }
-  else {
-    meta = as.data.frame(colData(sce))
-    batchFactor = factor(meta[, colnames(meta) == batch])
-    counts_normed = lapply(unique(batchFactor) , function(current.batch){
-      idx = which(batchFactor == current.batch)
-      current.counts = counts[, idx]
-      current.counts_normed = t(apply(current.counts, 1 , function(x) scale(x)))
-      idx = which(is.na(current.counts_normed))
-      current.counts_normed[idx] = 0
-      colnames(current.counts_normed) = colnames(current.counts)
-      
-      return(current.counts_normed)
-    })
-    counts_normed = do.call(cbind , counts_normed)
-    counts_normed = counts_normed[, match(colnames(sce) , colnames(counts_normed))]
-  }
-  return(counts_normed)
-}
-  
-normed.logcounts = add_z_norm(sce_denoised , "logcounts" , batch = "sample")
-assay(sce_denoised , "normed.logcounts") = normed.logcounts
-normed.logcounts.denoised = add_z_norm(sce_denoised , "logcounts.denoised" , batch = "sample")
-assay(sce_denoised , "normed.logcounts.denoised") = normed.logcounts.denoised
+# 
+# add_z_norm = function(sce , assay , batch = "sample"){
+#   counts = assay(sce , assay)
+#   if (is.null(batch)){
+#     counts_normed = t(apply(counts, 1 , function(x) scale(x)))
+#     idx = which(is.na(counts_normed))
+#     counts_normed[idx] = 0
+#     colnames(counts_normed) = colnames(counts)
+#   }
+#   else {
+#     meta = as.data.frame(colData(sce))
+#     batchFactor = factor(meta[, colnames(meta) == batch])
+#     counts_normed = lapply(unique(batchFactor) , function(current.batch){
+#       idx = which(batchFactor == current.batch)
+#       current.counts = counts[, idx]
+#       current.counts_normed = t(apply(current.counts, 1 , function(x) scale(x)))
+#       idx = which(is.na(current.counts_normed))
+#       current.counts_normed[idx] = 0
+#       colnames(current.counts_normed) = colnames(current.counts)
+#       
+#       return(current.counts_normed)
+#     })
+#     counts_normed = do.call(cbind , counts_normed)
+#     counts_normed = counts_normed[, match(colnames(sce) , colnames(counts_normed))]
+#   }
+#   return(counts_normed)
+# }
+#   
+# normed.logcounts = add_z_norm(sce_denoised , "logcounts" , batch = "sample")
+# assay(sce_denoised , "normed.logcounts") = normed.logcounts
+# normed.logcounts.denoised = add_z_norm(sce_denoised , "logcounts.denoised" , batch = "sample")
+# assay(sce_denoised , "normed.logcounts.denoised") = normed.logcounts.denoised
 
 # save
 saveRDS(sce_denoised , paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_denoised_" , system , ".Rds"))
