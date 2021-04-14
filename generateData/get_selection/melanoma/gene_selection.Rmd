@@ -26,6 +26,7 @@ library(BiocParallel)
 library(BiocNeighbors)
 library(SingleCellExperiment)
 library(dplyr)
+library(seewave)
 library(BiocStyle)
 ncores = 5
 mcparam = MulticoreParam(workers = ncores)
