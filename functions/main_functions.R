@@ -123,11 +123,11 @@ get_rid_of_rare_celltypes = function(sce , nCells.thresh = 10 , FDR.thresh = 0.0
 
 
 
-get_markers = function(sce , test = "binom", FDR.thresh = 0.01){
+get_markers = function(sce , test = "binom", type = "all", FDR.thresh = 0.01){
   # requires there is a column called celltype and assay called logcounts
   require(scran)
   # get potential relevant genes
-  markers <- scran::findMarkers(sce , groups=sce$celltype, direction = "up", pval.type="all", test = test, assay.type = "logcounts")
+  markers <- scran::findMarkers(sce , groups=sce$celltype, direction = "up", pval.type=type, test = test, assay.type = "logcounts")
   # put together
   celltypes = names(markers)
   markers = lapply(1:length(celltypes), function(i){
