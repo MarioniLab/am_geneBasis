@@ -410,8 +410,6 @@ get_distr_dist = function(sce , genes , assay = "logcounts" , batch = "sample" ,
   stat_predict = Reduce("+", stat_predict) / length(stat_predict)
   stat_real = counts_predict[, rownames(neighs)]
   
-  stat_real = stat_real
-  stat_predict = stat_predict
   
   stat = lapply(1:nrow(counts_predict) , function(i){
     if (type == "KS"){
@@ -419,7 +417,7 @@ get_distr_dist = function(sce , genes , assay = "logcounts" , batch = "sample" ,
       ks.dist = ks.test(stat_real[i,] , stat_predict[i,])
       ks.dist = as.numeric(ks.dist$statistic)
       out = data.frame(gene = rownames(counts_predict)[i] , ks.dist = ks.dist)
-      out = out[ , c("gene" , "ks.dist.D")]
+      #out = out[ , c("gene" , "ks.dist.D")]
       colnames(out) = c("gene" , "ks")
       out$ks[is.na(out$ks)] = eps
       out$ks[out$ks < eps] = eps
