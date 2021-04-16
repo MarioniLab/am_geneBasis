@@ -120,6 +120,7 @@ add_genes = function(sce , stat = NULL, genes_base , assay = "logcounts", n_gene
     }  
     idx = which(stat_genes$dist.ratio == max(stat_genes$dist.ratio))
     gene = stat_genes$gene[idx[1]]
+    print(gene)
     genes_all = c(genes_all , as.character(gene))
   }
   out = genes_all
@@ -128,7 +129,7 @@ add_genes = function(sce , stat = NULL, genes_base , assay = "logcounts", n_gene
 
 
 assays = c("logcounts" , "logcounts.denoised" , "z.logcounts" , "z.logcounts.denoised" , "cosine.logcounts" , "cosine.logcounts.denoised")
-types = c("dist.l1" , "dist.l2" , "KS")
+types = c("dist.l1" , "dist.l2" )
 runs = c(1:2)
 n_genes_total = 150
 pars = lapply(assays , function(assay){
@@ -153,6 +154,7 @@ genes_stat = bplapply(c(1:nrow(pars)) , function(i){
   saveRDS(genes , paste0(root.dir , "data/gene_selection/" , system , "/" , pars$assay[i] , "_" , pars$type[i] , "_", pars$run[i], ".Rds"))
   return(genes)
 }, BPPARAM = mcparam)
+
 
 
 

@@ -297,17 +297,17 @@ get_mapping = function(sce , assay = "logcounts" , genes = rownames(sce), batch 
     })
     if (!get.dist){
       cells_mapped = do.call(rbind , neighs)
-      cells_mapped = cells_mapped[ order(match(colnames(sce), rownames(cells_mapped))), ]
+      cells_mapped = cells_mapped[ match(colnames(sce), rownames(cells_mapped)), ]
       out = cells_mapped
     }
     else {
       distances = lapply(neighs , function(current.neighs) return(current.neighs$distances))
       distances = do.call(rbind , distances)
-      distances = distances[ order(match(colnames(sce), rownames(distances))), ]
+      distances = distances[ match(colnames(sce), rownames(distances)), ]
       
       cells_mapped = lapply(neighs , function(current.neighs) return(current.neighs$cells_mapped))
       cells_mapped = do.call(rbind , neighs$cells_mapped)
-      cells_mapped = cells_mapped[ order(match(colnames(sce), rownames(cells_mapped))), ]
+      cells_mapped = cells_mapped[ match(colnames(sce), rownames(cells_mapped)), ]
       
       out = list(cells_mapped = cells_mapped , distances = distances)
     }
