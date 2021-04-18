@@ -32,7 +32,6 @@ register(mcparam)
 #root.dir = "/Users/alsu/Develop/geneBasis/"
 root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
 source(paste0(root.dir, "am_geneBasis/functions/main_functions.R"))
-source(paste0(root.dir, "am_geneBasis/visualization_functions.R"))
 
 system = "melanoma"
 
