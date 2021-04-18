@@ -92,7 +92,7 @@ stat = lapply(assays , function(assay){
   return(current_stat)
 })
 stat = do.call(rbind , stat)
-saveRDS(stat_all , file = paste0(root.dir , "data/main_analysis/" , system , "/general_stat.Rds"))
+saveRDS(stat , file = paste0(root.dir , "data/main_analysis/" , system , "/general_stat.Rds"))
 
 
 ```
@@ -124,7 +124,7 @@ stat_selections = bplapply(1:nrow(gene_selections.anno) , function(i){
   return(current.stat)  
 }, BPPARAM = mcparam)
 stat_selections = do.call(rbind , stat_selections)
-saveRDS(stat_all , file = paste0(root.dir , "data/main_analysis/" , system , "/general_stat_selections.Rds"))
+saveRDS(stat_selections , file = paste0(root.dir , "data/main_analysis/" , system , "/general_stat_selections.Rds"))
 
 
 
@@ -284,14 +284,14 @@ stat_gene_score.nPC_all = do.call(rbind , stat_gene_score.nPC_all)
 
 # merge
 stat_gene_score = rbind(stat_gene_score.nPC_50 , stat_gene_score.nPC_all)
-colnames(stat_all)[which(colnames(stat_all) == "corr")] = "corr.all"
+colnames(stat)[which(colnames(stat) == "corr")] = "corr.all"
 eps = 0.0001
-stat_all$corr.all[is.na(stat_all$corr.all)] = eps
-stat_all$corr.all[stat_all$corr.all < eps] = eps
+stat$corr.all[is.na(stat$corr.all)] = eps
+stat$corr.all[stat$corr.all < eps] = eps
 
 stat_gene_score$corr[is.na(stat_gene_score$corr)] = eps
 stat_gene_score$corr[stat_gene_score$corr < eps] = eps
-stat_gene_score = merge(stat_gene_score , stat_all)
+stat_gene_score = merge(stat_gene_score , stat)
 stat_gene_score$corr.rario = stat_gene_score$corr/stat_gene_score$corr.all
 
 saveRDS(stat_gene_score , file = paste0(root.dir , "data/main_analysis/" , system , "/stat_gene_score.Rds"))
