@@ -37,7 +37,7 @@ system = "spleen"
 
 # read sce 
 sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_denoised_" , system , ".Rds"))
-
+sce$cell = colnames(sce)
 # read gene selection
 gene_selections.files = list.files(path=paste0(root.dir , "data/gene_selection/" , system , "/"))
 gene_selections = lapply(gene_selections.files , function(current.file){
@@ -142,6 +142,7 @@ get_celltypes_stat = function(sce , genes , batch = "sample", n.neigh = 5 , nPC 
   neighs = suppressWarnings( get_mapping(sce , assay = "logcounts" , genes = genes, batch = batch, n.neigh = n.neigh, nPC = nPC , get.dist = F , type = type))
   if (!is.null(neighs)){
     meta = as.data.frame(colData(sce))
+    #meta$cell = colnames(sce)
     current.mapping = data.frame(cell = rownames(neighs) , 
                                celltype = sapply(1:nrow(neighs) , function(i) meta$celltype[meta$cell == rownames(neighs)[i]]) , 
                                mapped_celltype = sapply(1:nrow(neighs), function(i) getmode(meta$celltype[match(neighs[i,] , meta$cell)] , 1:n.neigh) ))
