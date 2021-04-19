@@ -85,7 +85,7 @@ stat = lapply(assays , function(assay){
   current_stat = merge(current_stat , corr_stat)
   current_stat = merge(current_stat , mean_stat)
   current_stat = merge(current_stat , frac.expressed_stat)
-  current_stat$assay = assay
+  current_stat$assay.all = assay
   return(current_stat)
 })
 stat = do.call(rbind , stat)
