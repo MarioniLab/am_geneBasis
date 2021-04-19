@@ -132,6 +132,8 @@ saveRDS(stat_selections , file = paste0(root.dir , "data/main_analysis/" , syste
 
 ## Get celltype mapping
 
+### All genes we pick from selection
+
 ```{r get-celltype-mapping, message = FALSE}
 
 
@@ -150,9 +152,11 @@ get_celltypes_stat = function(sce , genes , batch = "sample", n.neigh = 5 , nPC 
   }
 }
 
+# all genes
 stat_mapping_celltypes = bplapply(1:nrow(gene_selections.anno), function(i){
   stat.per_selection = lapply(n_genes.grid , function(n_genes){
-    current.stat = get_celltypes_stat( sce , genes = gene_selections[[i]][1:n_genes] , batch = "sample", nPC = 50 )
+    current.genes = gene_selections[[i]][1:n_genes]
+    current.stat = get_celltypes_stat( sce , genes = current.genes , batch = "sample", nPC = 50 )
     if (!is.null(current.stat)){
       current.stat$n_genes = n_genes
       current.stat$id = i
@@ -167,7 +171,64 @@ stat_mapping_celltypes = bplapply(1:nrow(gene_selections.anno), function(i){
   return(stat.per_selection)
 }, BPPARAM = mcparam)
 stat_mapping_celltypes = do.call(rbind , stat_mapping_celltypes)
-saveRDS(stat_mapping_celltypes , file = paste0(root.dir , "data/main_analysis/" , system , "/stat_celltypes.Rds"))
+saveRDS(stat_mapping_celltypes , file = paste0(root.dir , "data/main_analysis/" , system , "/stat_celltypes_all_genes.Rds"))
+
+
+# all markers
+stat_mapping_celltypes = bplapply(1:nrow(gene_selections.anno), function(i){
+  stat.per_selection = lapply(n_genes.grid , function(n_genes){
+    current.genes = gene_selections[[i]][1:n_genes]
+    current.genes = as.character(markers$gene[markers$gene %in% current.genes])
+    if (length(current.genes) > 1) {
+      current.stat = get_celltypes_stat( sce , genes = current.genes , batch = "sample", nPC = 50 )
+      if (!is.null(current.stat)){
+        current.stat$n_genes = n_genes
+        current.stat$id = i
+        current.stat = merge(current.stat , gene_selections.anno , all.x = T , all.y = F)
+        return(current.stat)
+      }
+      else {
+        return(NULL)
+      }
+    }
+    else {
+      return(NULL)
+    }
+  })
+  stat.per_selection = do.call(rbind , stat.per_selection)
+  return(stat.per_selection)
+}, BPPARAM = mcparam)
+stat_mapping_celltypes = do.call(rbind , stat_mapping_celltypes)
+saveRDS(stat_mapping_celltypes , file = paste0(root.dir , "data/main_analysis/" , system , "/stat_celltypes_all_markers.Rds"))
+
+
+# strong markers
+stat_mapping_celltypes = bplapply(1:nrow(gene_selections.anno), function(i){
+  stat.per_selection = lapply(n_genes.grid , function(n_genes){
+    current.genes = gene_selections[[i]][1:n_genes]
+    current.genes = as.character(markers$gene[markers$gene %in% current.genes & markers$n.ct == 1])
+    if (length(current.genes) > 1) {
+      current.stat = get_celltypes_stat( sce , genes = current.genes , batch = "sample", nPC = 50 )
+      if (!is.null(current.stat)){
+        current.stat$n_genes = n_genes
+        current.stat$id = i
+        current.stat = merge(current.stat , gene_selections.anno , all.x = T , all.y = F)
+        return(current.stat)
+      }
+      else {
+        return(NULL)
+      }
+    }
+    else {
+      return(NULL)
+    }
+  })
+  stat.per_selection = do.call(rbind , stat.per_selection)
+  return(stat.per_selection)
+}, BPPARAM = mcparam)
+stat_mapping_celltypes = do.call(rbind , stat_mapping_celltypes)
+saveRDS(stat_mapping_celltypes , file = paste0(root.dir , "data/main_analysis/" , system , "/stat_celltypes_strong_markers.Rds"))
+
 
 
 
@@ -227,6 +288,8 @@ stat_cell_score.nPC_all = do.call(rbind , stat_cell_score.nPC_all)
 
 # merge
 stat_cell_score = rbind(stat_cell_score.nPC_50 , stat_cell_score.nPC_all)
+stat_cell_score$nPC = factor(stat_cell_score$nPC)
+
 saveRDS(stat_cell_score , file = paste0(root.dir , "data/main_analysis/" , system , "/stat_cell_score.Rds"))
 
 
@@ -281,6 +344,10 @@ stat_gene_score.nPC_all = do.call(rbind , stat_gene_score.nPC_all)
 
 # merge
 stat_gene_score = rbind(stat_gene_score.nPC_50 , stat_gene_score.nPC_all)
+stat_gene_score$nPC = factor(stat_gene_score$nPC)
+
+# only use stat for logcounts.denoised
+stat = stat[stat$assay.all == "logcounts.denoised" , ]
 colnames(stat)[which(colnames(stat) == "corr")] = "corr.all"
 eps = 0.0001
 stat$corr.all[is.na(stat$corr.all)] = eps
@@ -288,7 +355,7 @@ stat$corr.all[stat$corr.all < eps] = eps
 
 stat_gene_score$corr[is.na(stat_gene_score$corr)] = eps
 stat_gene_score$corr[stat_gene_score$corr < eps] = eps
-stat_gene_score = merge(stat_gene_score , stat)
+stat_gene_score = merge(stat_gene_score , stat[, c("gene" , "corr.all")])
 stat_gene_score$corr.rario = stat_gene_score$corr/stat_gene_score$corr.all
 
 saveRDS(stat_gene_score , file = paste0(root.dir , "data/main_analysis/" , system , "/stat_gene_score.Rds"))
