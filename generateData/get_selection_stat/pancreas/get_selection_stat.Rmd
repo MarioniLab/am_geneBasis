@@ -25,7 +25,7 @@ library(batchelor)
 library(stringr)
 library(BiocSingular)
 library(BiocParallel)
-ncores = 12
+ncores = 9
 mcparam = MulticoreParam(workers = ncores)
 register(mcparam)
 
@@ -37,6 +37,7 @@ system = "pancreas"
 
 # read sce 
 sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_denoised_" , system , ".Rds"))
+sce$cell = colnames(sce)
 
 # read gene selection
 gene_selections.files = list.files(path=paste0(root.dir , "data/gene_selection/" , system , "/"))

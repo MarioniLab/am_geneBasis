@@ -25,7 +25,7 @@ library(batchelor)
 library(stringr)
 library(BiocSingular)
 library(BiocParallel)
-ncores = 12
+ncores = 10
 mcparam = MulticoreParam(workers = ncores)
 register(mcparam)
 
