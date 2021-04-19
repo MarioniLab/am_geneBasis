@@ -53,7 +53,7 @@ gene_selections.anno = lapply(1:length(gene_selections.files) , function(i){
   return(out)
 })
 gene_selections.anno = do.call(rbind , gene_selections.anno)
-gene_selections.anno$descr = paste0(gene_selections.anno$assay , "_" , gene_selections.anno$type , "_" , gene_selections.anno$ratio.type )
+gene_selections.anno$descr = paste0(gene_selections.anno$assay , "_" , gene_selections.anno$type , "_" , gene_selections.anno$run )
 
 
 n_genes.grid = seq(25,150,25)
@@ -76,8 +76,6 @@ stat = lapply(assays , function(assay){
   
   corr_stat = suppressWarnings( get_distr_dist(sce, genes = rownames(sce), assay = assay , batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , type = "corr") )
   
-  ks_stat = suppressWarnings( get_distr_dist(sce, genes = rownames(sce), assay = assay , batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , type = "KS") )
-  
   mean_stat = apply(assay(sce , assay) , 1 , mean)
   mean_stat = data.frame(gene = names(mean_stat) , mean.expression = mean_stat)
 
@@ -86,7 +84,6 @@ stat = lapply(assays , function(assay){
 
   current_stat = merge(dist.l2_stat , dist.l1_stat)
   current_stat = merge(current_stat , corr_stat)
-  current_stat = merge(current_stat , ks_stat)
   current_stat = merge(current_stat , mean_stat)
   current_stat = merge(current_stat , frac.expressed_stat)
   current_stat$assay = assay
