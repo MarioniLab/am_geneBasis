@@ -68,30 +68,31 @@ n_genes.grid = seq(25,150,25)
 
 nPC = 50
 assays = c("logcounts" , "logcounts.denoised")
+# 
+# stat = lapply(assays , function(assay){
+#   dist.l2_stat = suppressWarnings( get_distr_dist(sce, genes = rownames(sce), assay = assay , batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , type = "dist.l2") )
+# 
+#   dist.l1_stat = suppressWarnings( get_distr_dist(sce, genes = rownames(sce), assay = assay , batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , type = "dist.l1") )
+# 
+#   corr_stat = suppressWarnings( get_distr_dist(sce, genes = rownames(sce), assay = assay , batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , type = "corr") )
+# 
+#   mean_stat = apply(assay(sce , assay) , 1 , mean)
+#   mean_stat = data.frame(gene = names(mean_stat) , mean.expression = mean_stat)
+# 
+#   frac.expressed_stat = apply(assay(sce , assay) , 1 , function(x) mean(x > 0))
+#   frac.expressed_stat = data.frame(gene = names(frac.expressed_stat) , frac.expressed = frac.expressed_stat)
+# 
+#   current_stat = merge(dist.l2_stat , dist.l1_stat)
+#   current_stat = merge(current_stat , corr_stat)
+#   current_stat = merge(current_stat , mean_stat)
+#   current_stat = merge(current_stat , frac.expressed_stat)
+#   current_stat$assay.all = assay
+#   return(current_stat)
+# })
+# stat = do.call(rbind , stat)
+# saveRDS(stat , file = paste0(root.dir , "data/main_analysis/" , system , "/general_stat.Rds"))
 
-stat = lapply(assays , function(assay){
-  dist.l2_stat = suppressWarnings( get_distr_dist(sce, genes = rownames(sce), assay = assay , batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , type = "dist.l2") )
-
-  dist.l1_stat = suppressWarnings( get_distr_dist(sce, genes = rownames(sce), assay = assay , batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , type = "dist.l1") )
-
-  corr_stat = suppressWarnings( get_distr_dist(sce, genes = rownames(sce), assay = assay , batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , type = "corr") )
-
-  mean_stat = apply(assay(sce , assay) , 1 , mean)
-  mean_stat = data.frame(gene = names(mean_stat) , mean.expression = mean_stat)
-
-  frac.expressed_stat = apply(assay(sce , assay) , 1 , function(x) mean(x > 0))
-  frac.expressed_stat = data.frame(gene = names(frac.expressed_stat) , frac.expressed = frac.expressed_stat)
-
-  current_stat = merge(dist.l2_stat , dist.l1_stat)
-  current_stat = merge(current_stat , corr_stat)
-  current_stat = merge(current_stat , mean_stat)
-  current_stat = merge(current_stat , frac.expressed_stat)
-  current_stat$assay.all = assay
-  return(current_stat)
-})
-stat = do.call(rbind , stat)
-saveRDS(stat , file = paste0(root.dir , "data/main_analysis/" , system , "/general_stat.Rds"))
-
+stat = readRDS(paste0(root.dir , "data/main_analysis/" , system , "/general_stat.Rds"))
 
 ```
 
@@ -138,6 +139,7 @@ saveRDS(stat_selections , file = paste0(root.dir , "data/main_analysis/" , syste
 
 
 get_celltypes_stat = function(sce , genes , batch = "sample", n.neigh = 5 , nPC = NULL, type = "together"){
+  sce = sce[, !is.na(sce$celltype)]
   neighs = suppressWarnings( get_mapping(sce , assay = "logcounts" , genes = genes, batch = batch, n.neigh = n.neigh, nPC = nPC , get.dist = F , type = type))
   if (!is.null(neighs)){
     meta = as.data.frame(colData(sce))
@@ -152,12 +154,15 @@ get_celltypes_stat = function(sce , genes , batch = "sample", n.neigh = 5 , nPC 
   }
 }
 
+
+
 # all genes
 stat_mapping_celltypes = bplapply(1:nrow(gene_selections.anno), function(i){
   stat.per_selection = lapply(n_genes.grid , function(n_genes){
     current.genes = gene_selections[[i]][1:n_genes]
     current.stat = get_celltypes_stat( sce , genes = current.genes , batch = "sample", nPC = 2*length(unique(sce$celltype)) )
     if (!is.null(current.stat)){
+      print(n_genes)
       current.stat$n_genes = n_genes
       current.stat$id = i
       current.stat = merge(current.stat , gene_selections.anno , all.x = T , all.y = F)
