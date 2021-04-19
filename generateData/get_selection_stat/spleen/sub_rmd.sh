@@ -11,7 +11,7 @@ script_name=stat_spl
 memory=550000
 r_command="rusage[mem=${memory}]"
 #num_processors
-nproc=10
+nproc=8
 
 smg=/nfs/research1/marioni/alsu/singularity/R1.simg
 script=/nfs/research1/marioni/alsu/geneBasis/am_geneBasis/generateData/get_selection_stat/spleen/run_rmd.R
