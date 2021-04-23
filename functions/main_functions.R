@@ -444,11 +444,42 @@ get_distr_dist = function(sce , genes , assay = "logcounts" , batch = "sample" ,
       out = data.frame(gene = rownames(counts_predict)[i] , dist.l2 = as.numeric(dist(rbind(stat_real[i,] , stat_predict[i,]) , method = "euclidean")))
       out$dist.l2[out$dist.l2 < eps] = eps
     }
+    else if (type == "dist.l3"){
+      out = data.frame(gene = rownames(counts_predict)[i] , dist.l3 = as.numeric(dist(rbind(stat_real[i,] , stat_predict[i,]) , method = "minkowski" , p = 3)))
+      out$dist.l3[out$dist.l3 < eps] = eps
+    }
     return(out)
   }) 
   stat = do.call(rbind , stat)
   return(stat)
 }
+
+
+get_lp_norm_dist = function(sce , genes , assay = "logcounts" , batch = "sample" , 
+                          n.neigh = 10 , nPC = 50 , genes.predict = rownames(sce) , p ){
+  eps = 0.00001
+  neighs = get_mapping(sce , assay = "logcounts" , genes = genes, batch = batch , n.neigh = n.neigh , nPC = nPC)
+  counts_predict = as.matrix(assay(sce[genes.predict , ] , assay))
+  
+  stat_predict = lapply(1:ncol(neighs) , function(j){
+    cells = neighs[,j]
+    current.stat_predict = counts_predict[, cells]
+    return(current.stat_predict)
+  })
+  stat_predict = Reduce("+", stat_predict) / length(stat_predict)
+  stat_real = counts_predict[, rownames(neighs)]
+  
+  
+  stat = lapply(1:nrow(counts_predict) , function(i){
+    out = data.frame(gene = rownames(counts_predict)[i] , dist = as.numeric(dist(rbind(stat_real[i,] , stat_predict[i,]) , method = "minkowski" , p = p)))
+    out$dist[out$dist < eps] = eps
+    return(out)
+  }) 
+  stat = do.call(rbind , stat)
+  return(stat)
+}
+
+
 
 
 

@@ -1,0 +1,144 @@
+---
+title: "Gene selection."
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+
+#Introduction & method
+
+
+```{r load, message = FALSE}
+# load libraries we are going to use
+
+library(Matrix)
+library(scran)
+library(scater)
+library(batchelor)
+library(knitr)
+library(reshape2)
+library(edgeR)
+library(ggplot2)
+library(BiocSingular)
+library(BiocParallel)
+library(BiocNeighbors)
+library(SingleCellExperiment)
+library(dplyr)
+library(BiocStyle)
+library(stats)
+ncores = 12
+mcparam = MulticoreParam(workers = ncores)
+register(mcparam)
+set.seed(32)
+
+
+#root.dir = "/Users/alsu/Develop/geneBasis/"
+root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
+source(paste0(root.dir , "am_geneBasis/functions/main_functions.R"))
+
+
+system = "atlas_E8.5"
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_denoised_" , system , ".Rds"))
+meta = as.data.frame(colData(sce))
+
+
+# assign gene-symbol names for the easier interpretation (for those which are dupped - ENSMUSG)
+sce.big = readRDS(paste0( root.dir, "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+rowdata = as.data.frame(rowData(sce.big))
+rm(sce.big)
+
+tab = table(rowdata$SYMBOL)
+tab = data.frame(SYMBOL = names(tab) , n = as.numeric(tab))
+rowdata = merge(rowdata , tab)
+
+rowdata$SYMBOL_unq = rowdata$SYMBOL
+rowdata$SYMBOL_unq[rowdata$n > 1] = rowdata$ENSEMBL[rowdata$n > 1]
+
+# assign as rownames
+rownames.sce = rownames(sce)
+rownames.sce = sapply(rownames.sce , function(gene) rowdata$SYMBOL_unq[rowdata$ENSEMBL == gene])
+rownames(sce) = rownames.sce
+
+sce = sce[!grepl("mt-" , rownames(sce)) , ]
+
+```
+
+
+# Iterative gene search
+
+```{r iterative-gene-search, message = FALSE}
+
+
+add_genes = function(sce , stat = NULL, genes_base , assay = "logcounts", n_genes_total , batch , p){
+  eps = 0.00001
+  if (type %in% c("dist.l1" , "dist.l2")){
+    ratio.type = "sub"
+  } else if (type %in% c("KS")){
+    ratio.type = "div"
+  }
+    
+  if (is.null(stat)){
+    stat = suppressWarnings( get_lp_norm_dist(sce, genes = rownames(sce), assay = assay, batch = batch , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , p = p) )
+    colnames(stat) = c("gene" , "dist.all")
+  }
+  genes_all = genes_base
+  while(length(genes_all) < n_genes_total){
+    stat_genes = suppressWarnings( get_lp_norm_dist(sce , genes = genes_all , assay = assay , batch = batch, n.neigh = 5 , nPC = NULL , genes.predict = rownames(sce) , p = p) )
+    colnames(stat_genes) = c("gene" , "dist")   
+    stat_genes = stat_genes[!stat_genes$gene %in% genes_all , ] 
+    stat_genes = merge(stat_genes , stat)
+    
+    if (ratio.type == "div"){
+      stat_genes$dist.ratio = stat_genes$dist / stat_genes$dist.all 
+    }
+    else if (ratio.type == "sub"){
+      stat_genes$dist.ratio = stat_genes$dist - stat_genes$dist.all 
+    }  
+    idx = which(stat_genes$dist.ratio == max(stat_genes$dist.ratio))
+    gene = stat_genes$gene[idx[1]]
+    print(gene)
+    genes_all = c(genes_all , as.character(gene))
+  }
+  out = genes_all
+  return(out)
+}
+
+
+assays = c("logcounts" , "logcounts.denoised")
+ps = c(1:4)
+runs = c(1:2)
+n_genes_total = 200
+pars = lapply(assays , function(assay){
+  pars.per_assay = lapply(ps , function(p){
+    pars.per_type = lapply(runs , function(run){
+      out = data.frame(assay = assay , p = p , run = run)
+      return(out)
+    })
+    pars.per_type = do.call(rbind , pars.per_type)
+    return(pars.per_type)
+  })
+  pars.per_assay = do.call(rbind , pars.per_assay)
+  return(pars.per_assay)
+}) 
+pars = do.call(rbind , pars)
+
+
+
+genes_stat = bplapply(c(1:nrow(pars)) , function(i){
+  genes_base = sample(rownames(sce) , 2)
+  genes = add_genes(sce , stat = NULL, genes_base = genes_base, assay = pars$assay[i], n_genes_total = n_genes_total, batch = "sample", p = pars$p[i])
+  saveRDS(genes , paste0(root.dir , "data/gene_selection/" , system , "/" , pars$assay[i] , "_L" , pars$p[i] , "_", pars$run[i], ".Rds"))
+  return(genes)
+}, BPPARAM = mcparam)
+
+
+
+```
+
+#Session Info
+
+```{r sessinf}
+sessionInfo()
+```
