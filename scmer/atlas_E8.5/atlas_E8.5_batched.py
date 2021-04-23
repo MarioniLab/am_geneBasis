@@ -27,7 +27,8 @@ sc.pp.neighbors(adata, n_neighbors=10, n_pcs=20)
 sc.tl.umap(adata)
 
 # create lambda grid
-lambdas = [1e-4 , 2e-4, 4e-4 , 6e-4 , 8e-4, 1e-3, 1.5e-3, 2e-3 , 2.5e-3, 3e-3 , 3.5e-3, 4e-3]
+# lambdas = [1e-4 = 395, 2e-4 = 295, 4e-4 = 180, 6e-4 = 133, 8e-4 = 131, 1e-3 = 116, 1.5e-3 = 84, 2e-3 =45, 2.5e-3=42, 3e-3 , 3.5e-3, 4e-3]
+lambdas = [3e-4, 5-4, 1.25e-3, 1.75e-3]
 for current_lambda in lambdas:
     model = scmer.UmapL1(lasso=current_lambda, ridge=0., n_pcs=50, perplexity=100., use_beta_in_Q=True, n_threads=9, pca_seed=2020)
     model.fit(adata.X)
