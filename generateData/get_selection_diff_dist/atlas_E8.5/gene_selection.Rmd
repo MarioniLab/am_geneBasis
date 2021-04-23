@@ -73,11 +73,6 @@ sce = sce[!grepl("mt-" , rownames(sce)) , ]
 
 add_genes = function(sce , stat = NULL, genes_base , assay = "logcounts", n_genes_total , batch , p){
   eps = 0.00001
-  if (type %in% c("dist.l1" , "dist.l2")){
-    ratio.type = "sub"
-  } else if (type %in% c("KS")){
-    ratio.type = "div"
-  }
     
   if (is.null(stat)){
     stat = suppressWarnings( get_lp_norm_dist(sce, genes = rownames(sce), assay = assay, batch = batch , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , p = p) )
