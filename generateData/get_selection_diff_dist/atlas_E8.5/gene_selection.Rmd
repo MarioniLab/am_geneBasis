@@ -85,12 +85,8 @@ add_genes = function(sce , stat = NULL, genes_base , assay = "logcounts", n_gene
     stat_genes = stat_genes[!stat_genes$gene %in% genes_all , ] 
     stat_genes = merge(stat_genes , stat)
     
-    if (ratio.type == "div"){
-      stat_genes$dist.ratio = stat_genes$dist / stat_genes$dist.all 
-    }
-    else if (ratio.type == "sub"){
-      stat_genes$dist.ratio = stat_genes$dist - stat_genes$dist.all 
-    }  
+    stat_genes$dist.ratio = stat_genes$dist - stat_genes$dist.all 
+   
     idx = which(stat_genes$dist.ratio == max(stat_genes$dist.ratio))
     gene = stat_genes$gene[idx[1]]
     print(gene)
