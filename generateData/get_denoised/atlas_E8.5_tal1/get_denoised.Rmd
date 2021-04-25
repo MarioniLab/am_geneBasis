@@ -1,0 +1,70 @@
+---
+title: "Gene selection."
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+
+#Introduction & method
+
+
+```{r load, message = FALSE}
+# load libraries we are going to use
+
+
+library(Matrix)
+library(scran)
+library(scater)
+library(batchelor)
+library(knitr)
+library(reshape2)
+library(edgeR)
+library(ggplot2)
+library(BiocSingular)
+library(BiocParallel)
+library(BiocNeighbors)
+library(SingleCellExperiment)
+library(dplyr)
+ncores = 4
+mcparam = MulticoreParam(workers = ncores)
+register(mcparam)
+set.seed(32)
+
+#root.dir = "/Users/alsu/Develop/geneBasis/"
+root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
+source(paste0(root.dir , "am_geneBasis/functions/main_functions.R"))
+
+
+system = "atlas_E8.5_tal1"
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+meta = as.data.frame(colData(sce))
+
+
+
+```
+
+# Add denoised and cosine normalized logcounts
+
+```{r denoise , message = FALSE}
+
+
+sce = retain_only_hvgs(sce , n = 10000 , var.thresh = 0)
+logcounts.denoised = denoise_logcounts(sce, batch = "sample", n.neigh = 10, nPC = 50, ncores = ncores)
+
+# combine together
+sce_denoised = SingleCellExperiment(assays = list("logcounts" = logcounts(sce), 
+                                                  "logcounts.denoised" = logcounts.denoised), colData = colData(sce))  
+reducedDims(sce_denoised) = reducedDims(sce)  
+
+saveRDS(sce_denoised , paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_denoised_" , system , ".Rds"))
+
+
+```
+
+#Session Info
+
+```{r sessinf}
+sessionInfo()
+```
