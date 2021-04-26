@@ -25,7 +25,7 @@ library(batchelor)
 library(stringr)
 library(BiocSingular)
 library(BiocParallel)
-ncores = 6
+ncores = 10
 mcparam = MulticoreParam(workers = ncores)
 register(mcparam)
 
@@ -77,12 +77,16 @@ stat = lapply(assays , function(assay){
   
   dist.l1_stat = suppressWarnings( get_lp_norm_dist(sce , genes = rownames(sce), assay = assay , batch = "sample" , 
                           n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , p = 1) )
+  colnames(dist.l1_stat) = c("gene" , "dist.l1")
   dist.l2_stat = suppressWarnings( get_lp_norm_dist(sce , genes = rownames(sce), assay = assay , batch = "sample" , 
                           n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , p = 2) )
+  colnames(dist.l2_stat) = c("gene" , "dist.l2")
   dist.l3_stat = suppressWarnings( get_lp_norm_dist(sce , genes = rownames(sce), assay = assay , batch = "sample" , 
                           n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , p = 3) )
+  colnames(dist.l3_stat) = c("gene" , "dist.l3")
   dist.l4_stat = suppressWarnings( get_lp_norm_dist(sce , genes = rownames(sce), assay = assay , batch = "sample" , 
                           n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , p = 4) )
+  colnames(dist.l4_stat) = c("gene" , "dist.l4")
   
   mean_stat = apply(assay(sce , assay) , 1 , mean)
   mean_stat = data.frame(gene = names(mean_stat) , mean.expression = mean_stat)
@@ -148,9 +152,9 @@ saveRDS(stat_selections , file = paste0(root.dir , "data/main_analysis/" , syste
 
 get_celltypes_stat = function(sce , genes , batch = "sample", n.neigh = 5 , nPC = NULL, type = "together"){
   neighs = suppressWarnings( get_mapping(sce , assay = "logcounts" , genes = genes, batch = batch, n.neigh = n.neigh, nPC = nPC , get.dist = F , type = type))
-  
+
   idx = which(is.na(sce$celltype))
-  sce$celltype[idx] = sce$annotation.l1[idx]
+  sce$celltype[idx] = as.character( sce$annotation.l1[idx] )
   if (!is.null(neighs)){
     meta = as.data.frame(colData(sce))
     current.mapping = data.frame(cell = rownames(neighs) ,
@@ -207,7 +211,7 @@ neighs.all = get_mapping(sce , assay = "logcounts", genes = rownames(sce), batch
 stat_cell_score.nPC_all = bplapply(1:nrow(gene_selections.anno), function(i){
   stat.per_selection = lapply(n_genes.grid , function(n_genes){
     current.genes = gene_selections[[i]][1:n_genes]
-    current.stat = suppressWarnings( get_preservation_score_simple(sce , neighs.all = neighs.all , assay = "logcounts" , genes.all = rownames(sce) , 
+    current.stat = suppressWarnings( get_preservation_score_simple(sce , neighs.all = neighs.all , assay = "logcounts" , genes.all = rownames(sce) ,
                                   genes.compare = gene_selections[[i]][1:n_genes], batch = "sample", n.neigh = 5 , nPC.all = 50 , nPC.compare = length(current.genes)-2 ) )
    if (!is.null(current.stat)){
       current.stat$n_genes = n_genes
