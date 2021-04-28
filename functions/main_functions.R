@@ -457,8 +457,14 @@ get_distr_dist = function(sce , genes , assay = "logcounts" , batch = "sample" ,
 
 get_lp_norm_dist = function(sce , genes , assay = "logcounts" , batch = "sample" , 
                           n.neigh = 10 , nPC = 50 , genes.predict = rownames(sce) , p ){
-  eps = 0.00001
-  neighs = get_mapping(sce , assay = "logcounts" , genes = genes, batch = batch , n.neigh = n.neigh , nPC = nPC)
+  
+  if (!is.null(genes)){
+    neighs = get_mapping(sce , assay = "logcounts" , genes = genes, batch = batch , n.neigh = n.neigh , nPC = nPC)
+  }
+  else {
+    neighs = initiate_mapping_for_gene_search(sce , batch = batch , n.neigh = n.neigh)
+  }
+  
   counts_predict = as.matrix(assay(sce[genes.predict , ] , assay))
   
   stat_predict = lapply(1:ncol(neighs) , function(j){
@@ -469,15 +475,51 @@ get_lp_norm_dist = function(sce , genes , assay = "logcounts" , batch = "sample"
   stat_predict = Reduce("+", stat_predict) / length(stat_predict)
   stat_real = counts_predict[, rownames(neighs)]
   
-  
   stat = lapply(1:nrow(counts_predict) , function(i){
     out = data.frame(gene = rownames(counts_predict)[i] , dist = as.numeric(dist(rbind(stat_real[i,] , stat_predict[i,]) , method = "minkowski" , p = p)))
-    out$dist[out$dist < eps] = eps
     return(out)
   }) 
   stat = do.call(rbind , stat)
   return(stat)
 }
+
+
+
+
+initiate_mapping_for_gene_search = function(sce , batch = "sample", n.neigh = 3){
+  require(irlba)
+  require(BiocNeighbors)
+  if (is.null(batch)){
+    batchFactor = factor(rep(1 , ncol(sce)))
+  }
+  else {
+    meta = as.data.frame(colData(sce))
+    batchFactor = factor(meta[, colnames(meta) == batch])
+  }
+  
+  initial_random_mtrx = suppressWarnings( abs(matrix(rnorm(10),2,ncol(sce))) )
+  colnames(initial_random_mtrx) = colnames(sce)
+  
+  neighs = lapply(unique(batchFactor) , function(current.batch){
+    idx = which(batchFactor == current.batch)
+    counts = t( initial_random_mtrx[, idx] )
+    
+    reference_cells = colnames(sce[,idx])
+    query_cells = colnames(sce[,idx])
+    
+    knns = suppressWarnings( queryKNN( counts[reference_cells ,], counts[query_cells ,], k = (n.neigh+1), get.index = TRUE, get.distance = F) )
+    cells_mapped = t( apply(knns$index, 1, function(x) reference_cells[x[2:(n.neigh+1)]]) )
+    rownames(cells_mapped) = query_cells
+    return(cells_mapped)
+  })
+   
+  neighs = do.call(rbind , neighs)
+  neighs = neighs[ match(colnames(sce), rownames(neighs)), ]
+  return(neighs)
+}
+
+
+
 
 
 
@@ -646,7 +688,7 @@ get_preservation_score_simple = function(sce , neighs.all = NULL , assay = "logc
 
 
 
-get_mapping_2_external_dataset = function(sce_reference , sce_query , cluster_id , genes, nPC = 100, n.neigh = 5){
+get_mapping_2_external_dataset = function(sce_reference , sce_query , cluster_id , genes, nPC = 100, n.neigh = 5, skip.first = F){
   genes = intersect(genes,rownames(sce_reference))
   genes = intersect(genes,rownames(sce_query))
   
@@ -659,19 +701,24 @@ get_mapping_2_external_dataset = function(sce_reference , sce_query , cluster_id
   assay(sce_query , "cosineNorm") = cosineNorm(logcounts(sce_query))
   
   sce_joint = cbind(assay(sce_query, "cosineNorm"), assay(sce_reference, "cosineNorm"))
-  batchFactor = factor(c(as.character(sce_query$sample), as.character(sce_reference$Sample)))
+  batchFactor = factor(c(as.character(sce_query$sample), as.character(sce_reference$sample)))
   
   mbpca = multiBatchPCA(sce_joint, batch = batchFactor, d = nPC)
   out = do.call(reducedMNN, mbpca)
   joint_pca = out$corrected
   current.knns = queryKNN( joint_pca[colnames(sce_reference),], joint_pca[colnames(sce_query),], k = n.neigh, 
                            get.index = TRUE, get.distance = FALSE)
-  cells.mapped = t( apply(current.knns$index, 1, function(x) colnames(sce_reference)[x]) )
+  if (skip.first){
+    cells.mapped = t( apply(current.knns$index, 1, function(x) colnames(sce_reference)[x[2:n.neigh]]) )
+  }
+  else {
+    cells.mapped = t( apply(current.knns$index, 1, function(x) colnames(sce_reference)[x]) )
+  }
   
   meta_reference = as.data.frame(colData(sce_reference))
-  mapped_ct = apply(cells.mapped , 1 , function(x) return(getmode(meta_reference[match(x, rownames(meta_reference)) , cluster_id] , c(1:n.neigh)) ))
+  mapped_cluster = apply(cells.mapped , 1 , function(x) return(getmode(meta_reference[match(x, rownames(meta_reference)) , cluster_id] , c(1:n.neigh)) ))
   meta_query = as.data.frame(colData(sce_query))
-  meta_query$mapped_ct = mapped_ct
+  meta_query$mapped_cluster = mapped_cluster
   return(meta_query)
 }
 
