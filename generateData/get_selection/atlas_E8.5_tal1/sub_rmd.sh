@@ -5,17 +5,17 @@ err_folder=${my_folder}/clust_err/geneBasis
 
 #SELECT SCRIPT
 #If you change this, you MUST update the wrapper's grep
-script_name=genes_spl
+script_name=genes_emb
 
 #CHOOSE PARAMETERS
 #RAM in megabytes
-memory=300000
+memory=500000
 r_command="rusage[mem=${memory}]"
 #num_processors
 nproc=5
 
 smg=/nfs/research1/marioni/alsu/singularity/R1.simg
-script=/nfs/research1/marioni/alsu/geneBasis/am_geneBasis/generateData/get_selection/spleen/run_rmd.R
+script=/nfs/research1/marioni/alsu/geneBasis/am_geneBasis/generateData/get_selection/atlas_E8.5_tal1/run_rmd.R
 
 bsub -q research-rh74 -e ${err_folder}/${script_name} \
 -o ${out_folder}/${script_name} \

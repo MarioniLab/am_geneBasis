@@ -38,7 +38,7 @@ root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
 source(paste0(root.dir , "am_geneBasis/functions/main_functions.R"))
 
 
-system = "melanoma"
+system = "atlas_E8.5_tal1"
 sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
 meta = as.data.frame(colData(sce))
 
@@ -46,7 +46,7 @@ meta = as.data.frame(colData(sce))
 sce = retain_only_hvgs(sce, n = 10000, var.thresh = 0)
   
 # discard mitochondrial
-rownames.sce = rownames(sce)
+rownames.sce = rowData(sce)[,2]
 idx = which(!grepl("mt-" , rownames.sce) & !grepl("MT-" , rownames.sce) & !grepl("Mt-" , rownames.sce))
 sce = sce[idx,]
 
