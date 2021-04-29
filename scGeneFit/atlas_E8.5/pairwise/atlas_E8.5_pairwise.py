@@ -51,6 +51,9 @@ celltypes_test = celltypes[idx_test].reshape(-1)
 # run
 num_markers = np.arange(10,260,10)
 for current_num_markers in num_markers:
+    res=optimize_epsilon(data_train, celltypes_train, data_test, celltypes_test, current_num_markers, method=method, fixed_parameters={'redundancy': 0.1, 'sampling_rate':0.1, 'max_constraints': 200, 'n_neighbors':2}, 
+                        bounds=[(0.1 , 5)], x0=[1], max_fun_evaluations=25, n_experiments=10, 
+                        clf=clf, verbose=True)
     current_markers= get_markers(data, celltypes, current_num_markers, method=method, sampling_rate=sampling_rate,
                      n_neighbors=n_neighbors, epsilon=1, max_constraints=max_constraints)
     current_genes = genes[current_markers]
