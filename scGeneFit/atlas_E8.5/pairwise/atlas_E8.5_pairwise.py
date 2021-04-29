@@ -15,7 +15,7 @@ def performance(X_train, y_train, X_test, y_test, clf):
 
 method = 'pairwise'
 sampling_rate=0.1
-n_neighbors=3
+n_neighbors=2
 max_constraints=1000
 
 # read dataset
