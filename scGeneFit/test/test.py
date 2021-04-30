@@ -20,7 +20,7 @@ system = 'atlas_E8.5'
 root_dir = '/nfs/research1/marioni/alsu/geneBasis/data/'
 adata = sc.read_h5ad(root_dir + 'scRNA_datasets/' + system + '/sce_' + system +'.h5ad')
 # specifically for spleen - discard cells w unresolved cts
-adata = adata[adata.obs["sample"] == "17", :]
+adata = adata[adata.obs["sample"] == 29, :]
 
 # select HVGs (to minimize complexity)
 sc.pp.filter_genes(adata, min_cells=3)
