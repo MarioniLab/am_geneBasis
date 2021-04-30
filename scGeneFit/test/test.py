@@ -36,16 +36,16 @@ celltypes = adata.obs['celltype'].astype('category').cat.codes.to_numpy()
 samples = adata.obs['sample'].astype('category').cat.codes.to_numpy()
 
 # split into train and test to optimize eps
-idx_test = np.asarray(np.where(samples == 0))
-idx_train = np.asarray(np.where(samples != 0))
+#idx_test = np.asarray(np.where(samples == 0))
+#idx_train = np.asarray(np.where(samples != 0))
 
-data_train = data[idx_train,:]
-data_train = data_train[0,:,:]
-celltypes_train = celltypes[idx_train].reshape(-1)
+#data_train = data[idx_train,:]
+#data_train = data_train[0,:,:]
+#celltypes_train = celltypes[idx_train].reshape(-1)
 
-data_test = data[idx_test,:]
-data_test = data_test[0,:,:]
-celltypes_test = celltypes[idx_test].reshape(-1)
+#data_test = data[idx_test,:]
+#data_test = data_test[0,:,:]
+#celltypes_test = celltypes[idx_test].reshape(-1)
 
 # run
 num_markers = [50, 100]
