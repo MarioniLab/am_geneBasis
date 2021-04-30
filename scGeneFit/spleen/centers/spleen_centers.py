@@ -33,27 +33,11 @@ adata = adata[:, adata.var.highly_variable]
 data = adata.layers["logcounts"].toarray()
 genes = adata.var_names
 celltypes = adata.obs['celltype'].astype('category').cat.codes.to_numpy()
-samples = adata.obs['sample'].astype('category').cat.codes.to_numpy()
-
-# split into train and test to optimize eps
-idx_test = np.asarray(np.where(samples == 0))
-idx_train = np.asarray(np.where(samples != 0))
-
-data_train = data[idx_train,:]
-data_train = data_train[0,:,:]
-celltypes_train = celltypes[idx_train].reshape(-1)
-
-data_test = data[idx_test,:]
-data_test = data_test[0,:,:]
-celltypes_test = celltypes[idx_test].reshape(-1)
 
 # run
 num_markers = np.arange(10,260,10)
 for current_num_markers in num_markers:
-    res=optimize_epsilon(data_train, celltypes_train, data_test, celltypes_test, current_num_markers, method=method, fixed_parameters={'redundancy': 0, 'max_constraints': 100}, 
-                        bounds=[(0.2 , 10)], x0=[1], max_fun_evaluations=25, n_experiments=10, 
-                        clf=clf, verbose=True)
-    current_markers= get_markers(data, celltypes, current_num_markers, method=method, redundancy=0.25, epsilon=float(res[0]))
+    current_markers= get_markers(data, celltypes, current_num_markers, method=method, redundancy=0.25, epsilon=1)
     current_genes = genes[current_markers]
     save_dir = root_dir + 'scGeneFit_res/' + system + '/' + method + '/'
     if not os.path.exists(save_dir):
