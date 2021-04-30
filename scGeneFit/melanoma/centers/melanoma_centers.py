@@ -16,7 +16,7 @@ def performance(X_train, y_train, X_test, y_test, clf):
 method = 'centers'
 redundancy = 0.25
 # read dataset
-system = 'atlas_E8.5'
+system = 'melanoma'
 root_dir = '/nfs/research1/marioni/alsu/geneBasis/data/'
 adata = sc.read_h5ad(root_dir + 'scRNA_datasets/' + system + '/sce_' + system +'.h5ad')
 
