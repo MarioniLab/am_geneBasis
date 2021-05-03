@@ -193,6 +193,13 @@ get_hvgs = function(sce, n = NULL, var.thresh = 0){
 get_mapping_single_batch = function(sce , assay = "logcounts" , genes = rownames(sce), n.neigh = 3, nPC = 50 , get.dist = F){
   require(irlba)
   require(BiocNeighbors)
+  require(BiocSingular)
+  require(BiocParallel)
+  
+  mcparam = MulticoreParam(workers = ncores)
+  register(mcparam)
+  set.seed(32)
+  
   current.sce = sce[genes , ]
   counts = as.matrix( assay(current.sce , assay) )
   meta = as.data.frame(colData(current.sce))
@@ -280,6 +287,10 @@ get_mapping_many_batches = function(sce , assay = "logcounts" , genes = rownames
 
 
 get_mapping = function(sce , assay = "logcounts" , genes = rownames(sce), batch = "sample", n.neigh = 3, nPC = 50 , get.dist = F, type = "per batch"){
+  require(BiocSingular)
+  require(BiocParallel)
+  require(BiocNeighbors)
+  
   if (is.null(batch)){
     out = get_mapping_single_batch(sce , assay = assay , genes = genes, n.neigh = n.neigh, nPC = nPC , get.dist = get.dist)
   }
@@ -456,15 +467,19 @@ get_distr_dist = function(sce , genes , assay = "logcounts" , batch = "sample" ,
 
 
 get_lp_norm_dist = function(sce , genes , assay = "logcounts" , batch = "sample" , 
-                          n.neigh = 10 , nPC = 50 , genes.predict = rownames(sce) , p ){
+                          n.neigh = 10 , nPC = 50 , genes.predict = rownames(sce) , p){
+  require(BiocNeighbors)
   
+  mcparam = MulticoreParam(workers = ncores)
+  register(mcparam)
+  set.seed(32)
+
   if (!is.null(genes)){
     neighs = get_mapping(sce , assay = "logcounts" , genes = genes, batch = batch , n.neigh = n.neigh , nPC = nPC)
   }
   else {
     neighs = initiate_mapping_for_gene_search(sce , batch = batch , n.neigh = n.neigh)
   }
-  
   counts_predict = as.matrix(assay(sce[genes.predict , ] , assay))
   
   stat_predict = lapply(1:ncol(neighs) , function(j){
@@ -475,11 +490,25 @@ get_lp_norm_dist = function(sce , genes , assay = "logcounts" , batch = "sample"
   stat_predict = Reduce("+", stat_predict) / length(stat_predict)
   stat_real = counts_predict[, rownames(neighs)]
   
-  stat = lapply(1:nrow(counts_predict) , function(i){
-    out = data.frame(gene = rownames(counts_predict)[i] , dist = as.numeric(dist(rbind(stat_real[i,] , stat_predict[i,]) , method = "minkowski" , p = p)))
-    return(out)
-  }) 
-  stat = do.call(rbind , stat)
+  if (p > 0 & p < Inf){
+    stat = lapply(1:nrow(counts_predict) , function(i){
+      out = data.frame(gene = rownames(counts_predict)[i] , dist = as.numeric(dist(rbind(stat_real[i,] , stat_predict[i,]) , method = "minkowski" , p = p)))
+      return(out)
+    }) 
+    stat = do.call(rbind , stat)
+  } else if (p == 0){
+    stat = lapply(1:nrow(counts_predict) , function(i){
+      out = data.frame(gene = rownames(counts_predict)[i] , dist = sum(stat_real[i,] != stat_predict[i,]))
+      return(out)
+    }) 
+    stat = do.call(rbind , stat)
+  } else if (is.infinite(p)){
+    stat = lapply(1:nrow(counts_predict) , function(i){
+      out = data.frame(gene = rownames(counts_predict)[i] , dist = max(abs(stat_real[i,] - stat_predict[i,])))
+      return(out)
+    }) 
+    stat = do.call(rbind , stat)
+  }
   return(stat)
 }
 
@@ -489,6 +518,7 @@ get_lp_norm_dist = function(sce , genes , assay = "logcounts" , batch = "sample"
 initiate_mapping_for_gene_search = function(sce , batch = "sample", n.neigh = 3){
   require(irlba)
   require(BiocNeighbors)
+  
   if (is.null(batch)){
     batchFactor = factor(rep(1 , ncol(sce)))
   }
