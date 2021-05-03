@@ -81,7 +81,7 @@ add_genes = function(sce , stat = NULL, genes_base , assay = "logcounts", n_gene
   return(out)
 }
 
-
+K = 5
 ps = c(0:5, Inf)
 runs = c(1:K)
 n_genes = 250
