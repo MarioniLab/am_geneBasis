@@ -109,7 +109,7 @@ stat = bplapply(n.grid , function(n){
 }, BPPARAM = mcparam)
 stat = do.call(rbind , stat)
 
-saveRDS(stat , file = paste0(root.dir , "processed_time/geneBasis/" , system , "/stat_unparalleled_unbatched.Rds"))
+saveRDS(stat , file = paste0(root.dir , "data/processed_time/geneBasis/" , system , "/stat_unparalleled_unbatched.Rds"))
 
 
 
