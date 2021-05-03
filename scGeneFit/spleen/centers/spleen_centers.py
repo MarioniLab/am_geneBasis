@@ -35,7 +35,7 @@ genes = adata.var_names
 celltypes = adata.obs['celltype'].astype('category').cat.codes.to_numpy()
 
 # run
-num_markers = np.arange(10,260,10)
+num_markers = np.arange(140,260,10)
 for current_num_markers in num_markers:
     current_markers= get_markers(data, celltypes, current_num_markers, method=method, redundancy=0.25, epsilon=1)
     current_genes = genes[current_markers]
