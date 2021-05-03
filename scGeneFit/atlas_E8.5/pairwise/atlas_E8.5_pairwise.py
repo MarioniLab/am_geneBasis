@@ -19,7 +19,7 @@ n_neighbors=2
 max_constraints=1000
 
 # read dataset
-system = 'melanoma'
+system = 'atlas_E8.5'
 root_dir = '/nfs/research1/marioni/alsu/geneBasis/data/'
 adata = sc.read_h5ad(root_dir + 'scRNA_datasets/' + system + '/sce_' + system +'.h5ad')
 
