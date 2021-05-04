@@ -90,7 +90,7 @@ n_genes = 250
 gene_selection = readRDS(paste0(root.dir , "data/gene_selection/" , system , "/gene_selection_1.Rds"))
 genes_stat = bplapply(nPC.grid , function(nPC){
   genes_base = gene_selection[1:(nPC + 1)]
-  genes = add_genes(sce , stat = NULL, genes_base = genes_base, assay = "logcounts", n_genes_total = n_genes, batch = "sample", p = p)
+  genes = add_genes(sce , stat = NULL, genes_base = genes_base, assay = "logcounts", n_genes_total = n_genes, batch = "sample", p = p, nPC = nPC)
   saveRDS(genes , paste0(root.dir , "data/gene_selection__optional_PCA/" , system , "/" , "gene_selection__nPC_" , nPC, ".Rds"))
   return(genes)
 }, BPPARAM = mcparam)
