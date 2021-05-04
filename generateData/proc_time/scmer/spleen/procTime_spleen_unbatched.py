@@ -20,7 +20,7 @@ adata = sc.read_h5ad(root_dir + 'scRNA_datasets/' + system + '/sce_' + system + 
 samples = adata.obs["sample"].unique()
 
 n_samples_to_process = list(range(2,(len(samples)+1)))
-min_disp = [0, 0.25, 0.5]
+min_disp = [0.5, 0.25, 0]
 n_threads = [1,3,6,9]
 lambdas = [2e-4, 4e-4, 6e-4, 8e-4, 1e-3, 1.5e-3, 2e-3, 2.5e-3, 3e-3 , 3.5e-3]
 
@@ -51,6 +51,6 @@ for current_n_samples_to_process in n_samples_to_process:
                 rows.append([current_n_samples_to_process , current_min_disp , current_n_threads , current_lambda , len(current_adata.obs) , len(current_adata.var_names) , len(current_genes), t])     
                 rows_all.append([current_n_samples_to_process , current_min_disp , current_n_threads , current_lambda , len(current_adata.obs) , len(current_adata.var_names) , len(current_genes), t])     
                 df = pd.DataFrame(rows, columns=["n_processed_samples", "min_disp", "n_threads", "lambda" , "n_cells" , "n_genes_init", "n_genes_selected", "time"])
-                df.to_csv(save_dir + 'stat_unbatched' + t1 + '.csv', header=True, index=None, sep=',')   
-df_all = pd.DataFrame(rows, columns=["n_processed_samples", "min_disp", "n_threads", "lambda" , "n_cells" , "n_genes_init", "n_genes_selected", "time"])
+                df.to_csv(save_dir + 'stat_unbatched_' + str(t1) + '.csv', header=True, index=None, sep=',')   
+df_all = pd.DataFrame(rows_all, columns=["n_processed_samples", "min_disp", "n_threads", "lambda" , "n_cells" , "n_genes_init", "n_genes_selected", "time"])
 df_all.to_csv(save_dir + 'stat_unbatched_combined.csv', header=True, index=None, sep=',')  
