@@ -24,7 +24,7 @@ adata = sc.read_h5ad(root_dir + 'scRNA_datasets/' + system + '/sce_' + system +'
 sc.pp.filter_genes(adata, min_cells=3)
 sc.pp.normalize_total(adata, target_sum=1e4)
 sc.pp.log1p(adata)
-sc.pp.highly_variable_genes(adata, min_mean=0.01, max_mean=3, min_disp=0.01)
+sc.pp.highly_variable_genes(adata, min_mean=0.01, max_mean=3, min_disp=0.55)
 adata = adata[:, adata.var.highly_variable]
 
 # read data, celltype labels (as ints) and genes
@@ -33,7 +33,7 @@ genes = adata.var_names
 celltypes = adata.obs['celltype'].astype('category').cat.codes.to_numpy()
 
 # run
-num_markers = np.arange(20,260,10)
+num_markers = np.arange(10,260,10)
 for current_num_markers in num_markers:
     current_markers= get_markers(data, celltypes, current_num_markers, method=method, redundancy=0.25, epsilon=1)
     current_genes = genes[current_markers]

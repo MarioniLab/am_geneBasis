@@ -27,7 +27,7 @@ adata = sc.read_h5ad(root_dir + 'scRNA_datasets/' + system + '/sce_' + system +'
 sc.pp.filter_genes(adata, min_cells=3)
 sc.pp.normalize_total(adata, target_sum=1e4)
 sc.pp.log1p(adata)
-sc.pp.highly_variable_genes(adata, min_mean=0.01, max_mean=3, min_disp=0.01)
+sc.pp.highly_variable_genes(adata, min_mean=0.01, max_mean=3, min_disp=0.55)
 adata = adata[:, adata.var.highly_variable]
 
 # read data, celltype labels (as ints) and genes
