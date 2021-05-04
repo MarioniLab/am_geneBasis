@@ -550,11 +550,6 @@ initiate_mapping_for_gene_search = function(sce , batch = "sample", n.neigh = 3)
 
 
 
-
-
-
-
-
 get_expr_real_and_neighbors = function(sce , genes , assay = "logcounts" , batch = "sample" , 
                                        n.neigh = 10 , nPC = 50 , genes.predict = rownames(sce)){
   eps = 0.00001
@@ -682,7 +677,7 @@ get_preservation_score = function(sce , assay = "logcounts" , genes.all = rownam
 
 
 get_preservation_score_simple = function(sce , neighs.all = NULL , assay = "logcounts" , genes.all = rownames(sce) , 
-                                  genes.compare , batch = "sample", n.neigh = 5 , nPC.all = 50 , nPC.compare = 200 ){
+                                  genes.compare , batch = "sample", n.neigh = 5 , nPC.all = 50 , nPC.compare = 200){
   neighs.compare = get_mapping(sce , assay = assay , genes = genes.compare, batch = batch, n.neigh = n.neigh, nPC = nPC.compare , type = "together")
   if (!is.null(neighs.compare)){
     if (is.null(neighs.all)){
@@ -699,11 +694,12 @@ get_preservation_score_simple = function(sce , neighs.all = NULL , assay = "logc
       
       dist_all = neighs.all.distances[i, idx_all]
       dist_compare = neighs.all.distances[i, idx_compare]
+      current.score = median(-dist_compare)/median(-dist_all)
       
-      current.bandwidth = mean(neighs.all.distances[i, ])
-      dist_all = exp(-1*dist_all/current.bandwidth)
-      dist_compare = exp(-1*dist_compare/current.bandwidth)
-      current.score = mean(dist_compare)/mean(dist_all)
+      #current.bandwidth = mean(neighs.all.distances[i, ])
+      #dist_all = exp(-1*dist_all/current.bandwidth)
+      #dist_compare = exp(-1*dist_compare/current.bandwidth)
+      #current.score = median(dist_compare)/median(dist_all)
       out = data.frame(score = current.score )
       return(out)
     })
