@@ -35,11 +35,11 @@ set.seed(32)
 root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
 source(paste0(root.dir, "am_geneBasis/functions/main_functions.R"))
 
-system = "spleen"
+system = "atlas_E8.5"
 
 # read sce 
 sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
-sce$cell = colnames(sce)
+
 
 ```
 
@@ -110,18 +110,33 @@ genes_scgenefit = lapply(n_genes , function(str){
 
 ```
 
-# Neighborhood preservation score (per cell)
+# Celltype mapping
 
-```{r neigh-all, message = FALSE}
+```{r celltype-mapping, message = FALSE}
 
 
-neighs.all = get_mapping(sce , assay = "logcounts", genes = rownames(sce), batch = "sample", n.neigh = "all", nPC = 50 , get.dist = T , type = "together")
+markers = get_markers(sce , test = "t" , type = "some")
+markers = table(markers$gene)
+markers = data.frame(gene = names(markers) , n.ct = as.numeric(markers))
 
-# z-scale
-distances = neighs.all$distances
-distances_scaled = t( apply(distances , 1 , function(x) scale(x)) )
-rownames(distances_scaled) = rownames(distances)
-neighs.all$distances = distances_scaled
+
+get_celltypes_stat = function(sce , genes , batch = "sample", n.neigh = 5){
+  genes = genes[genes %in% markers$gene]
+  nPC = 2*length(unique(sce$celltype))
+  neighs = suppressWarnings( get_mapping(sce , assay = "logcounts" , genes = genes, batch = batch, n.neigh = n.neigh, nPC = nPC , get.dist = F , type = "together"))
+  if (!is.null(neighs)){
+    meta = as.data.frame(colData(sce))
+    current.mapping = data.frame(cell = rownames(neighs) ,
+                               celltype = sapply(1:nrow(neighs) , function(i) meta$celltype[meta$cell == rownames(neighs)[i]]) ,
+                               mapped_celltype = sapply(1:nrow(neighs), function(i) getmode(meta$celltype[match(neighs[i,] , meta$cell)] , 1:n.neigh) ))
+    return(current.mapping)
+  }
+  else {
+    return(NULL)
+  }
+}
+
+
 
 
 ```
@@ -138,11 +153,11 @@ genes = lapply(1:length(genes_scmer_batched) , function(i){
   return(out)
 })
 
+
 stat_scmer_batched = bplapply(c(1:length(genes)) , function(i){
   current.genes = genes[[i]]
   stat.per_n_genes = lapply(1:length(current.genes) , function(j){
-    current.stat = suppressWarnings( get_preservation_score_simple(sce , neighs.all = neighs.all , assay = "logcounts" , genes.all = rownames(sce) , 
-                                  genes.compare = current.genes[[j]], batch = "sample", n.neigh = 5 , nPC.all = 50 , nPC.compare = 50) )
+    current.stat = suppressWarnings( get_celltypes_stat(sce , current.genes[[j]] , batch = "sample", n.neigh = 10 ) )
     current.stat$type = names(current.genes)[j]
     current.stat$n_genes = length(current.genes[[j]])
     return(current.stat)
@@ -151,7 +166,7 @@ stat_scmer_batched = bplapply(c(1:length(genes)) , function(i){
   return(stat.per_n_genes)
 }, BPPARAM = mcparam)
 stat_scmer_batched = do.call(rbind , stat_scmer_batched)
-saveRDS(stat_scmer_batched , file = paste0(root.dir , "data/benchmark/cell_score/" , system , "/cell_score__scmer_batched.Rds"))
+saveRDS(stat_scmer_batched , file = paste0(root.dir , "data/benchmark/celltype_classic/" , system , "/celltype_classic__scmer_batched.Rds"))
 
 
 ```
@@ -171,8 +186,7 @@ genes = lapply(1:length(genes_scmer_unbatched) , function(i){
 stat_scmer_unbatched = bplapply(c(1:length(genes)) , function(i){
   current.genes = genes[[i]]
   stat.per_n_genes = lapply(1:length(current.genes) , function(j){
-    current.stat = suppressWarnings( get_preservation_score_simple(sce , neighs.all = neighs.all , assay = "logcounts" , genes.all = rownames(sce) , 
-                                  genes.compare = current.genes[[j]], batch = "sample", n.neigh = 5 , nPC.all = 50 , nPC.compare = 50) )
+    current.stat = suppressWarnings( get_celltypes_stat(sce , current.genes[[j]] , batch = "sample", n.neigh = 10 ) )
     current.stat$type = names(current.genes)[j]
     current.stat$n_genes = length(current.genes[[j]])
     return(current.stat)
@@ -181,7 +195,7 @@ stat_scmer_unbatched = bplapply(c(1:length(genes)) , function(i){
   return(stat.per_n_genes)
 }, BPPARAM = mcparam)
 stat_scmer_unbatched = do.call(rbind , stat_scmer_unbatched)
-saveRDS(stat_scmer_unbatched , file = paste0(root.dir , "data/benchmark/cell_score/" , system , "/cell_score__scmer_unbatched.Rds"))
+saveRDS(stat_scmer_unbatched , file = paste0(root.dir , "data/benchmark/celltype_classic/" , system , "/celltype_classic__scmer_unbatched.Rds"))
 
 
 ```
@@ -201,8 +215,7 @@ genes = lapply(1:length(genes_scgenefit) , function(i){
 stat_scgenefit = bplapply(c(1:length(genes)) , function(i){
   current.genes = genes[[i]]
   stat.per_n_genes = lapply(1:length(current.genes) , function(j){
-    current.stat = suppressWarnings( get_preservation_score_simple(sce , neighs.all = neighs.all , assay = "logcounts" , genes.all = rownames(sce) , 
-                                  genes.compare = current.genes[[j]], batch = "sample", n.neigh = 5 , nPC.all = 50 , nPC.compare = 50) )
+    current.stat = suppressWarnings( get_celltypes_stat(sce , current.genes[[j]] , batch = "sample", n.neigh = 10 ) )
     current.stat$type = names(current.genes)[j]
     current.stat$n_genes = length(current.genes[[j]])
     return(current.stat)
@@ -211,7 +224,7 @@ stat_scgenefit = bplapply(c(1:length(genes)) , function(i){
   return(stat.per_n_genes)
 }, BPPARAM = mcparam)
 stat_scgenefit = do.call(rbind , stat_scgenefit)
-saveRDS(stat_scgenefit , file = paste0(root.dir , "data/benchmark/cell_score/" , system , "/cell_score__scgenefit.Rds"))
+saveRDS(stat_scmer_unbatched , file = paste0(root.dir , "data/benchmark/celltype_classic/" , system , "/celltype_classic__scgenefit.Rds"))
 
 
 ```
