@@ -1,0 +1,224 @@
+---
+title: "Pipeline to benchmark selections: geneBasis, SCMER, scGeneFit (marker selection) for cell score"
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+# Load dependencies
+
+```{r load, message = FALSE}
+
+
+library(SingleCellExperiment)
+library(batchelor)
+library(stats)
+library(BiocNeighbors)
+library(tibble)
+library(reshape2)
+library(plyr)
+library(dplyr)
+library(scran)
+library(batchelor)
+library(stringr)
+library(BiocSingular)
+library(BiocParallel)
+library(SingleCellExperiment)
+library(BiocStyle)
+ncores = 10
+mcparam = MulticoreParam(workers = ncores)
+register(mcparam)
+set.seed(32)
+
+#root.dir = "/Users/alsu/Develop/geneBasis/"
+root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
+source(paste0(root.dir, "am_geneBasis/functions/main_functions.R"))
+
+system = "spleen"
+
+# read sce 
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+sce$cell = colnames(sce)
+hvgs = get_hvgs(sce, n = 3000)
+
+
+```
+
+
+# Get gene selections
+
+## geneBasis
+
+```{r read-selection-gene-basis, message = FALSE}
+
+
+# read gene selection 
+gene_selections.files = list.files(path=paste0(root.dir , "data/gene_selection/" , system , "/"))
+gene_selections.file = gene_selections.files[1]
+genes_alsu = readRDS(paste0(root.dir , "data/gene_selection/" , system , "/" , gene_selections.file))
+
+
+```
+
+## SCMER
+
+```{r read-selection-scmer, message = FALSE}
+
+
+# batched
+scmer_batched.files = list.files(path = paste0( root.dir , "data/scmer_res_selected/" , system , "/batched/" ))
+n_genes = sapply(scmer_batched.files , function(str) str_replace_all(str,  ".txt" , ""))
+n_genes = sapply(n_genes , function(str) str_replace_all(str,  "nGenes_" , ""))
+n_genes = sort(as.numeric(n_genes))
+
+genes_scmer_batched = lapply(n_genes , function(str){
+  out = read.table(paste0( root.dir , "data/scmer_res_selected/" , system , "/batched/nGenes_" , str , ".txt") , header = F)
+  genes = out$V1
+  return(genes)
+})
+
+# unbatched
+scmer_unbatched.files = list.files(path = paste0( root.dir , "data/scmer_res_selected/" , system , "/unbatched/" ))
+n_genes = sapply(scmer_unbatched.files , function(str) str_replace_all(str,  ".txt" , ""))
+n_genes = sapply(n_genes , function(str) str_replace_all(str,  "nGenes_" , ""))
+n_genes = sort(as.numeric(n_genes))
+
+genes_scmer_unbatched = lapply(n_genes , function(str){
+  out = read.table(paste0( root.dir , "data/scmer_res_selected/" , system , "/unbatched/nGenes_" , str , ".txt") , header = F)
+  genes = out$V1
+  return(genes)
+})
+
+
+```
+
+## scGene-Fit
+
+```{r read-selection-scGene-Fit, message = FALSE}
+
+# centered
+scgenefit_centers.files = list.files(path = paste0( root.dir , "data/scGeneFit_res/" , system , "/centers/" ))
+n_genes = sapply(scgenefit_centers.files , function(str) str_replace_all(str,  ".txt" , ""))
+n_genes = sapply(n_genes , function(str) str_replace_all(str,  "nGenes_" , ""))
+n_genes = sort(as.numeric(n_genes))
+
+genes_scgenefit = lapply(n_genes , function(str){
+  out = read.table(paste0( root.dir , "data/scGeneFit_res/" , system , "/centers/nGenes_" , str , ".txt") , header = F)
+  genes = out$V1
+  return(genes)
+})
+
+
+```
+
+# Neighborhood preservation score (per cell)
+
+```{r corr-all, message = FALSE}
+
+
+stat_gene_score = suppressWarnings( get_distr_dist(sce, genes = rownames(sce), assay = "logcounts" , batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = hvgs , type = "corr") ) 
+colnames(stat_gene_score) = c("gene" , "corr_all")
+  
+
+```
+
+## Alsu VS scmer-batched
+
+```{r score-vs-scmer-batched, message = FALSE}
+
+
+genes = lapply(1:length(genes_scmer_batched) , function(i){
+  current.genes_scmer = genes_scmer_batched[[i]]
+  n_genes = length(current.genes_scmer)
+  out = list("alsu" = gene_selections[[1]][1:n_genes] , "scmer_batched" = current.genes_scmer)
+  return(out)
+})
+
+stat_scmer_batched = bplapply(c(1:length(genes)) , function(i){
+  current.genes = genes[[i]]
+  stat.per_n_genes = lapply(1:length(current.genes) , function(j){
+    current.stat = suppressWarnings( get_distr_dist(sce , genes = current.genes[[j]] , assay = "logcounts" , batch = "sample", n.neigh = 5 , nPC = 50 , genes.predict = hvgs , type = "corr") )
+    current.stat$type = names(current.genes)[j]
+    current.stat$n_genes = length(current.genes[[j]])
+    return(current.stat)
+  })
+  stat.per_n_genes = do.call(rbind , stat.per_n_genes)
+  return(stat.per_n_genes)
+}, BPPARAM = mcparam)
+stat_scmer_batched = do.call(rbind , stat_scmer_batched)
+stat_scmer_batched = merge(stat_scmer_batched , stat_gene_score, all.x = T , all.y = F)
+stat_scmer_batched$corr_ratio = stat_scmer_batched$corr/stat_scmer_batched$corr_all
+saveRDS(stat_scmer_batched , file = paste0(root.dir , "data/benchmark/gene_score/" , system , "/gene_score__scmer_batched.Rds"))
+
+
+```
+
+## Alsu VS scmer-unbatched
+
+```{r score-vs-scmer-unbatched, message = FALSE}
+
+
+genes = lapply(1:length(genes_scmer_unbatched) , function(i){
+  current.genes_scmer = genes_scmer_unbatched[[i]]
+  n_genes = length(current.genes_scmer)
+  out = list("alsu" = gene_selections[[1]][1:n_genes] , "scmer_unbatched" = current.genes_scmer)
+  return(out)
+})
+
+stat_scmer_unbatched = bplapply(c(1:length(genes)) , function(i){
+  current.genes = genes[[i]]
+  stat.per_n_genes = lapply(1:length(current.genes) , function(j){
+    current.stat = suppressWarnings( get_distr_dist(sce , genes = current.genes[[j]] , assay = "logcounts" , batch = "sample", n.neigh = 5 , nPC = 50 , genes.predict = hvgs , type = "corr") )
+    current.stat$type = names(current.genes)[j]
+    current.stat$n_genes = length(current.genes[[j]])
+    return(current.stat)
+  })
+  stat.per_n_genes = do.call(rbind , stat.per_n_genes)
+  return(stat.per_n_genes)
+}, BPPARAM = mcparam)
+stat_scmer_unbatched = do.call(rbind , stat_scmer_unbatched)
+stat_scmer_unbatched = merge(stat_scmer_unbatched , stat_gene_score, all.x = T , all.y = F)
+stat_scmer_unbatched$corr_ratio = stat_scmer_unbatched$corr/stat_scmer_unbatched$corr_all
+saveRDS(stat_scmer_unbatched , file = paste0(root.dir , "data/benchmark/gene_score/" , system , "/gene_score__scmer_unbatched.Rds"))
+
+
+```
+
+## Alsu VS scGeneFit
+
+```{r score-vs-scgenefit, message = FALSE}
+
+
+genes = lapply(1:length(genes_scgenefit) , function(i){
+  current.genes_scgenefit = genes_scgenefit[[i]]
+  n_genes = length(current.genes_scgenefit)
+  out = list("alsu" = gene_selections[[1]][1:n_genes] , "scgenefit" = current.genes_scgenefit)
+  return(out)
+})
+
+stat_scgenefit = bplapply(c(1:length(genes)) , function(i){
+  current.genes = genes[[i]]
+  stat.per_n_genes = lapply(1:length(current.genes) , function(j){
+    current.stat = suppressWarnings( get_distr_dist(sce , genes = current.genes[[j]] , assay = "logcounts" , batch = "sample", n.neigh = 5 , nPC = 50 , genes.predict = hvgs , type = "corr") )
+    current.stat$type = names(current.genes)[j]
+    current.stat$n_genes = length(current.genes[[j]])
+    return(current.stat)
+  })
+  stat.per_n_genes = do.call(rbind , stat.per_n_genes)
+  return(stat.per_n_genes)
+}, BPPARAM = mcparam)
+stat_scgenefit = do.call(rbind , stat_scgenefit)
+stat_scgenefit = merge(stat_scgenefit , stat_gene_score, all.x = T , all.y = F)
+stat_scgenefit$corr_ratio = stat_scgenefit$corr/stat_scgenefit$corr_all
+saveRDS(stat_scgenefit , file = paste0(root.dir , "data/benchmark/gene_score/" , system , "/gene_score__scgenefit.Rds"))
+
+
+```
+
+
+# Session Info
+
+```{r sessinf}
+sessionInfo()
+```
