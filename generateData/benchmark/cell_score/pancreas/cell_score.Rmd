@@ -40,6 +40,7 @@ system = "pancreas"
 # read sce 
 sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
 sce$cell = colnames(sce)
+sce = retain_only_hvgs(sce , n = 10000)
 
 ```
 
@@ -134,7 +135,7 @@ neighs.all$distances = distances_scaled
 genes = lapply(1:length(genes_scmer_batched) , function(i){
   current.genes_scmer = genes_scmer_batched[[i]]
   n_genes = length(current.genes_scmer)
-  out = list("alsu" = gene_selections[[1]][1:n_genes] , "scmer_batched" = current.genes_scmer)
+  out = list("alsu" = genes_alsu[1:n_genes] , "scmer_batched" = current.genes_scmer, "hvgs" = get_hvgs(n_genes))
   return(out)
 })
 
@@ -164,7 +165,7 @@ saveRDS(stat_scmer_batched , file = paste0(root.dir , "data/benchmark/cell_score
 genes = lapply(1:length(genes_scmer_unbatched) , function(i){
   current.genes_scmer = genes_scmer_unbatched[[i]]
   n_genes = length(current.genes_scmer)
-  out = list("alsu" = gene_selections[[1]][1:n_genes] , "scmer_unbatched" = current.genes_scmer)
+  out = list("alsu" = genes_alsu[1:n_genes] , "scmer_unbatched" = current.genes_scmer, "hvgs" = get_hvgs(n_genes))
   return(out)
 })
 
@@ -194,7 +195,7 @@ saveRDS(stat_scmer_unbatched , file = paste0(root.dir , "data/benchmark/cell_sco
 genes = lapply(1:length(genes_scgenefit) , function(i){
   current.genes_scgenefit = genes_scgenefit[[i]]
   n_genes = length(current.genes_scgenefit)
-  out = list("alsu" = gene_selections[[1]][1:n_genes] , "scgenefit" = current.genes_scgenefit)
+  out = list("alsu" = genes_alsu[1:n_genes] , "scgenefit" = current.genes_scgenefit)
   return(out)
 })
 
