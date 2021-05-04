@@ -30,7 +30,7 @@ sc.tl.umap(adata)
 #lambdas = [1e-4 , 2e-4, 4e-4 , 6e-4 , 8e-4, 1e-3, 1.5e-3, 2e-3 , 2.5e-3, 3e-3 , 3.5e-3, 4e-3]
 lambdas = [4e-4 , 6e-4 , 8e-4, 1e-3, 1.5e-3, 2e-3 , 2.5e-3, 3e-3 , 3.5e-3, 4e-3]
 for current_lambda in lambdas:
-    model = scmer.UmapL1(lasso=current_lambda, ridge=0., n_pcs=50, perplexity=100., use_beta_in_Q=True, n_threads=9, pca_seed=2020)
+    model = scmer.UmapL1(lasso=current_lambda, ridge=0., n_pcs=50, perplexity=100., use_beta_in_Q=True, n_threads=12, pca_seed=2020)
     model.fit(adata.X)
     genes = adata.var_names[model.get_mask()].tolist()
     save_dir = root_dir + 'scmer_res/' + system + '/batched/'
