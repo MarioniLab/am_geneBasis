@@ -28,7 +28,7 @@ library(SingleCellExperiment)
 library(dplyr)
 library(BiocStyle)
 library(stats)
-ncores = 12
+ncores = 5
 mcparam = MulticoreParam(workers = ncores)
 register(mcparam)
 set.seed(32)
@@ -82,7 +82,7 @@ add_genes = function(sce , stat = NULL, genes_base , assay = "logcounts", n_gene
   return(out)
 }
 
-K = 5
+K = 1
 ps = c(0:5, Inf)
 runs = c(1:K)
 n_genes = 250
