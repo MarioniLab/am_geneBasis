@@ -11,7 +11,7 @@ script_name=gs_pan
 memory=200000
 r_command="rusage[mem=${memory}]"
 #num_processors
-nproc=3
+nproc=1
 
 smg=/nfs/research1/marioni/alsu/singularity/R1.simg
 script=/nfs/research1/marioni/alsu/geneBasis/am_geneBasis/generateData/benchmark/gene_score/pancreas/run_rmd.R
