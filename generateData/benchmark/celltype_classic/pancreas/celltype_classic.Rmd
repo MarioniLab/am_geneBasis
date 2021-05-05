@@ -146,28 +146,28 @@ get_celltypes_stat = function(sce , genes , batch = "sample", n.neigh = 5){
 
 ```{r score-vs-scmer-batched, message = FALSE}
 
-
-genes = lapply(1:length(genes_scmer_batched) , function(i){
-  current.genes_scmer = genes_scmer_batched[[i]]
-  n_genes = length(current.genes_scmer)
-  out = list("alsu" = as.character(genes_alsu[1:n_genes]) , "scmer_batched" = as.character(current.genes_scmer))
-  return(out)
-})
-
-
-stat_scmer_batched = bplapply(c(1:length(genes)) , function(i){
-  current.genes = genes[[i]]
-  stat.per_n_genes = lapply(1:length(current.genes) , function(j){
-    current.stat = suppressWarnings( get_celltypes_stat(sce , current.genes[[j]] , batch = "sample", n.neigh = 10 ) )
-    current.stat$type = names(current.genes)[j]
-    current.stat$n_genes = length(current.genes[[j]])
-    return(current.stat)
-  })
-  stat.per_n_genes = do.call(rbind , stat.per_n_genes)
-  return(stat.per_n_genes)
-}, BPPARAM = mcparam)
-stat_scmer_batched = do.call(rbind , stat_scmer_batched)
-saveRDS(stat_scmer_batched , file = paste0(root.dir , "data/benchmark/celltype_classic/" , system , "/celltype_classic__scmer_batched.Rds"))
+# 
+# genes = lapply(1:length(genes_scmer_batched) , function(i){
+#   current.genes_scmer = genes_scmer_batched[[i]]
+#   n_genes = length(current.genes_scmer)
+#   out = list("alsu" = as.character(genes_alsu[1:n_genes]) , "scmer_batched" = as.character(current.genes_scmer))
+#   return(out)
+# })
+# 
+# 
+# stat_scmer_batched = bplapply(c(1:length(genes)) , function(i){
+#   current.genes = genes[[i]]
+#   stat.per_n_genes = lapply(1:length(current.genes) , function(j){
+#     current.stat = suppressWarnings( get_celltypes_stat(sce , current.genes[[j]] , batch = "sample", n.neigh = 10 ) )
+#     current.stat$type = names(current.genes)[j]
+#     current.stat$n_genes = length(current.genes[[j]])
+#     return(current.stat)
+#   })
+#   stat.per_n_genes = do.call(rbind , stat.per_n_genes)
+#   return(stat.per_n_genes)
+# }, BPPARAM = mcparam)
+# stat_scmer_batched = do.call(rbind , stat_scmer_batched)
+# saveRDS(stat_scmer_batched , file = paste0(root.dir , "data/benchmark/celltype_classic/" , system , "/celltype_classic__scmer_batched.Rds"))
 
 
 ```
@@ -176,28 +176,28 @@ saveRDS(stat_scmer_batched , file = paste0(root.dir , "data/benchmark/celltype_c
 
 ```{r score-vs-scmer-unbatched, message = FALSE}
 
-
-genes = lapply(1:length(genes_scmer_unbatched) , function(i){
-  current.genes_scmer = genes_scmer_unbatched[[i]]
-  n_genes = length(current.genes_scmer)
-  out = list("alsu" = as.character(genes_alsu[1:n_genes]) , "scmer_unbatched" = as.character(current.genes_scmer))
-  return(out)
-})
-
-stat_scmer_unbatched = bplapply(c(1:length(genes)) , function(i){
-  current.genes = genes[[i]]
-  stat.per_n_genes = lapply(1:length(current.genes) , function(j){
-    current.stat = suppressWarnings( get_celltypes_stat(sce , current.genes[[j]] , batch = "sample", n.neigh = 10 ) )
-    current.stat$type = names(current.genes)[j]
-    current.stat$n_genes = length(current.genes[[j]])
-    return(current.stat)
-  })
-  stat.per_n_genes = do.call(rbind , stat.per_n_genes)
-  return(stat.per_n_genes)
-}, BPPARAM = mcparam)
-stat_scmer_unbatched = do.call(rbind , stat_scmer_unbatched)
-saveRDS(stat_scmer_unbatched , file = paste0(root.dir , "data/benchmark/celltype_classic/" , system , "/celltype_classic__scmer_unbatched.Rds"))
-
+# 
+# genes = lapply(1:length(genes_scmer_unbatched) , function(i){
+#   current.genes_scmer = genes_scmer_unbatched[[i]]
+#   n_genes = length(current.genes_scmer)
+#   out = list("alsu" = as.character(genes_alsu[1:n_genes]) , "scmer_unbatched" = as.character(current.genes_scmer))
+#   return(out)
+# })
+# 
+# stat_scmer_unbatched = bplapply(c(1:length(genes)) , function(i){
+#   current.genes = genes[[i]]
+#   stat.per_n_genes = lapply(1:length(current.genes) , function(j){
+#     current.stat = suppressWarnings( get_celltypes_stat(sce , current.genes[[j]] , batch = "sample", n.neigh = 10 ) )
+#     current.stat$type = names(current.genes)[j]
+#     current.stat$n_genes = length(current.genes[[j]])
+#     return(current.stat)
+#   })
+#   stat.per_n_genes = do.call(rbind , stat.per_n_genes)
+#   return(stat.per_n_genes)
+# }, BPPARAM = mcparam)
+# stat_scmer_unbatched = do.call(rbind , stat_scmer_unbatched)
+# saveRDS(stat_scmer_unbatched , file = paste0(root.dir , "data/benchmark/celltype_classic/" , system , "/celltype_classic__scmer_unbatched.Rds"))
+# 
 
 ```
 
@@ -225,7 +225,7 @@ stat_scgenefit = bplapply(c(1:length(genes)) , function(i){
   return(stat.per_n_genes)
 }, BPPARAM = mcparam)
 stat_scgenefit = do.call(rbind , stat_scgenefit)
-saveRDS(stat_scmer_unbatched , file = paste0(root.dir , "data/benchmark/celltype_classic/" , system , "/celltype_classic__scgenefit.Rds"))
+saveRDS(stat_scgenefit , file = paste0(root.dir , "data/benchmark/celltype_classic/" , system , "/celltype_classic__scgenefit.Rds"))
 
 
 ```
