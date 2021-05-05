@@ -1,0 +1,176 @@
+---
+title: "Pipeline to benchmark selections: geneBasis, SCMER, scGeneFit (marker selection) for cell score"
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+# Load dependencies
+
+```{r load, message = FALSE}
+
+
+library(SingleCellExperiment)
+library(batchelor)
+library(stats)
+library(BiocNeighbors)
+library(tibble)
+library(reshape2)
+library(plyr)
+library(dplyr)
+library(scran)
+library(batchelor)
+library(stringr)
+library(BiocSingular)
+library(BiocParallel)
+library(SingleCellExperiment)
+library(BiocStyle)
+ncores = 10
+mcparam = MulticoreParam(workers = ncores)
+register(mcparam)
+set.seed(32)
+
+#root.dir = "/Users/alsu/Develop/geneBasis/"
+root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
+source(paste0(root.dir, "am_geneBasis/functions/main_functions.R"))
+
+system = "atlas_E8.5"
+
+# read sce 
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+#sce = retain_only_hvgs(sce , n = 10000)
+
+n_genes.grid = seq(10,250,10)
+
+```
+
+# Get gene selections
+
+
+```{r read-selection-gene-basis, message = FALSE}
+
+
+# read gene selection 
+gene_selections.files = list.files(path=paste0(root.dir , "data/gene_selection__diff_p/" , system , "/"))
+genes = lapply(gene_selections.files , function(current.file){
+  out = readRDS(paste0(root.dir , "data/gene_selection__diff_p/" , system , "/" , current.file))
+  return(as.character(out))
+})
+names(genes) = c(0:5, Inf)
+
+
+```
+
+
+# Neighborhood preservation score (per cell)
+
+```{r cell-score, message = FALSE}
+
+
+hvgs_5000 = as.character(get_hvgs(sce , n = 5000))
+neighs.all = get_mapping(sce , assay = "logcounts", genes = hvgs_5000, batch = "sample", n.neigh = "all", nPC = 50 , get.dist = T , type = "together")
+
+# z-scale
+distances = neighs.all$distances
+distances_scaled = t( apply(distances , 1 , function(x) scale(x)) )
+rownames(distances_scaled) = rownames(distances)
+neighs.all$distances = distances_scaled
+
+
+stat_cell_score = bplapply(n_genes.grid , function(n_genes){
+  stat.per_n_genes = lapply(1:length(genes) , function(i){
+    current.genes = genes[[i]]
+    current.stat = suppressWarnings( get_preservation_score_simple(sce , neighs.all = neighs.all , assay = "logcounts" , genes.all = rownames(sce) , 
+                                  genes.compare = current.genes[1:n_genes], batch = "sample", n.neigh = 5 , nPC.all = 50 , nPC.compare = 50) )
+    current.stat$n_genes = n_genes
+    current.stat$p = names(genes)[i]
+    return(current.stat)
+  })
+  stat.per_n_genes = do.call(rbind , stat.per_n_genes)
+  return(stat.per_n_genes)
+}, BPPARAM = mcparam)
+stat_cell_score = do.call(rbind , stat_cell_score)
+saveRDS(stat_cell_score , file = paste0(root.dir , "data/benchmark_method/diff_dist/" , system , "/cell_score.Rds"))
+
+
+
+```
+
+# Celltype mapping
+
+```{r celltype-mapping, message = FALSE}
+
+
+get_celltypes_stat = function(sce , genes , batch = "sample", n.neigh = 5){
+  nPC = 2*length(unique(sce$celltype))
+  neighs = suppressWarnings( get_mapping(sce , assay = "logcounts" , genes = genes, batch = batch, n.neigh = n.neigh, nPC = nPC , get.dist = F , type = "together"))
+  if (!is.null(neighs)){
+    meta = as.data.frame(colData(sce))
+    current.mapping = data.frame(cell = rownames(neighs) ,
+                               celltype = sapply(1:nrow(neighs) , function(i) meta$celltype[meta$cell == rownames(neighs)[i]]) ,
+                               mapped_celltype = sapply(1:nrow(neighs), function(i) getmode(meta$celltype[match(neighs[i,] , meta$cell)] , 1:n.neigh) ))
+    return(current.mapping)
+  }
+  else {
+    return(NULL)
+  }
+}
+
+
+stat_celltype = bplapply(n_genes.grid , function(n_genes){
+  stat.per_n_genes = lapply(1:length(genes) , function(i){
+    current.genes = genes[[i]]
+    current.stat = suppressWarnings( get_celltypes_stat(sce , current.genes[1:n_genes] , batch = "sample", n.neigh = 10 ) )
+    current.stat$n_genes = n_genes
+    current.stat$p = names(genes)[i]
+    return(current.stat)
+  })
+  stat.per_n_genes = do.call(rbind , stat.per_n_genes)
+  return(stat.per_n_genes)
+}, BPPARAM = mcparam)
+stat_celltype = do.call(rbind , stat_celltype)
+saveRDS(stat_celltype , file = paste0(root.dir , "data/benchmark_method/diff_dist/" , system , "/celltype_classic.Rds"))
+
+
+
+```
+
+# Gene score
+
+```{r gene-score, message = FALSE}
+
+
+genes.predict = as.character(get_hvgs(sce , n = 3000))
+hvgs_5000 = as.character(get_hvgs(sce , n = 5000))
+stat_gene_score_all = suppressWarnings( get_distr_dist(sce, genes = hvgs_5000, assay = "logcounts" , batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = genes.predict , type = "corr") ) 
+colnames(stat_gene_score_all) = c("gene" , "corr_all")
+
+
+
+stat_gene_score = bplapply(n_genes.grid , function(n_genes){
+  stat.per_n_genes = lapply(1:length(genes) , function(i){
+    current.genes = genes[[i]]
+    current.stat = suppressWarnings( get_distr_dist(sce , current.genes[1:n_genes] , assay = "logcounts" , batch = "sample", n.neigh = 5 , nPC= 50 , genes.predict = genes.predict , type = "corr" ) )
+    current.stat$n_genes = n_genes
+    current.stat$p = names(genes)[i]
+    return(current.stat)
+  })
+  stat.per_n_genes = do.call(rbind , stat.per_n_genes)
+  return(stat.per_n_genes)
+}, BPPARAM = mcparam)
+stat_gene_score = do.call(rbind , stat_gene_score)
+stat_gene_score = merge(stat_gene_score , stat_gene_score_all , all.x = T , all.y = F)
+stat_gene_score$corr_ratio = stat_gene_score$corr/stat_gene_score$corr_all
+saveRDS(stat_gene_score , file = paste0(root.dir , "data/benchmark_method/diff_dist/" , system , "/gene_score.Rds"))
+
+
+```
+
+
+
+# Session Info
+
+```{r sessinf}
+sessionInfo()
+```
