@@ -26,7 +26,7 @@ library(BiocSingular)
 library(BiocParallel)
 library(SingleCellExperiment)
 library(BiocStyle)
-ncores = 3
+ncores = 5
 mcparam = MulticoreParam(workers = ncores)
 register(mcparam)
 set.seed(32)
@@ -39,7 +39,7 @@ system = "atlas_E8.5"
 
 # read sce 
 sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
-sce = retain_only_hvgs(sce , n = 10000)
+#sce = retain_only_hvgs(sce , n = 10000)
 
 ```
 
@@ -115,7 +115,8 @@ genes_scgenefit = lapply(n_genes , function(str){
 ```{r neigh-all, message = FALSE}
 
 
-neighs.all = get_mapping(sce , assay = "logcounts", genes = rownames(sce), batch = "sample", n.neigh = "all", nPC = 50 , get.dist = T , type = "together")
+hvgs_5000 = as.character(get_hvgs(sce , n = 5000))
+neighs.all = get_mapping(sce , assay = "logcounts", genes = hvgs_5000, batch = "sample", n.neigh = "all", nPC = 50 , get.dist = T , type = "together")
 
 # z-scale
 distances = neighs.all$distances
@@ -134,22 +135,22 @@ neighs.all$distances = distances_scaled
 genes = lapply(1:length(genes_scmer_batched) , function(i){
   current.genes_scmer = genes_scmer_batched[[i]]
   n_genes = length(current.genes_scmer)
-  out = list("alsu" = genes_alsu[1:n_genes] , "scmer_batched" = current.genes_scmer , "hvgs" = get_hvgs(n_genes))
+  out = list("alsu" = as.character(genes_alsu[1:n_genes]) , "scmer_batched" = as.character(current.genes_scmer) , "hvgs" = as.character(get_hvgs(n_genes)))
   return(out)
 })
 
-stat_scmer_batched = lapply(c(1:length(genes)) , function(i){
+stat_scmer_batched = bplapply(c(1:length(genes)) , function(i){
   current.genes = genes[[i]]
-  stat.per_n_genes = bplapply(1:length(current.genes) , function(j){
+  stat.per_n_genes = lapply(1:length(current.genes) , function(j){
     current.stat = suppressWarnings( get_preservation_score_simple(sce , neighs.all = neighs.all , assay = "logcounts" , genes.all = rownames(sce) , 
                                   genes.compare = current.genes[[j]], batch = "sample", n.neigh = 5 , nPC.all = 50 , nPC.compare = 50) )
     current.stat$type = names(current.genes)[j]
     current.stat$n_genes = length(current.genes[[j]])
     return(current.stat)
-  }, BPPARAM = mcparam)
+  })
   stat.per_n_genes = do.call(rbind , stat.per_n_genes)
   return(stat.per_n_genes)
-})
+}, BPPARAM = mcparam)
 stat_scmer_batched = do.call(rbind , stat_scmer_batched)
 saveRDS(stat_scmer_batched , file = paste0(root.dir , "data/benchmark/cell_score/" , system , "/cell_score__scmer_batched.Rds"))
 
@@ -164,22 +165,22 @@ saveRDS(stat_scmer_batched , file = paste0(root.dir , "data/benchmark/cell_score
 genes = lapply(1:length(genes_scmer_unbatched) , function(i){
   current.genes_scmer = genes_scmer_unbatched[[i]]
   n_genes = length(current.genes_scmer)
-  out = list("alsu" = genes_alsu[1:n_genes] , "scmer_unbatched" = current.genes_scmer, "hvgs" = get_hvgs(n_genes))
+  out = list("alsu" = as.character(genes_alsu[1:n_genes]) , "scmer_unbatched" = as.character(current.genes_scmer) , "hvgs" = as.character(get_hvgs(n_genes)))
   return(out)
 })
 
-stat_scmer_unbatched = lapply(c(1:length(genes)) , function(i){
+stat_scmer_unbatched = bplapply(c(1:length(genes)) , function(i){
   current.genes = genes[[i]]
-  stat.per_n_genes = bplapply(1:length(current.genes) , function(j){
+  stat.per_n_genes = lapply(1:length(current.genes) , function(j){
     current.stat = suppressWarnings( get_preservation_score_simple(sce , neighs.all = neighs.all , assay = "logcounts" , genes.all = rownames(sce) , 
                                   genes.compare = current.genes[[j]], batch = "sample", n.neigh = 5 , nPC.all = 50 , nPC.compare = 50) )
     current.stat$type = names(current.genes)[j]
     current.stat$n_genes = length(current.genes[[j]])
     return(current.stat)
-  }, BPPARAM = mcparam)
+  })
   stat.per_n_genes = do.call(rbind , stat.per_n_genes)
   return(stat.per_n_genes)
-})
+}, BPPARAM = mcparam)
 stat_scmer_unbatched = do.call(rbind , stat_scmer_unbatched)
 saveRDS(stat_scmer_unbatched , file = paste0(root.dir , "data/benchmark/cell_score/" , system , "/cell_score__scmer_unbatched.Rds"))
 
@@ -194,11 +195,11 @@ saveRDS(stat_scmer_unbatched , file = paste0(root.dir , "data/benchmark/cell_sco
 genes = lapply(1:length(genes_scgenefit) , function(i){
   current.genes_scgenefit = genes_scgenefit[[i]]
   n_genes = length(current.genes_scgenefit)
-  out = list("alsu" = genes_alsu[1:n_genes] , "scgenefit" = current.genes_scgenefit)
+  out = list("alsu" = as.character(genes_alsu[1:n_genes]) , "scgenefit" = as.character(current.genes_scgenefit))
   return(out)
 })
 
-stat_scgenefit = lapply(c(1:length(genes)) , function(i){
+stat_scgenefit = bplapply(c(1:length(genes)) , function(i){
   current.genes = genes[[i]]
   stat.per_n_genes = lapply(1:length(current.genes) , function(j){
     current.stat = suppressWarnings( get_preservation_score_simple(sce , neighs.all = neighs.all , assay = "logcounts" , genes.all = rownames(sce) , 
@@ -209,7 +210,7 @@ stat_scgenefit = lapply(c(1:length(genes)) , function(i){
   })
   stat.per_n_genes = do.call(rbind , stat.per_n_genes)
   return(stat.per_n_genes)
-})
+}, BPPARAM = mcparam)
 stat_scgenefit = do.call(rbind , stat_scgenefit)
 saveRDS(stat_scgenefit , file = paste0(root.dir , "data/benchmark/cell_score/" , system , "/cell_score__scgenefit.Rds"))
 

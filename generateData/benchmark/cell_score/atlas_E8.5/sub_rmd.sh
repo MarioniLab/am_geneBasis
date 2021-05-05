@@ -11,7 +11,7 @@ script_name=cs_emb
 memory=300000
 r_command="rusage[mem=${memory}]"
 #num_processors
-nproc=3
+nproc=5
 
 smg=/nfs/research1/marioni/alsu/singularity/R1.simg
 script=/nfs/research1/marioni/alsu/geneBasis/am_geneBasis/generateData/benchmark/cell_score/atlas_E8.5/run_rmd.R
