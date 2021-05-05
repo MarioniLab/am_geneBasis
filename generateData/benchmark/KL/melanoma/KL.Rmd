@@ -1,0 +1,288 @@
+---
+title: "Pipeline to benchmark selections: geneBasis, SCMER, scGeneFit (marker selection) for cell score"
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+# Load dependencies
+
+```{r load, message = FALSE}
+
+
+library(SingleCellExperiment)
+library(batchelor)
+library(stats)
+library(BiocNeighbors)
+library(tibble)
+library(reshape2)
+library(plyr)
+library(dplyr)
+library(scran)
+library(batchelor)
+library(stringr)
+library(BiocSingular)
+library(BiocParallel)
+library(SingleCellExperiment)
+library(BiocStyle)
+ncores = 5
+mcparam = MulticoreParam(workers = ncores)
+register(mcparam)
+set.seed(32)
+
+#root.dir = "/Users/alsu/Develop/geneBasis/"
+root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
+source(paste0(root.dir, "am_geneBasis/functions/main_functions.R"))
+
+system = "melanoma"
+
+# read sce 
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+
+```
+
+# Set up functions
+
+```{r funcs, message = FALSE}
+
+
+get_dist_matrix = function(sce , genes , batch = "sample" , nPC = NULL){
+  counts = as.matrix(logcounts(sce[genes,]))
+  meta = as.data.frame(colData(sce))
+  batchFactor = factor(meta[, colnames(meta) == batch])
+  if (!is.null(nPC)){
+    counts = multiBatchPCA(counts , batch = batchFactor , d = nPC)
+    counts = do.call(reducedMNN , counts)
+    counts = counts$corrected
+  } 
+  else {
+    counts = fastMNN(counts , batch = batchFactor , d = NA)
+    counts = reducedDim(counts , "corrected")
+  }
+  out = as.matrix(dist(counts))
+  return(out)
+}
+
+get_prob_p = function(dist_matrix , sigma){
+  N = nrow(dist_matrix)
+  dist_matrix = exp(-1*(dist_matrix^2)/(2*sigma^2))
+  for (i in 1:N){
+    dist_matrix[i,i] = 0
+  }
+  denominator = apply(dist_matrix , 1 , function(x) sum(x))
+  denominator = matrix(rep(denominator , each=N) , ncol=N, byrow = T)
+  dist_matrix = dist_matrix/denominator
+  dist_matrix = (dist_matrix + t(dist_matrix))/(2*N)
+  return(dist_matrix)
+}
+
+get_prob_q = function(dist_matrix , sigma){
+  N = nrow(dist_matrix)
+  dist_matrix = 1/(1 + dist_matrix^2)
+  for (i in 1:N){
+    dist_matrix[i,i] = 0
+  }
+  denominator = sum(sum(dist_matrix))
+  dist_matrix = dist_matrix/denominator
+  return(dist_matrix)
+}
+
+get_KL = function(prob_p , prob_q){
+  norm_mtrx = prob_p*log(prob_p / prob_q)
+  score = sum(norm_mtrx[!is.na(norm_mtrx)])
+  return(score)
+}
+
+
+```
+
+# Get gene selections
+
+## geneBasis
+
+```{r read-selection-gene-basis, message = FALSE}
+
+# read gene selection 
+genes_alsu = readRDS(paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection_1.Rds"))
+
+
+```
+
+## SCMER
+
+```{r read-selection-scmer, message = FALSE}
+
+
+# batched
+scmer_batched.files = list.files(path = paste0( root.dir , "data/scmer_res_selected/" , system , "/batched/" ))
+n_genes = sapply(scmer_batched.files , function(str) str_replace_all(str,  ".txt" , ""))
+n_genes = sapply(n_genes , function(str) str_replace_all(str,  "nGenes_" , ""))
+n_genes = sort(as.numeric(n_genes))
+
+genes_scmer_batched = lapply(n_genes , function(str){
+  out = read.table(paste0( root.dir , "data/scmer_res_selected/" , system , "/batched/nGenes_" , str , ".txt") , header = F)
+  genes = out$V1
+  return(genes)
+})
+
+# unbatched
+scmer_unbatched.files = list.files(path = paste0( root.dir , "data/scmer_res_selected/" , system , "/unbatched/" ))
+n_genes = sapply(scmer_unbatched.files , function(str) str_replace_all(str,  ".txt" , ""))
+n_genes = sapply(n_genes , function(str) str_replace_all(str,  "nGenes_" , ""))
+n_genes = sort(as.numeric(n_genes))
+
+genes_scmer_unbatched = lapply(n_genes , function(str){
+  out = read.table(paste0( root.dir , "data/scmer_res_selected/" , system , "/unbatched/nGenes_" , str , ".txt") , header = F)
+  genes = out$V1
+  return(genes)
+})
+
+
+```
+
+## scGene-Fit
+
+```{r read-selection-scGene-Fit, message = FALSE}
+
+# centered
+scgenefit_centers.files = list.files(path = paste0( root.dir , "data/scGeneFit_res/" , system , "/centers/" ))
+n_genes = sapply(scgenefit_centers.files , function(str) str_replace_all(str,  ".txt" , ""))
+n_genes = sapply(n_genes , function(str) str_replace_all(str,  "nGenes_" , ""))
+n_genes = sort(as.numeric(n_genes))
+
+genes_scgenefit = lapply(n_genes , function(str){
+  out = read.table(paste0( root.dir , "data/scGeneFit_res/" , system , "/centers/nGenes_" , str , ".txt") , header = F)
+  genes = out$V1
+  return(genes)
+})
+
+
+```
+
+# Prob-matrix all
+
+```{r prob-matrix-all, message = FALSE}
+
+
+sigma.grid = c(1,10,100)
+
+hvgs_5000 = as.character(get_hvgs(sce , n = 5000))
+dist_all = get_dist_matrix(sce , genes = hvgs_5000, nPC = 50)
+prob_all = lapply(sigma.grid , function(sigma){
+  out = get_prob_p(dist_all, sigma = sigma) 
+  return(out)
+})
+ 
+
+
+```
+
+## Alsu VS scmer-batched
+
+```{r kl-vs-scmer-batched, message = FALSE}
+
+
+genes = lapply(1:length(genes_scmer_batched) , function(i){
+  current.genes_scmer = genes_scmer_batched[[i]]
+  n_genes = length(current.genes_scmer)
+  out = list("alsu" = as.character(genes_alsu[1:n_genes]) , "scmer_batched" = as.character(current.genes_scmer) , "hvgs" = as.character(get_hvgs(sce , n = n_genes)))
+  return(out)
+})
+
+stat_scmer_batched = bplapply( 1:length(genes) , function(i){
+  current.genes = genes[[i]]
+  stat.per_n_genes = lapply(1:length(current.genes) , function(j){
+    stat.per_sigma = lapply(1:length(sigma.grid) , function(k){
+      sigma = sigma.grid[k]
+      current.prob_subset = suppressWarnings( get_prob_q(get_dist_matrix(sce , genes = current.genes[[j]], nPC = 50), sigma = sigma) )
+      current.kl = get_KL(prob_all[[k]] , current.prob_subset)
+      out = data.frame( sigma = sigma , type = names(current.genes)[j] , n_genes = length(current.genes[[j]]) , kl =  current.kl )
+      return(out)
+    })
+    stat.per_sigma = do.call(rbind , stat.per_sigma)  
+    return(stat.per_sigma)
+  })
+  stat.per_n_genes = do.call(rbind , stat.per_n_genes)
+  return(stat.per_n_genes)
+}, BPPARAM = mcparam)
+stat_scmer_batched = do.call(rbind , stat_scmer_batched)
+saveRDS(stat_scmer_batched , file = paste0(root.dir , "data/benchmark/KL/" , system , "/KL__scmer_batched.Rds"))
+
+
+```
+
+## Alsu VS scmer-unbatched
+
+```{r kl-vs-scmer-unbatched, message = FALSE}
+
+
+genes = lapply(1:length(genes_scmer_unbatched) , function(i){
+  current.genes_scmer = genes_scmer_unbatched[[i]]
+  n_genes = length(current.genes_scmer)
+  out = list("alsu" = as.character(genes_alsu[1:n_genes]) , "scmer_unbatched" = as.character(current.genes_scmer) , "hvgs" = as.character(get_hvgs(sce , n = n_genes)))
+  return(out)
+})
+
+stat_scmer_unbatched = bplapply( 1:length(genes) , function(i){
+  current.genes = genes[[i]]
+  stat.per_n_genes = lapply(1:length(current.genes) , function(j){
+    stat.per_sigma = lapply(1:length(sigma.grid) , function(k){
+      sigma = sigma.grid[k]
+      current.prob_subset = suppressWarnings( get_prob_q(get_dist_matrix(sce , genes = current.genes[[j]], nPC = 50), sigma = sigma) )
+      current.kl = get_KL(prob_all[[k]] , current.prob_subset)
+      out = data.frame( sigma = sigma , type = names(current.genes)[j] , n_genes = length(current.genes[[j]]) , kl =  current.kl )
+      return(out)
+    })
+    stat.per_sigma = do.call(rbind , stat.per_sigma)  
+    return(stat.per_sigma)
+  })
+  stat.per_n_genes = do.call(rbind , stat.per_n_genes)
+  return(stat.per_n_genes)
+}, BPPARAM = mcparam)
+stat_scmer_unbatched = do.call(rbind , stat_scmer_unbatched)
+saveRDS(stat_scmer_batched , file = paste0(root.dir , "data/benchmark/KL/" , system , "/KL__scmer_batched.Rds"))
+
+
+```
+
+## Alsu VS scGeneFit
+
+```{r kl-vs-scgenefit, message = FALSE}
+
+
+genes = lapply(1:length(genes_scgenefit) , function(i){
+  current.genes_scgenefit = genes_scgenefit[[i]]
+  n_genes = length(current.genes_scgenefit)
+  out = list("alsu" = as.character(genes_alsu[1:n_genes]) , "scgenefit" = as.character(current.genes_scgenefit))
+  return(out)
+})
+
+stat_scgenefit = bplapply( 1:length(genes) , function(i){
+  current.genes = genes[[i]]
+  stat.per_n_genes = lapply(1:length(current.genes) , function(j){
+    stat.per_sigma = lapply(1:length(sigma.grid) , function(k){
+      sigma = sigma.grid[k]
+      current.prob_subset = suppressWarnings( get_prob_q(get_dist_matrix(sce , genes = current.genes[[j]], nPC = 50), sigma = sigma) )
+      current.kl = get_KL(prob_all[[k]] , current.prob_subset)
+      out = data.frame( sigma = sigma , type = names(current.genes)[j] , n_genes = length(current.genes[[j]]) , kl =  current.kl )
+      return(out)
+    })
+    stat.per_sigma = do.call(rbind , stat.per_sigma)  
+    return(stat.per_sigma)
+  })
+  stat.per_n_genes = do.call(rbind , stat.per_n_genes)
+  return(stat.per_n_genes)
+}, BPPARAM = mcparam)
+stat_scgenefit = do.call(rbind , stat_scgenefit)
+saveRDS(stat_scgenefit , file = paste0(root.dir , "data/benchmark/KL/" , system , "/KL__scgenefit.Rds"))
+
+
+```
+
+
+# Session Info
+
+```{r sessinf}
+sessionInfo()
+```
