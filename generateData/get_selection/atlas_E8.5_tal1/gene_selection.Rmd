@@ -28,7 +28,7 @@ library(SingleCellExperiment)
 library(dplyr)
 library(BiocStyle)
 library(stats)
-ncores = 5
+ncores = 2
 mcparam = MulticoreParam(workers = ncores)
 register(mcparam)
 set.seed(32)
@@ -36,7 +36,6 @@ set.seed(32)
 #root.dir = "/Users/alsu/Develop/geneBasis/"
 root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
 source(paste0(root.dir , "am_geneBasis/functions/main_functions.R"))
-
 
 system = "atlas_E8.5_tal1"
 sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
@@ -85,17 +84,15 @@ add_genes = function(sce , stat = NULL, genes_base , assay = "logcounts", n_gene
 
 
 
-K = 5
 p = 3
-n_genes = 250
+n_genes = 150
 
-genes_stat = bplapply(c(1:K) , function(i){
-  genes_base = sample(rownames(sce) , 2)
-  genes = add_genes(sce , stat = NULL, genes_base = NULL, assay = "logcounts", n_genes_total = n_genes, batch = "sample", p = p)
-  saveRDS(genes , paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection_" , i, ".Rds"))
+tomato.grid = c(T,F)
+genes_stat = bplapply(tomato.grid, function(tomato){
+  genes = add_genes(sce[, sce$tomato == tomato] , stat = NULL, genes_base = NULL, assay = "logcounts", n_genes_total = n_genes, batch = "sample", p = p)
+  saveRDS(genes , paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection_" , tomato, ".Rds"))
   return(genes)
 }, BPPARAM = mcparam)
-
 
 
 ```
