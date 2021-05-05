@@ -8,10 +8,10 @@ err_folder=${my_folder}/clust_err/geneBasis
 script_name=dd_spl
 #CHOOSE PARAMETERS
 #RAM in megabytes
-memory=400000
+memory=600000
 r_command="rusage[mem=${memory}]"
 #num_processors
-nproc=10
+nproc=7
 
 smg=/nfs/research1/marioni/alsu/singularity/R1.simg
 script=/nfs/research1/marioni/alsu/geneBasis/am_geneBasis/generateData/benchmark_method/diff_dist/spleen/run_rmd.R
