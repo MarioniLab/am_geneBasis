@@ -147,12 +147,13 @@ get_celltypes_stat = function(sce , genes , batch = "sample", n.neigh = 5){
 genes = lapply(1:length(genes_scmer_batched) , function(i){
   current.genes_scmer = genes_scmer_batched[[i]]
   n_genes = length(current.genes_scmer)
-  out = list("alsu" = genes_alsu[1:n_genes] , "scmer_batched" = current.genes_scmer)
+  out = list("alsu" = as.character(genes_alsu[1:n_genes]) , "scmer_batched" = as.character(current.genes_scmer))
   return(out)
 })
 
 
 stat_scmer_batched = lapply(c(1:length(genes)) , function(i){
+  print(i)
   current.genes = genes[[i]]
   stat.per_n_genes = lapply(1:length(current.genes) , function(j){
     current.stat = suppressWarnings( get_celltypes_stat(sce , current.genes[[j]] , batch = "sample", n.neigh = 10 ) )
@@ -177,7 +178,7 @@ saveRDS(stat_scmer_batched , file = paste0(root.dir , "data/benchmark/celltype_c
 genes = lapply(1:length(genes_scmer_unbatched) , function(i){
   current.genes_scmer = genes_scmer_unbatched[[i]]
   n_genes = length(current.genes_scmer)
-  out = list("alsu" = genes_alsu[1:n_genes] , "scmer_unbatched" = current.genes_scmer)
+  out = list("alsu" = as.character(genes_alsu[1:n_genes]) , "scmer_unbatched" = as.character(current.genes_scmer))
   return(out)
 })
 
@@ -206,7 +207,7 @@ saveRDS(stat_scmer_unbatched , file = paste0(root.dir , "data/benchmark/celltype
 genes = lapply(1:length(genes_scgenefit) , function(i){
   current.genes_scgenefit = genes_scgenefit[[i]]
   n_genes = length(current.genes_scgenefit)
-  out = list("alsu" = genes_alsu[1:n_genes] , "scgenefit" = current.genes_scgenefit)
+  out = list("alsu" = as.character(genes_alsu[1:n_genes]) , "scgenefit" = as.character(current.genes_scgenefit))
   return(out)
 })
 
