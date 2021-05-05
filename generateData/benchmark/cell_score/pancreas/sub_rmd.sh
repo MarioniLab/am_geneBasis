@@ -8,7 +8,7 @@ err_folder=${my_folder}/clust_err/geneBasis
 script_name=cs_pan
 #CHOOSE PARAMETERS
 #RAM in megabytes
-memory=300000
+memory=700000
 r_command="rusage[mem=${memory}]"
 #num_processors
 nproc=5
