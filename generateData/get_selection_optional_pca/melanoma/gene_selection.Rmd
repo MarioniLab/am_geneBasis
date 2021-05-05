@@ -74,7 +74,7 @@ add_genes = function(sce , stat = NULL, genes_base , assay = "logcounts", n_gene
       
     idx = which(stat_genes$dist.ratio == max(stat_genes$dist.ratio))
     gene = stat_genes$gene[idx[1]]
-    #print(gene)
+    print(gene)
     genes_all = c(genes_all , as.character(gene))
   }
   out = genes_all
@@ -88,7 +88,7 @@ n_genes = 250
 
 gene_selection = readRDS(paste0(root.dir , "data/gene_selection/" , system , "/gene_selection_1.Rds"))
 genes_stat = bplapply(nPC.grid , function(nPC){
-  genes_base = gene_selection[1:(nPC + 1)]
+  genes_base = as.character(gene_selection[1:(nPC + 1)])
   genes = add_genes(sce , stat = NULL, genes_base = genes_base, assay = "logcounts", n_genes_total = n_genes, batch = "sample", p = p, nPC = nPC)
   saveRDS(genes , paste0(root.dir , "data/gene_selection__optional_PCA/" , system , "/" , "gene_selection__nPC_" , nPC, ".Rds"))
   return(genes)
