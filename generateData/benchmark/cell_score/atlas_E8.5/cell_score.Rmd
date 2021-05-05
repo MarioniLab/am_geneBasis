@@ -54,7 +54,7 @@ sce = retain_only_hvgs(sce , n = 10000)
 # read gene selection 
 gene_selections.files = list.files(path=paste0(root.dir , "data/gene_selection/" , system , "/"))
 gene_selections.file = gene_selections.files[1]
-genes_alsu = readRDS(paste0(root.dir , "data/gene_selection/" , system , "/" , gene_selections.file))
+genes_alsu = readRDS(paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection_1.Rds"))
 
 
 ```
