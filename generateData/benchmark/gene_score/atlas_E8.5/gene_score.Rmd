@@ -39,8 +39,8 @@ system = "atlas_E8.5"
 
 # read sce 
 sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
-sce = retain_only_hvgs(sce, n = 3000)
-
+sce = retain_only_hvgs(sce, n = 10000)
+hvgs = get_hvgs(sce , n = 3000)
 
 ```
 
@@ -116,7 +116,7 @@ genes_scgenefit = lapply(n_genes , function(str){
 ```{r corr-all, message = FALSE}
 
 
-stat_gene_score = suppressWarnings( get_distr_dist(sce, genes = rownames(sce), assay = "logcounts" , batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , type = "corr") ) 
+stat_gene_score = suppressWarnings( get_distr_dist(sce, genes = rownames(sce), assay = "logcounts" , batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = hvgs , type = "corr") ) 
 colnames(stat_gene_score) = c("gene" , "corr_all")
   
 
@@ -137,7 +137,7 @@ genes = lapply(1:length(genes_scmer_batched) , function(i){
 stat_scmer_batched = bplapply(c(1:length(genes)) , function(i){
   current.genes = genes[[i]]
   stat.per_n_genes = lapply(c(1:length(current.genes)) , function(j){
-    current.stat = suppressWarnings( get_distr_dist(sce , genes = current.genes[[j]] , assay = "logcounts" , batch = "sample", n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , type = "corr") )
+    current.stat = suppressWarnings( get_distr_dist(sce , genes = current.genes[[j]] , assay = "logcounts" , batch = "sample", n.neigh = 5 , nPC = 50 , genes.predict = hvgs , type = "corr") )
     current.stat$type = names(current.genes)[j]
     current.stat$n_genes = length(current.genes[[j]])
     return(current.stat)
@@ -170,7 +170,7 @@ genes = lapply(1:length(genes_scmer_unbatched) , function(i){
 stat_scmer_unbatched = bplapply(c(1:length(genes)) , function(i){
   current.genes = genes[[i]]
   stat.per_n_genes = lapply(1:length(current.genes) , function(j){
-    current.stat = suppressWarnings( get_distr_dist(sce , genes = current.genes[[j]] , assay = "logcounts" , batch = "sample", n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , type = "corr") )
+    current.stat = suppressWarnings( get_distr_dist(sce , genes = current.genes[[j]] , assay = "logcounts" , batch = "sample", n.neigh = 5 , nPC = 50 , genes.predict = hvgs , type = "corr") )
     current.stat$type = names(current.genes)[j]
     current.stat$n_genes = length(current.genes[[j]])
     return(current.stat)
@@ -201,7 +201,7 @@ genes = lapply(1:length(genes_scgenefit) , function(i){
 stat_scgenefit = bplapply(c(1:length(genes)) , function(i){
   current.genes = genes[[i]]
   stat.per_n_genes = lapply(1:length(current.genes) , function(j){
-    current.stat = suppressWarnings( get_distr_dist(sce , genes = current.genes[[j]] , assay = "logcounts" , batch = "sample", n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , type = "corr") )
+    current.stat = suppressWarnings( get_distr_dist(sce , genes = current.genes[[j]] , assay = "logcounts" , batch = "sample", n.neigh = 5 , nPC = 50 , genes.predict = hvgs , type = "corr") )
     current.stat$type = names(current.genes)[j]
     current.stat$n_genes = length(current.genes[[j]])
     return(current.stat)
