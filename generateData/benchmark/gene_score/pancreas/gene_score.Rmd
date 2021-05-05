@@ -26,7 +26,7 @@ library(BiocSingular)
 library(BiocParallel)
 library(SingleCellExperiment)
 library(BiocStyle)
-ncores = 1
+ncores = 5
 mcparam = MulticoreParam(workers = ncores)
 register(mcparam)
 set.seed(32)
@@ -40,10 +40,12 @@ system = "pancreas"
 # read sce 
 sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
 sce$cell = colnames(sce)
-sce = retain_only_hvgs(sce, n = 3000)
+#sce = retain_only_hvgs(sce, n = 10000)
+genes.predict = as.character(get_hvgs(sce , n = 3000))
 
 
 ```
+
 
 
 # Get gene selections
@@ -56,7 +58,7 @@ sce = retain_only_hvgs(sce, n = 3000)
 # read gene selection 
 gene_selections.files = list.files(path=paste0(root.dir , "data/gene_selection/" , system , "/"))
 gene_selections.file = gene_selections.files[1]
-genes_alsu = readRDS(paste0(root.dir , "data/gene_selection/" , system , "/" , gene_selections.file))
+genes_alsu = readRDS(paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection_1.Rds"))
 
 
 ```
@@ -112,12 +114,13 @@ genes_scgenefit = lapply(n_genes , function(str){
 
 ```
 
-# Neighborhood preservation score (per cell)
+# Gene score
 
 ```{r corr-all, message = FALSE}
 
 
-stat_gene_score = suppressWarnings( get_distr_dist(sce, genes = rownames(sce), assay = "logcounts" , batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , type = "corr") ) 
+hvgs_5000 = as.character(get_hvgs(sce , n = 5000))
+stat_gene_score = suppressWarnings( get_distr_dist(sce, genes = hvgs_5000, assay = "logcounts" , batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = genes.predict , type = "corr") ) 
 colnames(stat_gene_score) = c("gene" , "corr_all")
   
 
@@ -131,25 +134,27 @@ colnames(stat_gene_score) = c("gene" , "corr_all")
 genes = lapply(1:length(genes_scmer_batched) , function(i){
   current.genes_scmer = genes_scmer_batched[[i]]
   n_genes = length(current.genes_scmer)
-  out = list("alsu" = genes_alsu[1:n_genes] , "scmer_batched" = current.genes_scmer, "hvgs" = get_hvgs(sce , n_genes))
+  out = list("alsu" = as.character(genes_alsu[1:n_genes]) , "scmer_batched" = as.character(current.genes_scmer), "hvgs" = as.character(get_hvgs(sce , n_genes)))
   return(out)
 })
 
-stat_scmer_batched = lapply(c(1:length(genes)) , function(i){
+stat_scmer_batched = bplapply(c(1:length(genes)) , function(i){
   current.genes = genes[[i]]
-  stat.per_n_genes = lapply(1:length(current.genes) , function(j){
-    current.stat = suppressWarnings( get_distr_dist(sce , genes = current.genes[[j]] , assay = "logcounts" , batch = "sample", n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , type = "corr") )
+  stat.per_n_genes = lapply(c(1:length(current.genes)) , function(j){
+    current.stat = suppressWarnings( get_distr_dist(sce , genes = current.genes[[j]] , assay = "logcounts" , batch = "sample", n.neigh = 5 , nPC = 50 , genes.predict = genes.predict , type = "corr") )
     current.stat$type = names(current.genes)[j]
     current.stat$n_genes = length(current.genes[[j]])
     return(current.stat)
   })
   stat.per_n_genes = do.call(rbind , stat.per_n_genes)
   return(stat.per_n_genes)
-})
+}, BPPARAM = mcparam)
 stat_scmer_batched = do.call(rbind , stat_scmer_batched)
 stat_scmer_batched = merge(stat_scmer_batched , stat_gene_score, all.x = T , all.y = F)
 stat_scmer_batched$corr_ratio = stat_scmer_batched$corr/stat_scmer_batched$corr_all
 saveRDS(stat_scmer_batched , file = paste0(root.dir , "data/benchmark/gene_score/" , system , "/gene_score__scmer_batched.Rds"))
+
+
 
 
 ```
@@ -162,21 +167,21 @@ saveRDS(stat_scmer_batched , file = paste0(root.dir , "data/benchmark/gene_score
 genes = lapply(1:length(genes_scmer_unbatched) , function(i){
   current.genes_scmer = genes_scmer_unbatched[[i]]
   n_genes = length(current.genes_scmer)
-  out = list("alsu" = genes_alsu[1:n_genes] , "scmer_unbatched" = current.genes_scmer, "hvgs" = get_hvgs(sce , n_genes))
+  out = list("alsu" = as.character(genes_alsu[1:n_genes]) , "scmer_unbatched" = as.character(current.genes_scmer), "hvgs" = as.character(get_hvgs(sce , n_genes)))
   return(out)
 })
 
-stat_scmer_unbatched = lapply(c(1:length(genes)) , function(i){
+stat_scmer_unbatched = bplapply(c(1:length(genes)) , function(i){
   current.genes = genes[[i]]
   stat.per_n_genes = lapply(1:length(current.genes) , function(j){
-    current.stat = suppressWarnings( get_distr_dist(sce , genes = current.genes[[j]] , assay = "logcounts" , batch = "sample", n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , type = "corr") )
+    current.stat = suppressWarnings( get_distr_dist(sce , genes = current.genes[[j]] , assay = "logcounts" , batch = "sample", n.neigh = 5 , nPC = 50 , genes.predict = genes.predict , type = "corr") )
     current.stat$type = names(current.genes)[j]
     current.stat$n_genes = length(current.genes[[j]])
     return(current.stat)
   })
   stat.per_n_genes = do.call(rbind , stat.per_n_genes)
   return(stat.per_n_genes)
-})
+}, BPPARAM = mcparam)
 stat_scmer_unbatched = do.call(rbind , stat_scmer_unbatched)
 stat_scmer_unbatched = merge(stat_scmer_unbatched , stat_gene_score, all.x = T , all.y = F)
 stat_scmer_unbatched$corr_ratio = stat_scmer_unbatched$corr/stat_scmer_unbatched$corr_all
@@ -193,21 +198,21 @@ saveRDS(stat_scmer_unbatched , file = paste0(root.dir , "data/benchmark/gene_sco
 genes = lapply(1:length(genes_scgenefit) , function(i){
   current.genes_scgenefit = genes_scgenefit[[i]]
   n_genes = length(current.genes_scgenefit)
-  out = list("alsu" = genes_alsu[1:n_genes] , "scgenefit" = current.genes_scgenefit)
+  out = list("alsu" = as.character(genes_alsu[1:n_genes]) , "scgenefit" = as.character(current.genes_scgenefit))
   return(out)
 })
 
-stat_scgenefit = lapply(c(1:length(genes)) , function(i){
+stat_scgenefit = bplapply(c(1:length(genes)) , function(i){
   current.genes = genes[[i]]
   stat.per_n_genes = lapply(1:length(current.genes) , function(j){
-    current.stat = suppressWarnings( get_distr_dist(sce , genes = current.genes[[j]] , assay = "logcounts" , batch = "sample", n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , type = "corr") )
+    current.stat = suppressWarnings( get_distr_dist(sce , genes = current.genes[[j]] , assay = "logcounts" , batch = "sample", n.neigh = 5 , nPC = 50 , genes.predict = genes.predict , type = "corr") )
     current.stat$type = names(current.genes)[j]
     current.stat$n_genes = length(current.genes[[j]])
     return(current.stat)
   })
   stat.per_n_genes = do.call(rbind , stat.per_n_genes)
   return(stat.per_n_genes)
-})
+}, BPPARAM = mcparam)
 stat_scgenefit = do.call(rbind , stat_scgenefit)
 stat_scgenefit = merge(stat_scgenefit , stat_gene_score, all.x = T , all.y = F)
 stat_scgenefit$corr_ratio = stat_scgenefit$corr/stat_scgenefit$corr_all
@@ -215,7 +220,6 @@ saveRDS(stat_scgenefit , file = paste0(root.dir , "data/benchmark/gene_score/" ,
 
 
 ```
-
 
 # Session Info
 
