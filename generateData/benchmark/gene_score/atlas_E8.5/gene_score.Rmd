@@ -26,7 +26,7 @@ library(BiocSingular)
 library(BiocParallel)
 library(SingleCellExperiment)
 library(BiocStyle)
-ncores = 10
+ncores = 3
 mcparam = MulticoreParam(workers = ncores)
 register(mcparam)
 set.seed(32)
@@ -136,7 +136,7 @@ genes = lapply(1:length(genes_scmer_batched) , function(i){
 
 stat_scmer_batched = bplapply(c(1:length(genes)) , function(i){
   current.genes = genes[[i]]
-  stat.per_n_genes = lapply(1:length(current.genes) , function(j){
+  stat.per_n_genes = lapply(c(1:length(current.genes)) , function(j){
     current.stat = suppressWarnings( get_distr_dist(sce , genes = current.genes[[j]] , assay = "logcounts" , batch = "sample", n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , type = "corr") )
     current.stat$type = names(current.genes)[j]
     current.stat$n_genes = length(current.genes[[j]])
@@ -149,6 +149,21 @@ stat_scmer_batched = do.call(rbind , stat_scmer_batched)
 stat_scmer_batched = merge(stat_scmer_batched , stat_gene_score, all.x = T , all.y = F)
 stat_scmer_batched$corr_ratio = stat_scmer_batched$corr/stat_scmer_batched$corr_all
 saveRDS(stat_scmer_batched , file = paste0(root.dir , "data/benchmark/gene_score/" , system , "/gene_score__scmer_batched.Rds"))
+
+
+stat_scmer_batched = lapply(c(1,2) , function(i){
+  current.genes = genes[[i]]
+  stat.per_n_genes = lapply(1:2 , function(j){
+    current.stat = suppressWarnings( get_distr_dist(sce , genes = current.genes[[j]] , assay = "logcounts" , batch = "sample", n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , type = "corr") )
+    current.stat$type = names(current.genes)[j]
+    current.stat$n_genes = length(current.genes[[j]])
+    return(current.stat)
+  })
+  stat.per_n_genes = do.call(rbind , stat.per_n_genes)
+  return(stat.per_n_genes)
+})
+stat_scmer_batched = do.call(rbind , stat_scmer_batched)
+stat_scmer_batched = merge(stat_scmer_batched , stat_gene_score, all.x = T , all.y = F)
 
 
 ```

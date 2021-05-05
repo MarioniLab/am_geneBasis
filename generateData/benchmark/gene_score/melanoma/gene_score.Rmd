@@ -26,7 +26,7 @@ library(BiocSingular)
 library(BiocParallel)
 library(SingleCellExperiment)
 library(BiocStyle)
-ncores = 10
+ncores = 3
 mcparam = MulticoreParam(workers = ncores)
 register(mcparam)
 set.seed(32)
