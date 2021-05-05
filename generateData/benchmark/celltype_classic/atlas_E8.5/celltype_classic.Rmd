@@ -26,7 +26,7 @@ library(BiocSingular)
 library(BiocParallel)
 library(SingleCellExperiment)
 library(BiocStyle)
-ncores = 10
+ncores = 5
 mcparam = MulticoreParam(workers = ncores)
 register(mcparam)
 set.seed(32)
@@ -54,7 +54,7 @@ sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , syst
 # read gene selection 
 gene_selections.files = list.files(path=paste0(root.dir , "data/gene_selection/" , system , "/"))
 gene_selections.file = gene_selections.files[1]
-genes_alsu = readRDS(paste0(root.dir , "data/gene_selection/" , system , "/" , gene_selections.file))
+genes_alsu = readRDS(paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection_1.Rds"))
 
 
 ```
@@ -135,8 +135,6 @@ get_celltypes_stat = function(sce , genes , batch = "sample", n.neigh = 5){
     return(NULL)
   }
 }
-
-
 
 
 ```
