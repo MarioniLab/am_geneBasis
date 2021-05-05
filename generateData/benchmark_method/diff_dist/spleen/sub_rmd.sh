@@ -8,7 +8,7 @@ err_folder=${my_folder}/clust_err/geneBasis
 script_name=dd_spl
 #CHOOSE PARAMETERS
 #RAM in megabytes
-memory=600000
+memory=800000
 r_command="rusage[mem=${memory}]"
 #num_processors
 nproc=7
