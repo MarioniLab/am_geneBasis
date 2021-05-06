@@ -1,0 +1,106 @@
+---
+title: "Gene selection."
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+
+#Introduction & method
+
+
+```{r load, message = FALSE}
+# load libraries we are going to use
+
+library(Matrix)
+library(scran)
+library(scater)
+library(batchelor)
+library(knitr)
+library(reshape2)
+library(edgeR)
+library(ggplot2)
+library(BiocSingular)
+library(BiocParallel)
+library(BiocNeighbors)
+library(SingleCellExperiment)
+library(dplyr)
+library(BiocStyle)
+library(stats)
+ncores = 1
+mcparam = MulticoreParam(workers = ncores)
+register(mcparam)
+set.seed(32)
+
+#root.dir = "/Users/alsu/Develop/geneBasis/"
+root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
+source(paste0(root.dir , "am_geneBasis/functions/main_functions.R"))
+
+
+system = "melanoma"
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+meta = as.data.frame(colData(sce))
+
+# reduce search - discard obviously uninteresting genes
+sce = retain_only_hvgs(sce, n = 10000, var.thresh = 0)
+  
+# discard mitochondrial
+rownames.sce = rownames(sce)
+idx = which(!grepl("mt-" , rownames.sce) & !grepl("MT-" , rownames.sce) & !grepl("Mt-" , rownames.sce))
+sce = sce[idx,]
+
+
+```
+
+
+# Iterative gene search
+
+```{r iterative-gene-search, message = FALSE}
+
+
+
+add_genes = function(sce , stat = NULL, genes_base , assay = "logcounts", n_genes_total , batch , p){
+  if (is.null(stat)){
+    stat = suppressWarnings( get_lp_norm_dist(sce, genes = rownames(sce), assay = assay, batch = batch , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , p = p) )
+    colnames(stat) = c("gene" , "dist.all")
+  }
+  genes_all = genes_base
+  while(length(genes_all) < n_genes_total){
+    stat_genes = suppressWarnings( get_lp_norm_dist(sce , genes = genes_all , assay = assay , batch = batch, n.neigh = 5 , nPC = NULL , genes.predict = rownames(sce) , p = p) )
+    colnames(stat_genes) = c("gene" , "dist")   
+    stat_genes = stat_genes[!stat_genes$gene %in% genes_all , ] 
+    stat_genes = merge(stat_genes , stat)
+    
+    stat_genes$dist.ratio = stat_genes$dist - stat_genes$dist.all 
+      
+    idx = which(stat_genes$dist.ratio == max(stat_genes$dist.ratio))
+    gene = stat_genes$gene[idx[1]]
+    #print(gene)
+    genes_all = c(genes_all , as.character(gene))
+  }
+  out = genes_all
+  return(out)
+}
+
+
+
+K = 1
+p = 3
+n_genes = 200
+
+genes_stat = lapply(c(1:K) , function(i){
+  genes = add_genes(sce , stat = NULL, genes_base = NULL, assay = "logcounts", n_genes_total = n_genes, batch = NULL, p = p)
+  saveRDS(genes , paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection_unbatched_" , i, ".Rds"))
+  return(genes)
+})
+
+
+
+```
+
+#Session Info
+
+```{r sessinf}
+sessionInfo()
+```
