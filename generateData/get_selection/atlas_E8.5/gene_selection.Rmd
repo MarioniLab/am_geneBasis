@@ -59,11 +59,8 @@ sce = sce[idx,]
 n_genes_total = 250
 
 genes_batched = gene_search(sce , genes_base = NULL, n_genes_total = 3, batch = "sample", n.neigh = 5, p = 3, K = 5, nPC = NULL, ncores = ncores)
-saveRDS(genes_batched , paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection_" , "batched", ".Rds"))
+saveRDS(genes_batched , paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection", ".Rds"))
 
-genes_unbatched = gene_search(sce , genes_base = NULL, n_genes_total = 3, batch = NULL, n.neigh = 5, p = 3, K = 5, nPC = NULL, ncores = ncores)
-saveRDS(genes_unbatched , paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection_" , "unbatched", ".Rds"))
- 
 
 ```
 
