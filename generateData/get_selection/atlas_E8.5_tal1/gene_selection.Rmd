@@ -28,7 +28,7 @@ library(SingleCellExperiment)
 library(dplyr)
 library(BiocStyle)
 library(stats)
-ncores = 2
+ncores = 7
 mcparam = MulticoreParam(workers = ncores)
 register(mcparam)
 set.seed(32)
@@ -39,7 +39,6 @@ source(paste0(root.dir , "am_geneBasis/functions/main_functions.R"))
 
 system = "atlas_E8.5_tal1"
 sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
-meta = as.data.frame(colData(sce))
 
 # reduce search - discard obviously uninteresting genes
 sce = retain_only_hvgs(sce, n = 10000, var.thresh = 0)
@@ -49,8 +48,6 @@ rownames.sce = rowData(sce)[,2]
 idx = which(!grepl("mt-" , rownames.sce) & !grepl("MT-" , rownames.sce) & !grepl("Mt-" , rownames.sce))
 sce = sce[idx,]
 
-sce = sce[, sce$sample %in% c(1,3)]
-
 ```
 
 
@@ -59,41 +56,14 @@ sce = sce[, sce$sample %in% c(1,3)]
 ```{r iterative-gene-search, message = FALSE}
 
 
+n_genes_total = 250
 
-add_genes = function(sce , stat = NULL, genes_base , assay = "logcounts", n_genes_total , batch , p){
-  if (is.null(stat)){
-    stat = suppressWarnings( get_lp_norm_dist(sce, genes = rownames(sce), assay = assay, batch = batch , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , p = p) )
-    colnames(stat) = c("gene" , "dist.all")
-  }
-  genes_all = genes_base
-  while(length(genes_all) < n_genes_total){
-    stat_genes = suppressWarnings( get_lp_norm_dist(sce , genes = genes_all , assay = assay , batch = batch, n.neigh = 5 , nPC = NULL , genes.predict = rownames(sce) , p = p) )
-    colnames(stat_genes) = c("gene" , "dist")   
-    stat_genes = stat_genes[!stat_genes$gene %in% genes_all , ] 
-    stat_genes = merge(stat_genes , stat)
-    
-    stat_genes$dist.ratio = stat_genes$dist - stat_genes$dist.all 
-      
-    idx = which(stat_genes$dist.ratio == max(stat_genes$dist.ratio))
-    gene = stat_genes$gene[idx[1]]
-    print(gene)
-    genes_all = c(genes_all , as.character(gene))
-  }
-  out = genes_all
-  return(out)
-}
+genes_T = gene_search(sce[, sce$tomato] , genes_base = NULL, n_genes_total = n_genes_total, batch = "sample", n.neigh = 5, p = 3, K = 5, nPC = NULL, ncores = ncores)
+saveRDS(genes_T , paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection_TRUE", ".Rds"))
 
+genes_F = gene_search(sce[, !sce$tomato] , genes_base = NULL, n_genes_total = n_genes_total, batch = "sample", n.neigh = 5, p = 3, K = 5, nPC = NULL, ncores = ncores)
+saveRDS(genes_F , paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection_FALSE", ".Rds"))
 
-
-p = 3
-n_genes = 150
-
-tomato.grid = c(T,F)
-genes_stat = bplapply(tomato.grid, function(tomato){
-  genes = add_genes(sce[, sce$tomato == tomato] , stat = NULL, genes_base = NULL, assay = "logcounts", n_genes_total = n_genes, batch = NULL, p = p)
-  saveRDS(genes , paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection_" , tomato, ".Rds"))
-  return(genes)
-}, BPPARAM = mcparam)
 
 
 ```

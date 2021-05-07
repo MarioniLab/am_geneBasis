@@ -9,7 +9,7 @@ script_name=genes_emb_ch_wt
 
 #CHOOSE PARAMETERS
 #RAM in megabytes
-memory=340000
+memory=200000
 r_command="rusage[mem=${memory}]"
 #num_processors
 nproc=5

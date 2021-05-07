@@ -12,7 +12,7 @@ script_name=genes_emb_ta1
 memory=300000
 r_command="rusage[mem=${memory}]"
 #num_processors
-nproc=2
+nproc=7
 
 smg=/nfs/research1/marioni/alsu/singularity/R1.simg
 script=/nfs/research1/marioni/alsu/geneBasis/am_geneBasis/generateData/get_selection/atlas_E8.5_tal1/run_rmd.R
