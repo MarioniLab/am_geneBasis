@@ -28,7 +28,7 @@ library(SingleCellExperiment)
 library(dplyr)
 library(BiocStyle)
 library(stats)
-ncores = 10
+ncores = 5
 mcparam = MulticoreParam(workers = ncores)
 register(mcparam)
 set.seed(32)
