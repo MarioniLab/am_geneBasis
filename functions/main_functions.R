@@ -370,12 +370,12 @@ get_expr_real_and_neighbors = function(sce , genes , assay = "logcounts" , batch
 }
 
 
-get_preservation_score_simple = function(sce , neighs.all = NULL , assay = "logcounts" , genes.all = rownames(sce) , 
+get_preservation_score_simple = function(sce , neighs.all = NULL ,  genes.all = rownames(sce) , 
                                   genes.compare , batch = "sample", n.neigh = 5 , nPC.all = 50 , nPC.compare = 200){
-  neighs.compare = get_mapping(sce , assay = assay , genes = genes.compare, batch = batch, n.neigh = n.neigh, nPC = nPC.compare , type = "together")
+  neighs.compare = get_mapping(sce , genes = genes.compare, batch = batch, n.neigh = n.neigh, nPC = nPC.compare , type = "together")
   if (!is.null(neighs.compare)){
     if (is.null(neighs.all)){
-      neighs.all = get_mapping(sce , assay = assay, genes = genes.all, batch = batch, n.neigh = "all", nPC = nPC.all , get.dist = T , type = "together")
+      neighs.all = get_mapping(sce , genes = genes.all, batch = batch, n.neigh = "all", nPC = nPC.all , get.dist = T , type = "together")
     }
     neighs.all.cells_mapped = neighs.all$cells_mapped
     neighs.all.distances = neighs.all$distances
