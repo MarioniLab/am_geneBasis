@@ -1,133 +1,10 @@
 # This script contains all functions needed for gene ranking project
 
-
-create_sce = function(counts , meta , batch = NULL){
-  counts = counts[, order(colnames(counts))]
-  meta = meta[order(meta$cell) , ]
-  if (is.null(batch)){
-    sce = SingleCellExperiment(assays = list("counts" = counts), colData = meta)
-    clusters <- quickCluster(sce, method="igraph", use.ranks=TRUE, d=50, min.mean=0.1)
-    sce <- computeSumFactors(sce, clusters=clusters)
-    sce <- logNormCounts(sce)
-    return(sce)
-  }
-  else {
-    if (!(batch %in% colnames(meta))){
-      stop("batch specified variable should exist in SingleCellExperiment object - are you sure there is no typo?")
-    }
-    else {
-      batchFactor = factor(meta[, colnames(meta) == batch])
-      sce = lapply(unique(batchFactor) , function(current.batch){
-        idx = which(batchFactor == current.batch)
-        current.sce = SingleCellExperiment(assays = list("counts" = counts[,idx]), colData = meta[idx,])
-        clusters <- quickCluster(current.sce, method="igraph", use.ranks=TRUE, d=50, min.mean=0.1)
-        current.sce <- computeSumFactors(current.sce, clusters=clusters)
-        return(current.sce)
-      })
-      sce = do.call(multiBatchNorm , sce )
-      sce = do.call(cbind, sce)
-      return(sce)
-    }
-  }
-}
-
-
-add_logcounts = function(sce , batch){
-  require(SingleCellExperiment)
-  require(scuttle)
-  require(batchelor)
-  meta = as.data.frame(colData(sce))
-  counts = counts(sce)
-  umaps = reducedDim(sce , "UMAP")
-  
-  # add logcounts
-  if (!is.null(batch)){
-    unq.batches = unique(meta[, batch])
-    sce = bplapply(unq.batches , function(current.batch){
-      idx = which(meta[ , batch ] == current.batch)
-      current.sce = SingleCellExperiment(assays = list("counts" = counts[,idx]), colData = meta[idx,])
-      reducedDims(current.sce) = list( UMAP = umaps[idx,] )
-      clusters <- quickCluster(current.sce, method="igraph", use.ranks=TRUE, d=50, min.mean=0.1)
-      current.sce <- computeSumFactors(current.sce, clusters=clusters)
-      return(current.sce)
-    } , BPPARAM = mcparam)
-    sce <- do.call(multiBatchNorm , sce )
-    sce = do.call(cbind , sce)
-  }
-  else {
-    sce = SingleCellExperiment(assays = list("counts" = counts), colData = meta)
-    reducedDims(sce) = list( UMAP = umaps )
-    clusters = quickCluster(sce, method="igraph", use.ranks=TRUE, d=50, min.mean=0.1)
-    sce = computeSumFactors(sce, clusters=clusters)
-    sce = logNormCounts(sce)
-  }
-  return(sce)
-}
-
-get_rid_of_highly_expressed_genes = function(sce , method = "absolute" , mean.thresh = 5, max.thresh = 500){
-  counts = counts(sce)
-  stat = data.frame(gene = rownames(counts) ,
-                    mean.counts = apply(counts , 1 , mean) ,
-                    max.counts = apply(counts , 1 , max) ,
-                    sd.counts = apply(counts , 1 , sd))
-  if (method == "absolute"){
-    genes.2keep = stat$gene[stat$mean.counts < mean.thresh & stat$max.counts < max.thresh]
-
-    sce.filtered = sce[rownames(sce) %in% genes.2keep , ]
-    genes.2discard = setdiff(rownames(sce) , rownames(sce.filtered))
-    print(paste0( "Discarded ", length(genes.2discard) , " genes as too highly expressed.") )
-    return(sce.filtered)
-  }
-}
-
-detect_rare_celltypes = function(sce , nCells.thresh = 10 , FDR.thresh = 0.05){
-  stat.celltype = table(sce$celltype)
-  rare_celltypes = stat.celltype[stat.celltype < nCells.thresh]
-  rare_celltypes = as.data.frame(rare_celltypes)
-
-  if (nrow(rare_celltypes) > 0){
-    colnames(rare_celltypes) = c("celltype" , "n.cells")
-    markers.rare_celltypes = lapply(as.character( rare_celltypes$celltype ), function(celltype){
-      current.sce = sce
-      current.sce$celltype.bool = current.sce$celltype == celltype
-      if (stat.celltype[celltype] > 1){
-        markers <- scran::findMarkers(current.sce , groups=current.sce$celltype.bool, direction = "up", test = "t", assay.type = "logcounts")
-        markers = as.data.frame( markers$`TRUE` )
-        markers = markers[markers$FDR < FDR.thresh , ]
-        if (nrow(markers) > 0){
-          markers = markers[order(markers$logFC.FALSE , decreasing = T) ,]
-          markers$celltype = celltype
-          return(markers)
-        }
-      }
-    })
-    markers.rare_celltypes = do.call(rbind , markers.rare_celltypes)
-    out = list(celltypes = rare_celltypes , markers = markers.rare_celltypes)
-  }
-  else {
-    out = list(celltypes = NULL , markers = NULL)
-  }
-  return(out)
-}
-
-get_rid_of_rare_celltypes = function(sce , nCells.thresh = 10 , FDR.thresh = 0.01){
-  rare_celltypes.stat = detect_rare_celltypes(sce , nCells.thresh , FDR.thresh)
-  if (!is.null(rare_celltypes.stat$celltypes)){
-    sce.filtered = sce[, !sce$celltype %in% unique( rare_celltypes.stat$celltypes$celltype )]
-  }
-  else {
-    sce.filtered = sce
-  }
-  return(sce.filtered)
-}
-
-
-
 get_markers = function(sce , test = "binom", type = "all", FDR.thresh = 0.01){
   # requires there is a column called celltype and assay called logcounts
   require(scran)
   # get potential relevant genes
-  markers <- scran::findMarkers(sce , groups=sce$celltype, direction = "up", pval.type=type, test = test, assay.type = "logcounts")
+  markers = scran::findMarkers(sce , groups=sce$celltype, direction = "up", pval.type=type, test = test, assay.type = "logcounts")
   # put together
   celltypes = names(markers)
   markers = lapply(1:length(celltypes), function(i){
@@ -142,75 +19,80 @@ get_markers = function(sce , test = "binom", type = "all", FDR.thresh = 0.01){
   return(markers)
 }
 
-
-get_fraction_mapped_correctly = function(mapping){
-  tab = table(mapping$celltype , mapping$mapped_celltype)
+get_fraction_mapped_correctly = function(mapping, cluster.id = "celltype" , cluster_mapped.id = "mapped_celltype"){
+  tab = table(mapping[, cluster.id] , mapping[, cluster_mapped.id])
   tab = sweep(tab, 1, rowSums(tab), "/" )
   tab = as.data.frame(tab)
-  colnames(tab) = c("celltype" , "mapped_celltype" , "frac")
+  colnames(tab) = c("cluster" , "mapped_cluster" , "frac")
 
-  celltypes = as.character(unique(tab$celltype))
-  stat = lapply(celltypes, function(celltype){
-    current.tab = tab[tab$celltype == celltype , ]
-    if (celltype %in% current.tab$mapped_celltype){
-      out = data.frame(celltype = celltype , frac_correctly_mapped = current.tab$frac[current.tab$mapped_celltype == celltype])
+  clusters = as.character(unique(tab$cluster))
+  stat = lapply(clusters, function(cluster){
+    current.tab = tab[tab$cluster == cluster , ]
+    if (cluster %in% current.tab$mapped_cluster){
+      out = data.frame(cluster = cluster , frac_correctly_mapped = current.tab$frac[current.tab$mapped_cluster == cluster])
     }
     else {
-      out = data.frame(celltype = celltype , frac_correctly_mapped = 0)
+      out = data.frame(cluster = cluster , frac_correctly_mapped = 0)
     }
     return(out)
   })
   stat = do.call(rbind, stat)
+  colnames(stat) = c(cluster.id , frac_correctly_mapped)
   return(stat)
 }
 
 
-retain_only_hvgs = function(sce, n = NULL, var.thresh = 0){
-  dec.sce <- modelGeneVar(sce)
-  hvg.genes = getTopHVGs(dec.sce, var.threshold = var.thresh)
-  if (!is.null(n) & n < length(hvg.genes)){
-    hvg.genes = getTopHVGs(dec.sce, n = n)
-  } 
-  print(paste0(length(hvg.genes) , " genes retained (out of " , nrow(sce) , ")"))
-  sce = sce[hvg.genes,]
-  
-  return(sce)
-}
-
-
 get_hvgs = function(sce, n = NULL, var.thresh = 0){
-  dec.sce <- modelGeneVar(sce)
-  if (is.null(n)){
-    hvg.genes = getTopHVGs(dec.sce, var.threshold = var.thresh)
-  } else {
-    hvg.genes = getTopHVGs(dec.sce, n = n)
+  require(scran)
+  dec.sce = scran::modelGeneVar(sce)
+  hvg.genes = scran::getTopHVGs(dec.sce, var.threshold = var.thresh)
+  if (!is.null(n) & n < length(hvg.genes)){
+    hvg.genes = scran::getTopHVGs(dec.sce, n = n)
   }
   return(hvg.genes)
 }
 
+retain_only_hvgs = function(sce, n = NULL, var.thresh = 0){
+  hvgs = get_hvgs(sce, n = n, var.thresh = var.thresh)
+  print(paste0(length(hvgs) , " genes retained (out of " , nrow(sce) , ")"))
+  sce = sce[hvgs,]
+  return(sce)
+}
 
 
-get_mapping_single_batch = function(sce , assay = "logcounts" , genes = rownames(sce), n.neigh = 3, nPC = 50 , get.dist = F){
+assign_neighbors = function(counts , reference_cells , query_cells, n.neigh = 5, get.dist = F){
+  require(BiocNeighbors)
+  
+  knns = BiocNeighbors::queryKNN( counts[reference_cells ,], counts[query_cells ,], k = (n.neigh+1), get.distance = get.dist)
+  cells_mapped = t( apply(knns$index, 1, function(x) reference_cells[x[2:(n.neigh+1)]]) )
+  rownames(cells_mapped) = query_cells
+  if (!get.dist){
+    out = cells_mapped
+  }
+  if (get.dist){
+    distances = knns$distance[, 2:(n.neigh+1)]
+    rownames(distances) = query_cells
+    out = list(cells_mapped = cells_mapped , distances = distances)
+  }
+  return(out)
+}
+
+
+get_mapping_single_batch = function(sce , genes = rownames(sce), n.neigh = 5, nPC = 50 , get.dist = F){
   require(irlba)
   require(BiocNeighbors)
-  require(BiocSingular)
-  require(BiocParallel)
-  
-  mcparam = MulticoreParam(workers = ncores)
-  register(mcparam)
   set.seed(32)
   
   current.sce = sce[genes , ]
-  counts = as.matrix( assay(current.sce , assay) )
+  counts = as.matrix( logcounts(current.sce) )
   meta = as.data.frame(colData(current.sce))
   res = tryCatch(
     {
       if (!is.null(nPC)){
-        pcs = prcomp_irlba(t(counts) , n = min(nPC, (nrow(counts)-1) ))
+        pcs = irlba::prcomp_irlba(t(counts) , n = min(nPC, (nrow(counts)-1) ))
         counts = pcs$x
         rownames(counts) = colnames(current.sce)
-      }
-      else {
+      } else {
         counts = t(counts)
       }
       reference_cells = colnames(current.sce)
@@ -219,17 +101,7 @@ get_mapping_single_batch = function(sce , assay = "logcounts" , genes = rownames
       if (n.neigh == "all"){
         n.neigh = length(reference_cells) - 1
       }
-      knns = queryKNN( counts[reference_cells ,], counts[query_cells ,], k = (n.neigh+1), get.index = TRUE, get.distance = get.dist)
-      cells_mapped = t( apply(knns$index, 1, function(x) reference_cells[x[2:(n.neigh+1)]]) )
-      rownames(cells_mapped) = query_cells
-      if (!get.dist){
-        out = cells_mapped
-      }
-      if (get.dist){
-        distances = knns$distance[, 2:(n.neigh+1)]
-        rownames(distances) = query_cells
-        out = list(cells_mapped = cells_mapped , distances = distances)
-      }
+      out = assign_neighbors(counts , reference_cells , query_cells, n.neigh = n.neigh, get.dist = get.dist)
       return(out)
     },
     error = function(dump){
@@ -241,19 +113,23 @@ get_mapping_single_batch = function(sce , assay = "logcounts" , genes = rownames
 }
 
 
-get_mapping_many_batches = function(sce , assay = "logcounts" , genes = rownames(sce), batch = "sample", n.neigh = 3, nPC = 50 , get.dist = F){
+get_mapping_many_batches = function(sce , genes = rownames(sce), batch = "sample", n.neigh = 5, nPC = 50 , get.dist = F){
+  require(batchelor)
+  require(BiocNeighbors)
+  set.seed(32)
+  
   current.sce = sce[genes , ]
-  counts = as.matrix( assay(current.sce , assay) )
+  counts = as.matrix( logcounts(current.sce) )
   meta = as.data.frame(colData(current.sce))
   batchFactor = factor(meta[, colnames(meta) == batch])
   res = tryCatch(
     {
       if (!is.null(nPC)){
-        counts = multiBatchPCA(counts , batch = batchFactor , d = nPC)
-        counts = do.call(reducedMNN , counts)
+        counts = batchelor::multiBatchPCA(counts , batch = batchFactor , d = nPC)
+        counts = do.call(batchelor::reducedMNN , counts)
         counts = counts$corrected
       } else {
-        counts = fastMNN(counts , batch = batchFactor , d = NA)
+        counts = batchelor::fastMNN(counts , batch = batchFactor , d = NA)
         counts = reducedDim(counts , "corrected")
       }
       reference_cells = colnames(current.sce)
@@ -262,17 +138,7 @@ get_mapping_many_batches = function(sce , assay = "logcounts" , genes = rownames
       if (n.neigh == "all"){
         n.neigh = length(reference_cells) - 1
       }
-      knns = queryKNN( counts[reference_cells ,], counts[query_cells ,], k = (n.neigh+1), get.index = TRUE, get.distance = get.dist)
-      cells_mapped = t( apply(knns$index, 1, function(x) reference_cells[x[2:(n.neigh+1)]]) )
-      rownames(cells_mapped) = query_cells
-      if (!get.dist){
-        out = cells_mapped
-      }
-      if (get.dist){
-        distances = knns$distance[, 2:(n.neigh+1)]
-        rownames(distances) = query_cells
-        out = list(cells_mapped = cells_mapped , distances = distances)
-      }
+      out = assign_neighbors(counts , reference_cells , query_cells, n.neigh = n.neigh, get.dist = get.dist)
       return(out)
     },
     error = function(dump){
@@ -284,28 +150,32 @@ get_mapping_many_batches = function(sce , assay = "logcounts" , genes = rownames
 }
 
 
-
-
-get_mapping = function(sce , assay = "logcounts" , genes = rownames(sce), batch = "sample", n.neigh = 3, nPC = 50 , get.dist = F, type = "per batch"){
+get_mapping = function(sce , genes = rownames(sce), batch = "sample", n.neigh = 5, nPC = 50 , get.dist = F, type = "per batch", ncores = ncores){
   require(BiocSingular)
   require(BiocParallel)
   require(BiocNeighbors)
   
+  mcparam = MulticoreParam(workers = ncores)
+  register(mcparam)
+  set.seed(32)
+  
   if (is.null(batch)){
-    out = get_mapping_single_batch(sce , assay = assay , genes = genes, n.neigh = n.neigh, nPC = nPC , get.dist = get.dist)
+    out = get_mapping_single_batch(sce , genes = genes, n.neigh = n.neigh, nPC = nPC , get.dist = get.dist)
   }
   else if (type == "together") {
-    out = get_mapping_many_batches(sce , assay = assay , genes = genes, batch = batch , n.neigh = n.neigh, nPC = nPC , get.dist = get.dist)
+    out = get_mapping_many_batches(sce , genes = genes, batch = batch , n.neigh = n.neigh, nPC = nPC , get.dist = get.dist)
   }
   else if (type == "per batch") {
+    
     meta = as.data.frame(colData(sce))
     batchFactor = factor(meta[, colnames(meta) == batch])
-    neighs = lapply(unique(batchFactor) , function(current.batch){
+    mcparam = MulticoreParam(workers = min(ncores , length(unique(batchFactor))))
+    register(mcparam)
+    neighs = bplapply(unique(batchFactor) , function(current.batch){
       idx = which(batchFactor == current.batch)
-      current.sce = sce[, idx]
-      current.neighs = get_mapping_single_batch(current.sce , assay = assay , genes = genes, n.neigh = n.neigh, nPC = nPC , get.dist = get.dist)
+      current.neighs = get_mapping_single_batch(sce[, idx] , genes = genes, n.neigh = n.neigh, nPC = nPC , get.dist = get.dist)
       return(current.neighs)
-    })
+    }, BPPARAM = mcparam)
     if (!get.dist){
       cells_mapped = do.call(rbind , neighs)
       cells_mapped = cells_mapped[ match(colnames(sce), rownames(cells_mapped)), ]
@@ -327,197 +197,84 @@ get_mapping = function(sce , assay = "logcounts" , genes = rownames(sce), batch 
 }
 
 
-
-
-denoise_logcounts = function(sce, batch = "sample", n.neigh = 10, nPC = 50, ncores = 1){
-  require(abind)
+get_corr_per_gene = function(sce , genes , batch = "sample" , 
+                                           n.neigh = 10 , nPC = 50 , genes.predict = rownames(sce) , method = "spearman" , ncores = 1){
   require(BiocSingular)
   require(BiocParallel)
-  require(BiocNeighbors)
   
   mcparam = MulticoreParam(workers = ncores)
   register(mcparam)
-  set.seed(32)
   
-  if (!is.null(batch)){
-    meta = as.data.frame(colData(sce))
-    batchFactor = factor(meta[, colnames(meta) == batch])
-    logcounts_denoised = bplapply(unique(batchFactor) , function(current.batch){
-      idx = which(batchFactor == current.batch)
-      current.sce = sce[, idx]
-      current.neighs = get_mapping_single_batch(current.sce , assay = "logcounts", genes = rownames(sce), n.neigh = n.neigh, nPC = nPC, get.dist = F)
-      current.logcounts_real = as.matrix(logcounts(current.sce))
-      current.logcounts_denoised = lapply(1:n.neigh , function(i){
-        cells = as.character( current.neighs[,i] )
-        current.counts = current.logcounts_real[, cells]
-        return(current.counts)
-      })
-      current.logcounts_denoised = do.call(abind, c(current.logcounts_denoised, list(along=3)))
-      current.logcounts_denoised = apply(current.logcounts_denoised, 1:2, median)
-      colnames(current.logcounts_denoised) = colnames(current.sce)
-      return(current.logcounts_denoised)
-    }, BPPARAM = mcparam)
-    logcounts_denoised = do.call(cbind , logcounts_denoised)
-    logcounts_denoised = logcounts_denoised[, match(colnames(sce), colnames(logcounts_denoised))]
-    return(logcounts_denoised)
-  }
-  else {
-    current.neighs = get_mapping_single_batch(sce , assay = "logcounts", genes = rownames(sce), n.neigh = n.neigh, nPC = nPC, get.dist = F)
-    current.logcounts_real = as.matrix(logcounts(current.sce))
-    current.logcounts_denoised = lapply(1:n.neigh , function(i){
-      cells = as.character( current.neighs[,i] )
-      current.counts = current.logcounts_real[, cells]
-      return(current.counts)
-    })
-    current.logcounts_denoised = do.call(abind, c(current.logcounts_denoised, list(along=3)))
-    current.logcounts_denoised = apply(current.logcounts_denoised, 1:2, median)
-    colnames(current.logcounts_denoised) = colnames(current.sce)
-    current.logcounts_denoised = current.logcounts_denoised[, match(colnames(sce), colnames(current.logcounts_denoised))]
-    return(current.logcounts_denoised)
-  }
-}
-
-
-get_corr_transcriptome_per_gene = function(sce , genes , assay = "logcounts" , batch = "sample" , 
-                                           n.neigh = 10 , nPC = 50 , genes.predict = rownames(sce) ,
-                                           method = "pearson", type = "per batch"){
-  neighs = get_mapping(sce , assay = "logcounts" , genes = genes, batch = batch , n.neigh = n.neigh , nPC = nPC , get.dist = F , type = type)
-  if (!is.null(neighs)){
-    counts_predict = as.matrix(assay(sce[genes.predict , ] , assay))
-    
-    stat_predict = lapply(1:ncol(neighs) , function(j){
-      cells = neighs[,j]
-      current.stat_predict = counts_predict[, cells]
-      return(current.stat_predict)
-    })
-    stat_predict = Reduce("+", stat_predict) / length(stat_predict)
-    
-    stat_real = counts_predict[, rownames(neighs)]
-    
-    corr = lapply(1:nrow(counts_predict) , function(i){
-      out = data.frame(gene = rownames(counts_predict)[i] , corr = cor(stat_real[i,] , stat_predict[i,] , method = method))
-      return(out)
-    }) 
-    corr = do.call(rbind , corr)
-    return(corr)
-  }
-  else {
-    return(NULL)
-  }
-}
-
-
-get_distr_dist = function(sce , genes , assay = "logcounts" , batch = "sample" , 
-                                           n.neigh = 10 , nPC = 50 , genes.predict = rownames(sce) , type ){
   eps = 0.00001
-  neighs = get_mapping(sce , assay = "logcounts" , genes = genes, batch = batch , n.neigh = n.neigh , nPC = nPC)
-  counts_predict = as.matrix(assay(sce[genes.predict , ] , assay))
+  neighs = get_mapping(sce , genes = genes, batch = batch , n.neigh = n.neigh , nPC = nPC, ncores = ncores)
+  counts_predict = as.matrix(logcounts(sce[genes.predict , ]))
   
-  stat_predict = lapply(1:ncol(neighs) , function(j){
+  stat_predict = bplapply(1:ncol(neighs) , function(j){
     cells = neighs[,j]
     current.stat_predict = counts_predict[, cells]
     return(current.stat_predict)
-  })
+  }, BPPARAM = mcparam)
   stat_predict = Reduce("+", stat_predict) / length(stat_predict)
   stat_real = counts_predict[, rownames(neighs)]
   
   
-  stat = lapply(1:nrow(counts_predict) , function(i){
-    if (type == "KS"){
-      #out = data.frame(gene = rownames(counts_predict)[i] , ks.dist = ks.dist(stat_real[i,] , stat_predict[i,]))
-      ks.dist = ks.test(stat_real[i,] , stat_predict[i,])
-      ks.dist = as.numeric(ks.dist$statistic)
-      out = data.frame(gene = rownames(counts_predict)[i] , ks.dist = ks.dist)
-      #out = out[ , c("gene" , "ks.dist.D")]
-      colnames(out) = c("gene" , "ks")
-      out$ks[is.na(out$ks)] = eps
-      out$ks[out$ks < eps] = eps
-    }
-    else if (type == "JS"){
-      vec = rbind(stat_real[i,] , stat_predict[i,])
-      out = data.frame(gene = rownames(counts_predict)[i] , JS = suppressMessages(JSD(vec)))
-      out$JS[out$JS < eps] = eps
-    }
-    else if (type == "Wasserstein"){
-      out = data.frame(gene = rownames(counts_predict)[i] , wasserstein = wasserstein1d(stat_real[i,] , stat_predict[i,]))
-      out$wasserstein[out$wasserstein < eps] = eps
-    }  
-    else if (type == "corr"){
-      out = data.frame(gene = rownames(counts_predict)[i] , corr = cor(stat_real[i,] , stat_predict[i,] , method = "spearman"))
-      out$corr[is.na(out$corr)] = eps
-      out$corr[out$corr < eps] = eps
-    }
-    else if (type == "dist.l1"){
-      out = data.frame(gene = rownames(counts_predict)[i] , dist.l1 = as.numeric(dist(rbind(stat_real[i,] , stat_predict[i,]) , method = "manhattan")))
-      out$dist.l1[out$dist.l1 < eps] = eps
-    }
-    else if (type == "dist.l2"){
-      out = data.frame(gene = rownames(counts_predict)[i] , dist.l2 = as.numeric(dist(rbind(stat_real[i,] , stat_predict[i,]) , method = "euclidean")))
-      out$dist.l2[out$dist.l2 < eps] = eps
-    }
-    else if (type == "dist.l3"){
-      out = data.frame(gene = rownames(counts_predict)[i] , dist.l3 = as.numeric(dist(rbind(stat_real[i,] , stat_predict[i,]) , method = "minkowski" , p = 3)))
-      out$dist.l3[out$dist.l3 < eps] = eps
-    }
+  stat = bplapply(1:nrow(counts_predict) , function(i){
+    out = data.frame(gene = rownames(counts_predict)[i] , corr = cor(stat_real[i,] , stat_predict[i,] , method = method))
+    out$corr[is.na(out$corr)] = eps
+    out$corr[out$corr < eps] = eps
     return(out)
-  }) 
+  }, BPPARAM = mcparam) 
   stat = do.call(rbind , stat)
   return(stat)
 }
 
 
-get_lp_norm_dist = function(sce , genes , assay = "logcounts" , batch = "sample" , 
-                          n.neigh = 10 , nPC = 50 , genes.predict = rownames(sce) , p){
-  require(BiocNeighbors)
-  
+get_lp_norm_dist = function(sce , genes , batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , p, ncores = 1){
+  require(BiocSingular)
+  require(BiocParallel)
   mcparam = MulticoreParam(workers = ncores)
   register(mcparam)
-  set.seed(32)
 
   if (!is.null(genes)){
-    neighs = get_mapping(sce , assay = "logcounts" , genes = genes, batch = batch , n.neigh = n.neigh , nPC = nPC)
+    neighs = get_mapping(sce , genes = genes, batch = batch , n.neigh = n.neigh , nPC = nPC, ncores = ncores)
   }
   else {
-    neighs = initiate_mapping_for_gene_search(sce , batch = batch , n.neigh = n.neigh)
+    neighs = initiate_random_mapping(sce , batch = batch , n.neigh = n.neigh, ncores = ncores)
   }
-  counts_predict = as.matrix(assay(sce[genes.predict , ] , assay))
+  counts_predict = as.matrix(logcounts(sce[genes.predict , ]))
   
-  stat_predict = lapply(1:ncol(neighs) , function(j){
+  stat_predict = bplapply(1:ncol(neighs) , function(j){
     cells = neighs[,j]
     current.stat_predict = counts_predict[, cells]
     return(current.stat_predict)
-  })
+  }, BPPARAM = mcparam)
   stat_predict = Reduce("+", stat_predict) / length(stat_predict)
   stat_real = counts_predict[, rownames(neighs)]
   
-  if (p > 0 & p < Inf){
-    stat = lapply(1:nrow(counts_predict) , function(i){
+  if (p < Inf){
+    stat = bplapply(1:nrow(counts_predict) , function(i){
       out = data.frame(gene = rownames(counts_predict)[i] , dist = as.numeric(dist(rbind(stat_real[i,] , stat_predict[i,]) , method = "minkowski" , p = p)))
       return(out)
-    }) 
-    stat = do.call(rbind , stat)
-  } else if (p == 0){
-    stat = lapply(1:nrow(counts_predict) , function(i){
-      out = data.frame(gene = rownames(counts_predict)[i] , dist = sum(stat_real[i,] != stat_predict[i,]))
-      return(out)
-    }) 
+    }, BPPARAM = mcparam) 
     stat = do.call(rbind , stat)
   } else if (is.infinite(p)){
-    stat = lapply(1:nrow(counts_predict) , function(i){
+    stat = bplapply(1:nrow(counts_predict) , function(i){
       out = data.frame(gene = rownames(counts_predict)[i] , dist = max(abs(stat_real[i,] - stat_predict[i,])))
       return(out)
-    }) 
+    }, BPPARAM = mcparam) 
     stat = do.call(rbind , stat)
   }
   return(stat)
 }
 
 
-
-
-initiate_mapping_for_gene_search = function(sce , batch = "sample", n.neigh = 3){
+initiate_random_mapping = function(sce , batch = "sample", n.neigh = 5, ncores = 1){
   require(irlba)
   require(BiocNeighbors)
+  require(BiocSingular)
+  require(BiocParallel)
+  mcparam = MulticoreParam(workers = ncores)
+  register(mcparam)
   
   if (is.null(batch)){
     batchFactor = factor(rep(1 , ncol(sce)))
@@ -530,24 +287,69 @@ initiate_mapping_for_gene_search = function(sce , batch = "sample", n.neigh = 3)
   initial_random_mtrx = suppressWarnings( abs(matrix(rnorm(10),2,ncol(sce))) )
   colnames(initial_random_mtrx) = colnames(sce)
   
-  neighs = lapply(unique(batchFactor) , function(current.batch){
+  neighs = bplapply(unique(batchFactor) , function(current.batch){
     idx = which(batchFactor == current.batch)
     counts = t( initial_random_mtrx[, idx] )
     
     reference_cells = colnames(sce[,idx])
     query_cells = colnames(sce[,idx])
     
-    knns = suppressWarnings( queryKNN( counts[reference_cells ,], counts[query_cells ,], k = (n.neigh+1), get.index = TRUE, get.distance = F) )
+    knns = suppressWarnings( queryKNN( counts[reference_cells ,], counts[query_cells ,], k = (n.neigh+1), get.distance = F) )
     cells_mapped = t( apply(knns$index, 1, function(x) reference_cells[x[2:(n.neigh+1)]]) )
     rownames(cells_mapped) = query_cells
     return(cells_mapped)
-  })
-   
+  }, BPPARAM = mcparam)
   neighs = do.call(rbind , neighs)
   neighs = neighs[ match(colnames(sce), rownames(neighs)), ]
   return(neighs)
 }
 
+add_gene_to_current_selection = function(sce , stat_all, genes = NULL , batch = NULL , n.neigh = 5, nPC = NULL, p = 3, ncores = 1){
+  stat_genes = suppressWarnings( get_lp_norm_dist(sce , genes = genes , batch = batch, n.neigh = n.neigh , nPC = nPC, 
+                                                    genes.predict = rownames(sce) , p = p, ncores = ncores) )
+  stat_genes = stat_genes[!stat_genes$gene %in% genes , ] 
+  stat_genes = merge(stat_genes , stat_all)
+  stat_genes$dist_diff = stat_genes$dist - stat_genes$dist_all 
+  idx = which(stat_genes$dist_diff == max(stat_genes$dist_diff))
+  gene = stat_genes$gene[idx[1]]
+  return(gene)
+}
+  
+add_first_gene = function(sce , stat_all, batch = NULL , n.neigh = 5, p = 3 , K = 5, ncores = 1){
+  require(BiocSingular)
+  require(BiocParallel)
+  mcparam = MulticoreParam(workers = ncores)
+  register(mcparam)
+  
+  first_genes = bplapply(1:K , function(dump){
+    gene = add_gene_to_current_selection(sce , stat_all, genes = NULL , batch = batch , n.neigh = n.neigh, nPC = NULL, p = p)
+    print(gene)
+  }, BPPARAM = mcparam)
+  first_genes = unlist(first_genes)
+  out = as.character(names(sort(table(first_genes),decreasing=TRUE)[1]))
+  return(out)
+}
+  
+
+gene_search = function(sce , genes_base = NULL, n_genes_total , batch = NULL, n.neigh = 5, p = 3, K = 5, nPC = NULL, ncores = 1){
+  # get baseline stat-all
+  stat_all = suppressWarnings( get_lp_norm_dist(sce, genes = rownames(sce), batch = batch , n.neigh = n.neigh , nPC = 50 , 
+                                                genes.predict = rownames(sce) , p = p, ncores = ncores) )
+  colnames(stat_all) = c("gene" , "dist_all")
+  
+  # add first gene if selection is empty
+  if (is.null(genes_base)){
+    genes_base = add_first_gene(sce , stat_all, batch = batch , n.neigh = n.neigh, p = p, K = K, ncores = min(K, ncores))
+  }
+  
+  genes_all = genes_base
+  while(length(genes_all) < n_genes_total){
+    gene = add_gene_to_current_selection(sce , stat_all, genes = genes_all , batch = batch , n.neigh = n.neigh, nPC = nPC, p = p, ncores = ncores)
+    genes_all = c(genes_all , as.character(gene))
+  }
+  out = data.frame(rank = c(1:length(genes_all)) , gene = genes_all)
+  return(out)
+}
 
 
 get_expr_real_and_neighbors = function(sce , genes , assay = "logcounts" , batch = "sample" , 
@@ -565,114 +367,6 @@ get_expr_real_and_neighbors = function(sce , genes , assay = "logcounts" , batch
   stat_real = counts_predict[, rownames(neighs)]
   out = list(real = stat_real , predict = stat_predict)
   return(out)
-}
-
-
-
-get_cells_not_mapped_well = function(sce , stat_predict.all , genes.selection , assay = "logcounts" , batch = "sample" , 
-                                     n.neigh = 10 , nPC.selection = 50,  genes.predict = rownames(sce) ){
-  neighs.selection = get_mapping(sce , assay = "logcounts" , genes = genes.selection, batch = batch , n.neigh = n.neigh , nPC = nPC.selection)
-  counts_predict = as.matrix(assay(sce[genes.predict , ] , assay))
-  
-  stat_predict.selection = lapply(1:ncol(neighs.selection) , function(j){
-    cells = neighs.selection[,j]
-    current.stat_predict = counts_predict[, cells]
-    current.stat_predict = current.stat_predict
-    return(current.stat_predict)
-  })
-  
-  stat = lapply(1:2000 , function(i){
-    stat.per_gene = sapply(1:ncol(counts_predict) , function(j) {
-      vec_1 = sapply(1:length(stat_predict.all) , function(k) return(stat_predict.all[[k]][i,j]))
-      vec_2 = sapply(1:length(stat_predict.selection) , function(k) return(stat_predict.selection[[k]][i,j]))
-      my.t = t.test(vec_1 , vec_2)
-      p = my.t$p.value
-      if (is.na(p) | p > 0.05){
-        return(0)
-      }
-      else {
-        return(1)
-      }
-    })
-    out = data.frame(gene = rownames(counts_predict)[i] , n_cells_mismapped = sum(stat.per_gene))
-    return(out)
-  })
-  stat = do.call(rbind , stat)
-  return(stat)
-  
-}
-
-
-
-get_moran_score = function(sce , genes , nPC = 50 , assay = "logcounts" , genes.predict = rownames(sce) ){
-  
-  snn.graph = as.matrix( as_adjacency_matrix( buildSNNGraph(assay(sce[genes , ], "logcounts") , d = nPC)) ) 
-  snn.graph = snn.graph*0.9999
-  
-  counts = as.matrix(assay(sce[genes.predict , ] , assay))
-  moran.score = aquila::MoransI(values = counts , weights = snn.graph, temp_dir = "~/Develop/test")
-  colnames(moran.score) = c("gene" , "moran")
-  return(moran.score)
-  
-}
-
-
-get_preservation_score = function(sce , assay = "logcounts" , genes.all = rownames(sce) , 
-                                  genes.compare , batch = "sample", n.neigh = 5 , nPC.all = 50 , nPC.compare = 200 , 
-                                  bandwidth.type = "per_cell"){
-  neighs.compare = get_mapping(sce , assay = assay , genes = genes.compare, batch = batch, n.neigh = n.neigh, nPC = nPC.compare)
-  neighs.all = get_mapping(sce , assay = assay, genes = genes.all, batch = batch, n.neigh = (ncol(sce)-1), nPC = nPC.all , get.dist = T)
-  
-  # add random neighbors from the celltype
-  neighs.rand = lapply(colnames(sce) , function(cell){
-    cells = colnames(sce)[sce$celltype == sce$celltype[colnames(sce) == cell]]
-    cells = setdiff(cells , cell)
-    return(sample(cells , n.neigh))
-  })
-  neighs.rand = do.call(rbind , neighs.rand)
-  
-  
-  neighs.all.cells_mapped = neighs.all$cells_mapped
-  neighs.all.distances = neighs.all$distances
-  n.cells = ncol(sce)
-  
-  score = lapply(1:nrow(neighs.compare) , function(i){
-    cells = neighs.all.cells_mapped[i,]
-    idx_all = c(1:n.neigh)
-    idx_compare = which(cells %in% neighs.compare[i,] )
-    idx_rand = which(cells %in% neighs.rand[i,] )
-    
-    dist_all = neighs.all.distances[i, idx_all]
-    dist_compare = neighs.all.distances[i, idx_compare]
-    dist_rand = neighs.all.distances[i, idx_rand]
-    
-    if (bandwidth.type == "per_cell") {
-      current.bandwidth = max(dist_all)
-      dist_all = exp(-1*dist_all/current.bandwidth)
-      dist_compare = exp(-1*dist_compare/current.bandwidth)
-      dist_rand = exp(-1*dist_rand/current.bandwidth)
-      current.score = mean(dist_compare)/mean(dist_all)
-      current.score.rand = mean(dist_rand)/mean(dist_all)
-    } else if (bandwidth.type == "all") {
-      current.bandwidth = mean(neighs.all.distances[i, ])
-      dist_all = exp(-1*dist_all/current.bandwidth)
-      dist_compare = exp(-1*dist_compare/current.bandwidth)
-      dist_rand = exp(-1*dist_rand/current.bandwidth)
-      current.score = mean(dist_compare)/mean(dist_all)
-      current.score.rand = mean(dist_rand)/mean(dist_all)
-    } else if (bandwidth.type == "quantile_mean"){
-      current.score = mean(idx_compare/n.cells)
-      current.score.rand =  mean(idx_rand/n.cells)
-    } else if (bandwidth.type == "quantile_max"){
-      current.score = max(idx_compare/n.cells)
-      current.score.rand =  max(idx_rand/n.cells)
-    }
-    out = data.frame(score = current.score , score_rand = current.score.rand)
-    return(out)
-  })
-  score = do.call(rbind , score)
-  score$cell = rownames(neighs.compare)
-  return(score)
 }
 
 
@@ -760,67 +454,4 @@ getmode <- function(v, dist) {
   } else {
     return(names(tab)[which.max(tab)])
   }
-}
-
-
-get_loadings_squared = function(sce, nPC = 50 , type ){
-  require(irlba)
-  pcs = prcomp_irlba(t(as.matrix(logcounts(sce))) , n = nPC)
-  loadings = pcs$rotation
-  rownames(loadings) = rownames(sce)
-  if (type == "sum"){
-    loadings.squared = data.frame( gene = rownames(loadings) , loading.squared = apply(loadings , 1 , function(x) sum(x^2)))
-  } 
-  else if (type == "max") {
-    loadings.squared = data.frame( gene = rownames(loadings) , loading.squared = apply(loadings , 1 , function(x) max(x^2)))
-  }
-  return(loadings.squared)
-}
-
-
-get_wallace_dist_between_clusters = function(clusters_1 , clusters_2){
-  df = as.data.frame( cbind(clusters_1 , clusters_2) )
-  colnames(df) = c("clust_1" , "clust_2")
-  
-  cells = rownames(df)
-  N_11 = sapply(1:(nrow(df) - 1) , function(i1){
-    N_11.per_cell = sapply((i1+1):nrow(df) , function(i2){
-      return(df$clust_1[i1] == df$clust_1[i2] & df$clust_2[i1] == df$clust_2[i2])
-    })
-    return(sum(N_11.per_cell))
-  })
-  N_11 = sum(N_11)
-  
-  tab.clust_1 = as.numeric( table(df$clust_1) )
-  denominator.clust_1 = sapply(tab.clust_1 , function(x) return(x*(x-1)/2))
-  denominator.clust_1 = sum(denominator.clust_1)
-    
-  tab.clust_2 = as.numeric( table(df$clust_2) )
-  denominator.clust_2 = sapply(tab.clust_2 , function(x) return(x*(x-1)/2))
-  denominator.clust_2 = sum(denominator.clust_2)
-  
-  out = data.frame(wallace_first_over_second = N_11/denominator.clust_1 , wallace_second_over_first = N_11/denominator.clust_2)
-  return(out)
-}
-
-
-get_cluster_comparison_stats = function(clusters_1 , clusters_2){
-  out = data.frame(vi = compare(clusters_1,clusters_2,"vi"),
-             nmi = compare(clusters_1,clusters_2,"nmi"),
-             split.join = compare(clusters_1,clusters_2,"split.join"),
-             rand = compare(clusters_1,clusters_2,"rand"),
-             adjusted.rand = compare(clusters_1,clusters_2,"adjusted.rand")
-  )
-  out = cbind(out , get_wallace_dist_between_clusters(clusters_1 , clusters_2))
-  return(out)
-}
-
-
-
-# get function that estimates whether the gene is ct marker or no
-get_ct_marker_genes = function(sce , genes){
-  current.logcounts = as.matrix(logcounts(sce[genes,]))
-  current.logcounts = apply(current.logcounts , 1 , function(x) quantile(x,0.5))
-  current.logcounts = current.logcounts > 0
-  return(names(current.logcounts)[current.logcounts == F])
 }
