@@ -12,7 +12,7 @@ script_name=genes_pc_mel
 memory=200000
 r_command="rusage[mem=${memory}]"
 #num_processors
-nproc=4
+nproc=5
 
 smg=/nfs/research1/marioni/alsu/singularity/R1.simg
 script=/nfs/research1/marioni/alsu/geneBasis/am_geneBasis/generateData/get_selection_optional_pca/melanoma/run_rmd.R
