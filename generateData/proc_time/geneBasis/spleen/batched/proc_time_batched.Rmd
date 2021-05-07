@@ -41,7 +41,7 @@ source(paste0(root.dir , "am_geneBasis/functions/main_functions.R"))
 system = "spleen"
 sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
 meta = as.data.frame(colData(sce))
-
+sce$cell = colnames(sce)
 
 ```
 
@@ -90,7 +90,7 @@ stat = lapply(n.grid , function(n){
   stat.per_n_genes_init = lapply(ncores.grid, function(ncores){
     stat.per_ncores = lapply(c(2:length(samples)) , function(n_samples){
       current.sce = retain_only_hvgs(sce[, sce$sample %in% samples[1:n_samples]], n = n, var.thresh = 0)
-      rownames.sce = rownames(sce)
+      rownames.sce = rownames(current.sce)
       idx = which(!grepl("mt-" , rownames.sce) & !grepl("MT-" , rownames.sce) & !grepl("Mt-" , rownames.sce))
       current.sce = current.sce[idx,]
       out = proc_time_add_genes(current.sce , n_genes_total = n_genes_total, batch = "sample" , ncores = ncores)
