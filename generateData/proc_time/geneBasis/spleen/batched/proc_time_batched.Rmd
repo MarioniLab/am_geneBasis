@@ -70,7 +70,7 @@ proc_time_add_genes = function(sce , n_genes_total = 200, batch = NULL, n.neigh 
     stat_genes = suppressWarnings( get_lp_norm_dist(sce , genes = genes_all , batch = batch, n.neigh = n.neigh , nPC = NULL, genes.predict = rownames(sce) , p = p, ncores=ncores) )
     colnames(stat_genes) = c("gene" , "dist")   
     stat_genes = stat_genes[!stat_genes$gene %in% genes_all , ] 
-    stat_genes = merge(stat_genes , stat)
+    stat_genes = merge(stat_genes , stat_all)
     stat_genes$dist_diff = stat_genes$dist - stat_genes$dist_all 
     idx = which(stat_genes$dist_diff == max(stat_genes$dist_diff))
     gene = stat_genes$gene[idx[1]]

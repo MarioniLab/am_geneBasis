@@ -54,23 +54,24 @@ meta = as.data.frame(colData(sce))
 
 proc_time_add_genes = function(sce , n_genes_total = 200, batch = NULL, n.neigh = 5, p = 3, ncores){
   t0 = proc.time()
-  stat_all = suppressWarnings( get_lp_norm_dist(sce, genes = rownames(sce), batch = batch , n.neigh = n.neigh , nPC = 50 , 
-                                                genes.predict = rownames(sce) , p = p, ncores = ncores) )
+  stat_all = suppressWarnings( get_lp_norm_dist(current.sce, genes = rownames(current.sce), batch = batch , n.neigh = n.neigh , nPC = 50 , 
+                                                genes.predict = rownames(current.sce) , p = p, ncores = ncores) )
   colnames(stat_all) = c("gene" , "dist_all")
   
+  print("1")
   t1 = proc.time()
   t = c(t1[["elapsed"]] - t0[["elapsed"]])
   
   genes_base = add_first_gene(sce , stat_all, batch = batch , n.neigh = n.neigh, p = p, K = 1, ncores = 1)
   t2 = proc.time()
   t = c(t , t2[["elapsed"]] - t0[["elapsed"]])
-  
+  print("1")
   genes_all = genes_base
   while(length(genes_all) < n_genes_total){
     stat_genes = suppressWarnings( get_lp_norm_dist(sce , genes = genes_all , batch = batch, n.neigh = n.neigh , nPC = NULL, genes.predict = rownames(sce) , p = p, ncores=ncores) )
     colnames(stat_genes) = c("gene" , "dist")   
     stat_genes = stat_genes[!stat_genes$gene %in% genes_all , ] 
-    stat_genes = merge(stat_genes , stat)
+    stat_genes = merge(stat_genes , stat_all)
     stat_genes$dist_diff = stat_genes$dist - stat_genes$dist_all 
     idx = which(stat_genes$dist_diff == max(stat_genes$dist_diff))
     gene = stat_genes$gene[idx[1]]
