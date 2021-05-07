@@ -150,7 +150,7 @@ get_mapping_many_batches = function(sce , genes = rownames(sce), batch = "sample
 }
 
 
-get_mapping = function(sce , genes = rownames(sce), batch = "sample", n.neigh = 5, nPC = 50 , get.dist = F, type = "per batch", ncores = ncores){
+get_mapping = function(sce , genes = rownames(sce), batch = "sample", n.neigh = 5, nPC = 50 , get.dist = F, type = "per batch", ncores = 1){
   require(BiocSingular)
   require(BiocParallel)
   require(BiocNeighbors)
