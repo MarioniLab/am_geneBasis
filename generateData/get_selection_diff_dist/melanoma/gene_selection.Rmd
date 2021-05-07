@@ -28,7 +28,7 @@ library(SingleCellExperiment)
 library(dplyr)
 library(BiocStyle)
 library(stats)
-ncores = 5
+ncores = 10
 mcparam = MulticoreParam(workers = ncores)
 register(mcparam)
 set.seed(32)
@@ -58,50 +58,15 @@ sce = sce[idx,]
 ```{r iterative-gene-search, message = FALSE}
 
 
-add_genes = function(sce , stat = NULL, genes_base , assay = "logcounts", n_genes_total , batch , p){
-  if (is.null(stat)){
-    stat = suppressWarnings( get_lp_norm_dist(sce, genes = rownames(sce), assay = assay, batch = batch , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , p = p) )
-    colnames(stat) = c("gene" , "dist.all")
-  }
-  genes_all = genes_base
-  while(length(genes_all) < n_genes_total){
-    stat_genes = suppressWarnings( get_lp_norm_dist(sce , genes = genes_all , assay = assay , batch = batch, n.neigh = 5 , nPC = NULL , genes.predict = rownames(sce) , p = p) )
-    colnames(stat_genes) = c("gene" , "dist")   
-    stat_genes = stat_genes[!stat_genes$gene %in% genes_all , ] 
-    stat_genes = merge(stat_genes , stat)
-    
-    stat_genes$dist.ratio = stat_genes$dist - stat_genes$dist.all 
-      
-    idx = which(stat_genes$dist.ratio == max(stat_genes$dist.ratio))
-    gene = stat_genes$gene[idx[1]]
-    #print(gene)
-    genes_all = c(genes_all , as.character(gene))
-  }
-  out = genes_all
-  return(out)
-}
+p.grid = c(0:5, Inf)
+n_genes_total = 250
 
-K = 5
-ps = c(0:5, Inf)
-runs = c(1:K)
-n_genes = 250
-
-pars = lapply(ps , function(p){
-  pars.per_p = lapply(runs , function(run){
-    out = data.frame(p = p , run = run)
-    return(out)
-  })
-  pars.per_p = do.call(rbind , pars.per_p)
-  return(pars.per_p)
-})
-pars = do.call(rbind , pars)
-
-
-genes_stat = bplapply(c(1:nrow(pars)) , function(i){
-  genes = add_genes(sce , stat = NULL, genes_base = NULL, assay = "logcounts", n_genes_total = n_genes, batch = "sample", p = pars$p[i])
-  saveRDS(genes , paste0(root.dir , "data/gene_selection__diff_p/" , system , "/gene_selection__L_" , pars$p[i] ,"__" , pars$run[i], ".Rds"))
+genes_stat = lapply(p.grid , function(p){
+  genes = gene_search(sce , genes_base = NULL, n_genes_total = n_genes_total, batch = "sample", n.neigh = 5, p = p, K = 5, nPC = NULL, ncores = ncores)
+  saveRDS(genes , paste0(root.dir , "data/gene_selection__diff_p/" , system , "/gene_selection__L_" , p, ".Rds"))
   return(genes)
-}, BPPARAM = mcparam)
+})
+
 
 
 
