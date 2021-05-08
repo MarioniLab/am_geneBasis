@@ -44,7 +44,6 @@ sce = retain_only_hvgs(sce , n = 10000)
 ```
 
 
-
 # Get gene selections
 
 ## geneBasis
@@ -147,7 +146,7 @@ stat_scmer_batched = bplapply(c(1:length(genes)) , function(i){
   stat.per_n_genes = lapply(1:length(current.genes) , function(j){
     stat.PC_50 = lapply(samples , function(sample){
       current.sce = sce[, sce$sample == sample]
-      current.neighs.all = neighs.all[[which(names(neighs.all) = sample)]]
+      current.neighs.all = neighs.all[[which(names(neighs.all) == sample)]]
       current.stat = suppressWarnings( get_preservation_score_simple(current.sce , neighs.all = current.neighs.all , assay = "logcounts" , genes.all = rownames(current.sce) , 
                                   genes.compare = current.genes[[j]], batch = NULL, n.neigh = 5 , nPC.all = 50 , nPC.compare = 50) )
     })
@@ -157,7 +156,7 @@ stat_scmer_batched = bplapply(c(1:length(genes)) , function(i){
     
     stat.PC_all = lapply(samples , function(sample){
       current.sce = sce[, sce$sample == sample]
-      current.neighs.all = neighs.all[[which(names(neighs.all) = sample)]]
+      current.neighs.all = neighs.all[[which(names(neighs.all) == sample)]]
       current.stat = suppressWarnings( get_preservation_score_simple(current.sce , neighs.all = current.neighs.all , assay = "logcounts" , genes.all = rownames(current.sce) , 
                                   genes.compare = current.genes[[j]], batch = NULL, n.neigh = 5 , nPC.all = 50 , nPC.compare = length(current.genes[[j]])-1) )
     })
@@ -196,7 +195,7 @@ stat_scmer_unbatched = bplapply(c(1:length(genes)) , function(i){
   stat.per_n_genes = lapply(1:length(current.genes) , function(j){
    stat.PC_50 = lapply(samples , function(sample){
       current.sce = sce[, sce$sample == sample]
-      current.neighs.all = neighs.all[[which(names(neighs.all) = sample)]]
+      current.neighs.all = neighs.all[[which(names(neighs.all) == sample)]]
       current.stat = suppressWarnings( get_preservation_score_simple(current.sce , neighs.all = current.neighs.all , assay = "logcounts" , genes.all = rownames(current.sce) , 
                                   genes.compare = current.genes[[j]], batch = NULL, n.neigh = 5 , nPC.all = 50 , nPC.compare = 50) )
     })
@@ -206,7 +205,7 @@ stat_scmer_unbatched = bplapply(c(1:length(genes)) , function(i){
     
     stat.PC_all = lapply(samples , function(sample){
       current.sce = sce[, sce$sample == sample]
-      current.neighs.all = neighs.all[[which(names(neighs.all) = sample)]]
+      current.neighs.all = neighs.all[[which(names(neighs.all) == sample)]]
       current.stat = suppressWarnings( get_preservation_score_simple(current.sce , neighs.all = current.neighs.all , assay = "logcounts" , genes.all = rownames(current.sce) , 
                                   genes.compare = current.genes[[j]], batch = NULL, n.neigh = 5 , nPC.all = 50 , nPC.compare = length(current.genes[[j]])-1) )
     })
@@ -245,7 +244,7 @@ stat_scgenefit = bplapply(c(1:length(genes)) , function(i){
   stat.per_n_genes = lapply(1:length(current.genes) , function(j){
     stat.PC_50 = lapply(samples , function(sample){
       current.sce = sce[, sce$sample == sample]
-      current.neighs.all = neighs.all[[which(names(neighs.all) = sample)]]
+      current.neighs.all = neighs.all[[which(names(neighs.all) == sample)]]
       current.stat = suppressWarnings( get_preservation_score_simple(current.sce , neighs.all = current.neighs.all , assay = "logcounts" , genes.all = rownames(current.sce) , 
                                   genes.compare = current.genes[[j]], batch = NULL, n.neigh = 5 , nPC.all = 50 , nPC.compare = 50) )
     })
@@ -255,7 +254,7 @@ stat_scgenefit = bplapply(c(1:length(genes)) , function(i){
     
     stat.PC_all = lapply(samples , function(sample){
       current.sce = sce[, sce$sample == sample]
-      current.neighs.all = neighs.all[[which(names(neighs.all) = sample)]]
+      current.neighs.all = neighs.all[[which(names(neighs.all) == sample)]]
       current.stat = suppressWarnings( get_preservation_score_simple(current.sce , neighs.all = current.neighs.all , assay = "logcounts" , genes.all = rownames(current.sce) , 
                                   genes.compare = current.genes[[j]], batch = NULL, n.neigh = 5 , nPC.all = 50 , nPC.compare = length(current.genes[[j]])-1) )
     })
@@ -276,7 +275,6 @@ saveRDS(stat_scgenefit , file = paste0(root.dir , "data/benchmark/cell_score/" ,
 
 
 ```
-
 
 
 # Session Info
