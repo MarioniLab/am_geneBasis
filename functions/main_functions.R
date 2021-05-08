@@ -496,7 +496,7 @@ generateSimilarity = function(SCE, k = 50, batchFactor = NULL, HVGs = NULL) {
     PCs = reducedDim(SCE, "PCA")
   }
   
-  graph = makeKNNGraph(PCs, k = k)
+  graph = bluster::makeKNNGraph(PCs, k = k)
   V(graph)$name <- colnames(SCE)
   
   graph_sim = igraph::similarity(graph, method = "jaccard")
