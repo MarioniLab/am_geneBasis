@@ -149,7 +149,7 @@ stat_scmer_batched = bplapply(c(1:length(genes)) , function(i){
     stat.PC_50 = lapply(samples , function(sample){
       current.sce = sce[, sce$sample == sample]
       current.neighs.all = neighs.all[[which(names(neighs.all) == sample)]]
-      current.stat = suppressWarnings( get_preservation_score_simple(current.sce , neighs.all = current.neighs.all , assay = "logcounts" , genes.all = rownames(current.sce) , 
+      current.stat = suppressWarnings( get_preservation_score_simple(current.sce , neighs.all = current.neighs.all, genes.all = rownames(current.sce) , 
                                   genes.compare = current.genes[[j]], batch = NULL, n.neigh = 5 , nPC.all = 50 , nPC.compare = 50) )
     })
     stat.PC_50 = do.call(rbind , stat.PC_50)
@@ -159,7 +159,7 @@ stat_scmer_batched = bplapply(c(1:length(genes)) , function(i){
     stat.PC_all = lapply(samples , function(sample){
       current.sce = sce[, sce$sample == sample]
       current.neighs.all = neighs.all[[which(names(neighs.all) == sample)]]
-      current.stat = suppressWarnings( get_preservation_score_simple(current.sce , neighs.all = current.neighs.all , assay = "logcounts" , genes.all = rownames(current.sce) , 
+      current.stat = suppressWarnings( get_preservation_score_simple(current.sce , neighs.all = current.neighs.all , genes.all = rownames(current.sce) , 
                                   genes.compare = current.genes[[j]], batch = NULL, n.neigh = 5 , nPC.all = 50 , nPC.compare = length(current.genes[[j]])-1) )
     })
     stat.PC_all = do.call(rbind , stat.PC_all)
@@ -198,7 +198,7 @@ stat_scmer_unbatched = bplapply(c(1:length(genes)) , function(i){
    stat.PC_50 = lapply(samples , function(sample){
       current.sce = sce[, sce$sample == sample]
       current.neighs.all = neighs.all[[which(names(neighs.all) == sample)]]
-      current.stat = suppressWarnings( get_preservation_score_simple(current.sce , neighs.all = current.neighs.all , assay = "logcounts" , genes.all = rownames(current.sce) , 
+      current.stat = suppressWarnings( get_preservation_score_simple(current.sce , neighs.all = current.neighs.all  , genes.all = rownames(current.sce) , 
                                   genes.compare = current.genes[[j]], batch = NULL, n.neigh = 5 , nPC.all = 50 , nPC.compare = 50) )
     })
     stat.PC_50 = do.call(rbind , stat.PC_50)
@@ -208,7 +208,7 @@ stat_scmer_unbatched = bplapply(c(1:length(genes)) , function(i){
     stat.PC_all = lapply(samples , function(sample){
       current.sce = sce[, sce$sample == sample]
       current.neighs.all = neighs.all[[which(names(neighs.all) == sample)]]
-      current.stat = suppressWarnings( get_preservation_score_simple(current.sce , neighs.all = current.neighs.all , assay = "logcounts" , genes.all = rownames(current.sce) , 
+      current.stat = suppressWarnings( get_preservation_score_simple(current.sce , neighs.all = current.neighs.all, genes.all = rownames(current.sce) , 
                                   genes.compare = current.genes[[j]], batch = NULL, n.neigh = 5 , nPC.all = 50 , nPC.compare = length(current.genes[[j]])-1) )
     })
     stat.PC_all = do.call(rbind , stat.PC_all)
@@ -247,7 +247,7 @@ stat_scgenefit = bplapply(c(1:length(genes)) , function(i){
     stat.PC_50 = lapply(samples , function(sample){
       current.sce = sce[, sce$sample == sample]
       current.neighs.all = neighs.all[[which(names(neighs.all) == sample)]]
-      current.stat = suppressWarnings( get_preservation_score_simple(current.sce , neighs.all = current.neighs.all , assay = "logcounts" , genes.all = rownames(current.sce) , 
+      current.stat = suppressWarnings( get_preservation_score_simple(current.sce , neighs.all = current.neighs.all , genes.all = rownames(current.sce) , 
                                   genes.compare = current.genes[[j]], batch = NULL, n.neigh = 5 , nPC.all = 50 , nPC.compare = 50) )
     })
     stat.PC_50 = do.call(rbind , stat.PC_50)
@@ -257,7 +257,7 @@ stat_scgenefit = bplapply(c(1:length(genes)) , function(i){
     stat.PC_all = lapply(samples , function(sample){
       current.sce = sce[, sce$sample == sample]
       current.neighs.all = neighs.all[[which(names(neighs.all) == sample)]]
-      current.stat = suppressWarnings( get_preservation_score_simple(current.sce , neighs.all = current.neighs.all , assay = "logcounts" , genes.all = rownames(current.sce) , 
+      current.stat = suppressWarnings( get_preservation_score_simple(current.sce , neighs.all = current.neighs.all , genes.all = rownames(current.sce) , 
                                   genes.compare = current.genes[[j]], batch = NULL, n.neigh = 5 , nPC.all = 50 , nPC.compare = length(current.genes[[j]])-1) )
     })
     stat.PC_all = do.call(rbind , stat.PC_all)
