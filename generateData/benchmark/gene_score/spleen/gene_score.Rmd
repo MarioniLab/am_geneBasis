@@ -47,19 +47,14 @@ genes.predict = as.character(get_hvgs(sce , n = 3000))
 ```
 
 
-
 # Get gene selections
 
 ## geneBasis
 
 ```{r read-selection-gene-basis, message = FALSE}
 
-
-# read gene selection 
-gene_selections.files = list.files(path=paste0(root.dir , "data/gene_selection/" , system , "/"))
-gene_selections.file = gene_selections.files[1]
-genes_alsu = readRDS(paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection_1.Rds"))
-
+genes_alsu = readRDS(paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection.Rds"))
+genes_alsu = as.character(genes_alsu$gene)
 
 ```
 
@@ -99,14 +94,16 @@ genes_scmer_unbatched = lapply(n_genes , function(str){
 
 ```{r read-selection-scGene-Fit, message = FALSE}
 
-# centered
-scgenefit_centers.files = list.files(path = paste0( root.dir , "data/scGeneFit_res/" , system , "/centers/" ))
+
+option = "centers"
+
+scgenefit_centers.files = list.files(path = paste0( root.dir , "data/scGeneFit_res/" , system , "/" , option , "/" ))
 n_genes = sapply(scgenefit_centers.files , function(str) str_replace_all(str,  ".txt" , ""))
 n_genes = sapply(n_genes , function(str) str_replace_all(str,  "nGenes_" , ""))
 n_genes = sort(as.numeric(n_genes))
 
 genes_scgenefit = lapply(n_genes , function(str){
-  out = read.table(paste0( root.dir , "data/scGeneFit_res/" , system , "/centers/nGenes_" , str , ".txt") , header = F)
+  out = read.table(paste0( root.dir , "data/scGeneFit_res/" , system , "/" , option , "/nGenes_" , str , ".txt") , header = F)
   genes = out$V1
   return(genes)
 })
@@ -119,8 +116,7 @@ genes_scgenefit = lapply(n_genes , function(str){
 ```{r corr-all, message = FALSE}
 
 
-hvgs_5000 = as.character(get_hvgs(sce , n = 5000))
-stat_gene_score = suppressWarnings( get_distr_dist(sce, genes = hvgs_5000, assay = "logcounts" , batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = genes.predict , type = "corr") ) 
+stat_gene_score = suppressWarnings( get_corr_per_gene(sce, genes = rownames(sce), batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce)) ) 
 colnames(stat_gene_score) = c("gene" , "corr_all")
   
 
@@ -134,17 +130,27 @@ colnames(stat_gene_score) = c("gene" , "corr_all")
 genes = lapply(1:length(genes_scmer_batched) , function(i){
   current.genes_scmer = genes_scmer_batched[[i]]
   n_genes = length(current.genes_scmer)
-  out = list("alsu" = as.character(genes_alsu[1:n_genes]) , "scmer_batched" = as.character(current.genes_scmer), "hvgs" = as.character(get_hvgs(sce , n_genes)))
+  out = list("alsu" = as.character(genes_alsu[1:n_genes]) , "scmer_batched" = as.character(current.genes_scmer), "hvgs" = as.character(get_hvgs(sce , n_genes)) , "random" = sample(rownames(sce) , n_genes))
   return(out)
 })
 
 stat_scmer_batched = bplapply(c(1:length(genes)) , function(i){
   current.genes = genes[[i]]
   stat.per_n_genes = lapply(c(1:length(current.genes)) , function(j){
-    current.stat = suppressWarnings( get_distr_dist(sce , genes = current.genes[[j]] , assay = "logcounts" , batch = "sample", n.neigh = 5 , nPC = 50 , genes.predict = genes.predict , type = "corr") )
-    current.stat$type = names(current.genes)[j]
-    current.stat$n_genes = length(current.genes[[j]])
+    
+    current.stat.nPC_50 = suppressWarnings( get_corr_per_gene(sce, genes = current.genes[[j]], batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce)) ) 
+    current.stat.nPC_50$type = names(current.genes)[j]
+    current.stat.nPC_50$n_genes = length(current.genes[[j]])
+    current.stat.nPC_50$nPC = 50
+    
+    current.stat.nPC_all = suppressWarnings( get_corr_per_gene(sce, genes = current.genes[[j]], batch = "sample" , n.neigh = 5 , nPC = length(current.genes[[j]]) - 1 , genes.predict = rownames(sce)) ) 
+    current.stat.nPC_all$type = names(current.genes)[j]
+    current.stat.nPC_all$n_genes = length(current.genes[[j]])
+    current.stat.nPC_all$nPC = "all"
+    
+    current.stat = rbind(current.stat.nPC_50, current.stat.nPC_all)
     return(current.stat)
+    
   })
   stat.per_n_genes = do.call(rbind , stat.per_n_genes)
   return(stat.per_n_genes)
@@ -153,7 +159,6 @@ stat_scmer_batched = do.call(rbind , stat_scmer_batched)
 stat_scmer_batched = merge(stat_scmer_batched , stat_gene_score, all.x = T , all.y = F)
 stat_scmer_batched$corr_ratio = stat_scmer_batched$corr/stat_scmer_batched$corr_all
 saveRDS(stat_scmer_batched , file = paste0(root.dir , "data/benchmark/gene_score/" , system , "/gene_score__scmer_batched.Rds"))
-
 
 
 
@@ -167,16 +172,25 @@ saveRDS(stat_scmer_batched , file = paste0(root.dir , "data/benchmark/gene_score
 genes = lapply(1:length(genes_scmer_unbatched) , function(i){
   current.genes_scmer = genes_scmer_unbatched[[i]]
   n_genes = length(current.genes_scmer)
-  out = list("alsu" = as.character(genes_alsu[1:n_genes]) , "scmer_unbatched" = as.character(current.genes_scmer), "hvgs" = as.character(get_hvgs(sce , n_genes)))
+  out = list("alsu" = as.character(genes_alsu[1:n_genes]) , "scmer_unbatched" = as.character(current.genes_scmer), "hvgs" = as.character(get_hvgs(sce , n_genes)), "random" = sample(rownames(sce) , n_genes))
   return(out)
 })
 
 stat_scmer_unbatched = bplapply(c(1:length(genes)) , function(i){
   current.genes = genes[[i]]
   stat.per_n_genes = lapply(1:length(current.genes) , function(j){
-    current.stat = suppressWarnings( get_distr_dist(sce , genes = current.genes[[j]] , assay = "logcounts" , batch = "sample", n.neigh = 5 , nPC = 50 , genes.predict = genes.predict , type = "corr") )
-    current.stat$type = names(current.genes)[j]
-    current.stat$n_genes = length(current.genes[[j]])
+    
+    current.stat.nPC_50 = suppressWarnings( get_corr_per_gene(sce, genes = current.genes[[j]], batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce)) ) 
+    current.stat.nPC_50$type = names(current.genes)[j]
+    current.stat.nPC_50$n_genes = length(current.genes[[j]])
+    current.stat.nPC_50$nPC = 50
+    
+    current.stat.nPC_all = suppressWarnings( get_corr_per_gene(sce, genes = current.genes[[j]], batch = "sample" , n.neigh = 5 , nPC = length(current.genes[[j]]) - 1 , genes.predict = rownames(sce)) ) 
+    current.stat.nPC_all$type = names(current.genes)[j]
+    current.stat.nPC_all$n_genes = length(current.genes[[j]])
+    current.stat.nPC_all$nPC = "all"
+    
+    current.stat = rbind(current.stat.nPC_50, current.stat.nPC_all)
     return(current.stat)
   })
   stat.per_n_genes = do.call(rbind , stat.per_n_genes)
@@ -198,16 +212,26 @@ saveRDS(stat_scmer_unbatched , file = paste0(root.dir , "data/benchmark/gene_sco
 genes = lapply(1:length(genes_scgenefit) , function(i){
   current.genes_scgenefit = genes_scgenefit[[i]]
   n_genes = length(current.genes_scgenefit)
-  out = list("alsu" = as.character(genes_alsu[1:n_genes]) , "scgenefit" = as.character(current.genes_scgenefit))
+  out = list("alsu" = as.character(genes_alsu[1:n_genes]) , "scgenefit" = as.character(current.genes_scgenefit) , "hvgs" = as.character(get_hvgs(sce , n_genes)), "random" = sample(rownames(sce) , n_genes))
   return(out)
 })
 
 stat_scgenefit = bplapply(c(1:length(genes)) , function(i){
   current.genes = genes[[i]]
   stat.per_n_genes = lapply(1:length(current.genes) , function(j){
-    current.stat = suppressWarnings( get_distr_dist(sce , genes = current.genes[[j]] , assay = "logcounts" , batch = "sample", n.neigh = 5 , nPC = 50 , genes.predict = genes.predict , type = "corr") )
-    current.stat$type = names(current.genes)[j]
-    current.stat$n_genes = length(current.genes[[j]])
+    
+    current.stat.nPC_50 = suppressWarnings( get_corr_per_gene(sce, genes = current.genes[[j]], batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce)) ) 
+    current.stat.nPC_50$type = names(current.genes)[j]
+    current.stat.nPC_50$n_genes = length(current.genes[[j]])
+    current.stat.nPC_50$nPC = 50
+    
+    current.stat.nPC_all = suppressWarnings( get_corr_per_gene(sce, genes = current.genes[[j]], batch = "sample" , n.neigh = 5 , nPC = length(current.genes[[j]]) - 1 , genes.predict = rownames(sce)) ) 
+    current.stat.nPC_all$type = names(current.genes)[j]
+    current.stat.nPC_all$n_genes = length(current.genes[[j]])
+    current.stat.nPC_all$nPC = "all"
+    
+    current.stat = rbind(current.stat.nPC_50, current.stat.nPC_all)
+    
     return(current.stat)
   })
   stat.per_n_genes = do.call(rbind , stat.per_n_genes)
