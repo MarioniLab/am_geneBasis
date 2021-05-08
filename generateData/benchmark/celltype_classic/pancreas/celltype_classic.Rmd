@@ -121,14 +121,19 @@ get_celltypes_stat = function(sce , genes , batch = "sample", n.neigh = 5, optio
   if (option == "markers"){
     genes = genes[genes %in% markers$gene]
   }
-  nPC = 50
-  neighs = suppressWarnings( get_mapping(sce , genes = genes, batch = batch, n.neigh = n.neigh, nPC = nPC , get.dist = F , type = "together"))
-  if (!is.null(neighs)){
-    meta = as.data.frame(colData(sce))
-    current.mapping = data.frame(cell = rownames(neighs) ,
-                               celltype = sapply(1:nrow(neighs) , function(i) meta$celltype[meta$cell == rownames(neighs)[i]]) ,
-                               mapped_celltype = sapply(1:nrow(neighs), function(i) getmode(meta$celltype[match(neighs[i,] , meta$cell)] , 1:n.neigh) ))
-    return(current.mapping)
+  if (length(genes) > 1){
+    nPC = 50
+    neighs = suppressWarnings( get_mapping(sce , genes = genes, batch = batch, n.neigh = n.neigh, nPC = nPC , get.dist = F , type = "together"))
+    if (!is.null(neighs)){
+      meta = as.data.frame(colData(sce))
+      current.mapping = data.frame(cell = rownames(neighs) ,
+                                 celltype = sapply(1:nrow(neighs) , function(i) meta$celltype[meta$cell == rownames(neighs)[i]]) ,
+                                 mapped_celltype = sapply(1:nrow(neighs), function(i) getmode(meta$celltype[match(neighs[i,] , meta$cell)] , 1:n.neigh) ))
+      return(current.mapping)
+    }
+    else {
+      return(NULL)
+    }
   }
   else {
     return(NULL)
