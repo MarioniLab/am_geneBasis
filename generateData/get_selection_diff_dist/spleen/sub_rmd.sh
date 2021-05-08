@@ -9,10 +9,10 @@ script_name=genes_spl
 
 #CHOOSE PARAMETERS
 #RAM in megabytes
-memory=500000
+memory=450000
 r_command="rusage[mem=${memory}]"
 #num_processors
-nproc=10
+nproc=6
 
 smg=/nfs/research1/marioni/alsu/singularity/R1.simg
 script=/nfs/research1/marioni/alsu/geneBasis/am_geneBasis/generateData/get_selection_diff_dist/spleen/run_rmd.R

@@ -28,7 +28,7 @@ library(SingleCellExperiment)
 library(dplyr)
 library(BiocStyle)
 library(stats)
-ncores = 5
+ncores = 4
 mcparam = MulticoreParam(workers = ncores)
 register(mcparam)
 set.seed(32)
@@ -63,12 +63,14 @@ nPC.grid = c(10, 25, 50, 100)
 n_genes_total = 250
 
 gene_selection = readRDS(paste0(root.dir , "data/gene_selection/" , system , "/gene_selection.Rds"))
-genes_stat = lapply(nPC.grid , function(nPC){
-  genes_base = gene_selection$gene[gene_selection$rank <= nPC + 1]
-  genes = gene_search(sce , genes_base = NULL, n_genes_total = n_genes_total, batch = "sample", n.neigh = 5, p = 3, K = 5, nPC = nPC, ncores = ncores)
+genes_stat = bplapply(nPC.grid , function(nPC){
+  genes_base = as.character(gene_selection$gene[gene_selection$rank <= nPC + 1])
+  genes = gene_search(sce , genes_base = genes_base, n_genes_total = n_genes_total, batch = "sample", n.neigh = 5, p = 3, K = 5, nPC = nPC)
   saveRDS(genes , paste0(root.dir , "data/gene_selection__optional_PCA/" , system , "/" , "gene_selection__nPC_" , nPC, ".Rds"))
   return(genes)
-})
+}, BPPARAM = mcparam)
+
+
 
 
 
