@@ -150,14 +150,14 @@ get_mapping_many_batches = function(sce , genes = rownames(sce), batch = "sample
 }
 
 
-get_mapping = function(sce , genes = rownames(sce), batch = "sample", n.neigh = 5, nPC = 50 , get.dist = F, type = "per batch", ncores = 1){
-  require(BiocSingular)
-  require(BiocParallel)
+get_mapping = function(sce , genes = rownames(sce), batch = "sample", n.neigh = 5, nPC = 50 , get.dist = F, type = "per batch"){
+  #require(BiocSingular)
+  #require(BiocParallel)
   require(BiocNeighbors)
   
-  mcparam = MulticoreParam(workers = ncores)
-  register(mcparam)
-  set.seed(32)
+  #mcparam = MulticoreParam(workers = ncores)
+  #register(mcparam)
+  #set.seed(32)
   
   if (is.null(batch)){
     out = get_mapping_single_batch(sce , genes = genes, n.neigh = n.neigh, nPC = nPC , get.dist = get.dist)
@@ -169,13 +169,12 @@ get_mapping = function(sce , genes = rownames(sce), batch = "sample", n.neigh = 
     
     meta = as.data.frame(colData(sce))
     batchFactor = factor(meta[, colnames(meta) == batch])
-    mcparam = MulticoreParam(workers = min(ncores , length(unique(batchFactor))))
-    register(mcparam)
-    neighs = bplapply(unique(batchFactor) , function(current.batch){
+    
+    neighs = lapply(unique(batchFactor) , function(current.batch){
       idx = which(batchFactor == current.batch)
       current.neighs = get_mapping_single_batch(sce[, idx] , genes = genes, n.neigh = n.neigh, nPC = nPC , get.dist = get.dist)
       return(current.neighs)
-    }, BPPARAM = mcparam)
+    })
     if (!get.dist){
       cells_mapped = do.call(rbind , neighs)
       cells_mapped = cells_mapped[ match(colnames(sce), rownames(cells_mapped)), ]
@@ -198,83 +197,84 @@ get_mapping = function(sce , genes = rownames(sce), batch = "sample", n.neigh = 
 
 
 get_corr_per_gene = function(sce , genes , batch = "sample" , 
-                                           n.neigh = 10 , nPC = 50 , genes.predict = rownames(sce) , method = "spearman" , ncores = 1){
-  require(BiocSingular)
-  require(BiocParallel)
+                                           n.neigh = 10 , nPC = 50 , genes.predict = rownames(sce) , method = "spearman"){
+  #require(BiocSingular)
+  #require(BiocParallel)
   
-  mcparam = MulticoreParam(workers = ncores)
-  register(mcparam)
+  #mcparam = MulticoreParam(workers = ncores)
+  #register(mcparam)
   
   eps = 0.00001
-  neighs = get_mapping(sce , genes = genes, batch = batch , n.neigh = n.neigh , nPC = nPC, ncores = ncores)
+  neighs = get_mapping(sce , genes = genes, batch = batch , n.neigh = n.neigh , nPC = nPC)
   counts_predict = as.matrix(logcounts(sce[genes.predict , ]))
   
-  stat_predict = bplapply(1:ncol(neighs) , function(j){
+  stat_predict = lapply(1:ncol(neighs) , function(j){
     cells = neighs[,j]
     current.stat_predict = counts_predict[, cells]
     return(current.stat_predict)
-  }, BPPARAM = mcparam)
+  })
   stat_predict = Reduce("+", stat_predict) / length(stat_predict)
   stat_real = counts_predict[, rownames(neighs)]
   
   
-  stat = bplapply(1:nrow(counts_predict) , function(i){
+  stat = lapply(1:nrow(counts_predict) , function(i){
     out = data.frame(gene = rownames(counts_predict)[i] , corr = cor(stat_real[i,] , stat_predict[i,] , method = method))
     out$corr[is.na(out$corr)] = eps
     out$corr[out$corr < eps] = eps
     return(out)
-  }, BPPARAM = mcparam) 
+  }) 
   stat = do.call(rbind , stat)
   return(stat)
 }
 
 
-get_lp_norm_dist = function(sce , genes , batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , p, ncores = 1){
-  require(BiocSingular)
-  require(BiocParallel)
-  mcparam = MulticoreParam(workers = ncores)
-  register(mcparam)
+get_lp_norm_dist = function(sce , genes , batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , p){
+  #require(BiocSingular)
+  #require(BiocParallel)
+  #mcparam = MulticoreParam(workers = ncores)
+  #register(mcparam)
 
   if (!is.null(genes)){
-    neighs = get_mapping(sce , genes = genes, batch = batch , n.neigh = n.neigh , nPC = nPC, ncores = ncores)
+    neighs = get_mapping(sce , genes = genes, batch = batch , n.neigh = n.neigh , nPC = nPC)
   }
   else {
-    neighs = initiate_random_mapping(sce , batch = batch , n.neigh = n.neigh, ncores = ncores)
+    neighs = initiate_random_mapping(sce , batch = batch , n.neigh = n.neigh)
   }
-  counts_predict = as.matrix(logcounts(sce[genes.predict , ]))
   
-  stat_predict = bplapply(1:ncol(neighs) , function(j){
+  counts_predict = as.matrix(logcounts(sce[genes.predict , ]))
+
+  stat_predict = lapply(1:ncol(neighs) , function(j){
     cells = neighs[,j]
     current.stat_predict = counts_predict[, cells]
     return(current.stat_predict)
-  }, BPPARAM = mcparam)
+  })
   stat_predict = Reduce("+", stat_predict) / length(stat_predict)
   stat_real = counts_predict[, rownames(neighs)]
   
   if (p < Inf){
-    stat = bplapply(1:nrow(counts_predict) , function(i){
+    stat = lapply(1:nrow(counts_predict) , function(i){
       out = data.frame(gene = rownames(counts_predict)[i] , dist = as.numeric(dist(rbind(stat_real[i,] , stat_predict[i,]) , method = "minkowski" , p = p)))
       return(out)
-    }, BPPARAM = mcparam) 
+    }) 
     stat = do.call(rbind , stat)
   } else if (is.infinite(p)){
-    stat = bplapply(1:nrow(counts_predict) , function(i){
+    stat = lapply(1:nrow(counts_predict) , function(i){
       out = data.frame(gene = rownames(counts_predict)[i] , dist = max(abs(stat_real[i,] - stat_predict[i,])))
       return(out)
-    }, BPPARAM = mcparam) 
+    }) 
     stat = do.call(rbind , stat)
   }
   return(stat)
 }
 
 
-initiate_random_mapping = function(sce , batch = "sample", n.neigh = 5, ncores = 1){
+initiate_random_mapping = function(sce , batch = "sample", n.neigh = 5){
   require(irlba)
   require(BiocNeighbors)
-  require(BiocSingular)
-  require(BiocParallel)
-  mcparam = MulticoreParam(workers = ncores)
-  register(mcparam)
+  #require(BiocSingular)
+  #require(BiocParallel)
+  #mcparam = MulticoreParam(workers = ncores)
+  #register(mcparam)
   
   if (is.null(batch)){
     batchFactor = factor(rep(1 , ncol(sce)))
@@ -287,7 +287,7 @@ initiate_random_mapping = function(sce , batch = "sample", n.neigh = 5, ncores =
   initial_random_mtrx = suppressWarnings( abs(matrix(rnorm(10),2,ncol(sce))) )
   colnames(initial_random_mtrx) = colnames(sce)
   
-  neighs = bplapply(unique(batchFactor) , function(current.batch){
+  neighs = lapply(unique(batchFactor) , function(current.batch){
     idx = which(batchFactor == current.batch)
     counts = t( initial_random_mtrx[, idx] )
     
@@ -298,15 +298,15 @@ initiate_random_mapping = function(sce , batch = "sample", n.neigh = 5, ncores =
     cells_mapped = t( apply(knns$index, 1, function(x) reference_cells[x[2:(n.neigh+1)]]) )
     rownames(cells_mapped) = query_cells
     return(cells_mapped)
-  }, BPPARAM = mcparam)
+  })
   neighs = do.call(rbind , neighs)
   neighs = neighs[ match(colnames(sce), rownames(neighs)), ]
   return(neighs)
 }
 
-add_gene_to_current_selection = function(sce , stat_all, genes = NULL , batch = NULL , n.neigh = 5, nPC = NULL, p = 3, ncores = 1){
+add_gene_to_current_selection = function(sce , stat_all, genes = NULL , batch = NULL , n.neigh = 5, nPC = NULL, p = 3){
   stat_genes = suppressWarnings( get_lp_norm_dist(sce , genes = genes , batch = batch, n.neigh = n.neigh , nPC = nPC, 
-                                                    genes.predict = rownames(sce) , p = p, ncores = ncores) )
+                                                    genes.predict = rownames(sce) , p = p) )
   stat_genes = stat_genes[!stat_genes$gene %in% genes , ] 
   stat_genes = merge(stat_genes , stat_all)
   stat_genes$dist_diff = stat_genes$dist - stat_genes$dist_all 
@@ -315,36 +315,35 @@ add_gene_to_current_selection = function(sce , stat_all, genes = NULL , batch = 
   return(gene)
 }
   
-add_first_gene = function(sce , stat_all, batch = NULL , n.neigh = 5, p = 3 , K = 5, ncores = 1){
-  require(BiocSingular)
-  require(BiocParallel)
-  mcparam = MulticoreParam(workers = ncores)
-  register(mcparam)
+add_first_gene = function(sce , stat_all, batch = NULL , n.neigh = 5, p = 3 , K = 5){
+  #require(BiocSingular)
+  #require(BiocParallel)
+  #mcparam = MulticoreParam(workers = ncores)
+  #register(mcparam)
   
-  first_genes = bplapply(1:K , function(dump){
+  first_genes = lapply(1:K , function(dump){
     gene = add_gene_to_current_selection(sce , stat_all, genes = NULL , batch = batch , n.neigh = n.neigh, nPC = NULL, p = p)
-    print(gene)
-  }, BPPARAM = mcparam)
+  })
   first_genes = unlist(first_genes)
   out = as.character(names(sort(table(first_genes),decreasing=TRUE)[1]))
   return(out)
 }
   
 
-gene_search = function(sce , genes_base = NULL, n_genes_total , batch = NULL, n.neigh = 5, p = 3, K = 5, nPC = NULL, ncores = 1){
+gene_search = function(sce , genes_base = NULL, n_genes_total , batch = NULL, n.neigh = 5, p = 3, K = 5, nPC = NULL){
   # get baseline stat-all
   stat_all = suppressWarnings( get_lp_norm_dist(sce, genes = rownames(sce), batch = batch , n.neigh = n.neigh , nPC = 50 , 
-                                                genes.predict = rownames(sce) , p = p, ncores = ncores) )
+                                                genes.predict = rownames(sce) , p = p) )
   colnames(stat_all) = c("gene" , "dist_all")
   
   # add first gene if selection is empty
   if (is.null(genes_base)){
-    genes_base = add_first_gene(sce , stat_all, batch = batch , n.neigh = n.neigh, p = p, K = K, ncores = min(K, ncores))
+    genes_base = add_first_gene(sce , stat_all, batch = batch , n.neigh = n.neigh, p = p, K = K)
   }
   
   genes_all = genes_base
   while(length(genes_all) < n_genes_total){
-    gene = add_gene_to_current_selection(sce , stat_all, genes = genes_all , batch = batch , n.neigh = n.neigh, nPC = nPC, p = p, ncores = ncores)
+    gene = add_gene_to_current_selection(sce , stat_all, genes = genes_all , batch = batch , n.neigh = n.neigh, nPC = nPC, p = p)
     genes_all = c(genes_all , as.character(gene))
   }
   out = data.frame(rank = c(1:length(genes_all)) , gene = genes_all)

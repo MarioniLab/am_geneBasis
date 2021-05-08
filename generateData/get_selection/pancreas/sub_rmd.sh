@@ -1,4 +1,4 @@
-#INITIALISE FOLDERS
+1#INITIALISE FOLDERS
 my_folder=/nfs/research1/marioni/alsu
 out_folder=${my_folder}/clust_out/geneBasis
 err_folder=${my_folder}/clust_err/geneBasis
@@ -9,10 +9,10 @@ script_name=genes_pan
 
 #CHOOSE PARAMETERS
 #RAM in megabytes
-memory=400000
+memory=250000
 r_command="rusage[mem=${memory}]"
 #num_processors
-nproc=5
+nproc=1
 
 smg=/nfs/research1/marioni/alsu/singularity/R1.simg
 script=/nfs/research1/marioni/alsu/geneBasis/am_geneBasis/generateData/get_selection/pancreas/run_rmd.R

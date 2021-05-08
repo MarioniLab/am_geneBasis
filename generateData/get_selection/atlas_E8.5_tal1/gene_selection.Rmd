@@ -28,7 +28,7 @@ library(SingleCellExperiment)
 library(dplyr)
 library(BiocStyle)
 library(stats)
-ncores = 5
+ncores = 2
 mcparam = MulticoreParam(workers = ncores)
 register(mcparam)
 set.seed(32)
@@ -58,11 +58,13 @@ sce = sce[idx,]
 
 n_genes_total = 250
 
-genes_T = gene_search(sce[, sce$tomato] , genes_base = NULL, n_genes_total = n_genes_total, batch = "sample", n.neigh = 5, p = 3, K = 5, nPC = NULL, ncores = ncores)
-saveRDS(genes_T , paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection_TRUE", ".Rds"))
+tomato_status = c(TRUE, FALSE)
 
-genes_F = gene_search(sce[, !sce$tomato] , genes_base = NULL, n_genes_total = n_genes_total, batch = "sample", n.neigh = 5, p = 3, K = 5, nPC = NULL, ncores = ncores)
-saveRDS(genes_F , paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection_FALSE", ".Rds"))
+genes = bplapply(tomato_status , function(tomato){
+  genes = gene_search(sce[, sce$tomato == tomato] , genes_base = NULL, n_genes_total = n_genes_total, batch = "sample", n.neigh = 5, p = 3, K = 5, nPC = NULL)
+  saveRDS(genes , paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection_", tomato, ".Rds"))
+  return(NULL)
+}, BPPARAM = mcparam)
 
 
 

@@ -28,7 +28,7 @@ library(SingleCellExperiment)
 library(dplyr)
 library(BiocStyle)
 library(stats)
-ncores = 3
+ncores = 1
 mcparam = MulticoreParam(workers = ncores)
 register(mcparam)
 set.seed(32)
@@ -58,15 +58,15 @@ sce = sce[idx,]
 
 n_genes_total = 250
 
-genes = gene_search(sce , genes_base = NULL, n_genes_total = n_genes_total, batch = "sample", n.neigh = 5, p = 3, K = 5, nPC = NULL, ncores = ncores)
+genes = gene_search(sce , genes_base = NULL, n_genes_total = n_genes_total, batch = "sample", n.neigh = 5, p = 3, K = 5, nPC = NULL)
 saveRDS(genes , paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection", ".Rds"))
 
-genes_unbatched = gene_search(sce , genes_base = NULL, n_genes_total = n_genes_total, batch = NULL, n.neigh = 5, p = 3, K = 5, nPC = NULL, ncores = ncores)
+genes_unbatched = gene_search(sce , genes_base = NULL, n_genes_total = n_genes_total, batch = NULL, n.neigh = 5, p = 3, K = 5, nPC = NULL)
 saveRDS(genes , paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection_unbatched", ".Rds"))
 
 # just in case: use counts
 logcounts(sce) = counts(sce)
-genes_counts = gene_search(sce , genes_base = NULL, n_genes_total = n_genes_total, batch = "sample", n.neigh = 5, p = 3, K = 5, nPC = NULL, ncores = ncores)
+genes_counts = gene_search(sce , genes_base = NULL, n_genes_total = n_genes_total, batch = "sample", n.neigh = 5, p = 3, K = 5, nPC = NULL)
 saveRDS(genes_counts , paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection_counts", ".Rds"))
 
 
