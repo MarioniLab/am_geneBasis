@@ -89,7 +89,7 @@ get_mapping_single_batch = function(sce , genes = rownames(sce), n.neigh = 5, nP
   res = tryCatch(
     {
       if (!is.null(nPC)){
-        pcs = irlba::prcomp_irlba(t(counts) , n = min(nPC, (nrow(counts)-1) ))
+        pcs = irlba::prcomp_irlba(t(counts) , n = min(nPC, (nrow(counts)-1) , (ncol(counts) - 1)))
         counts = pcs$x
         rownames(counts) = colnames(current.sce)
       } else {
@@ -344,6 +344,7 @@ gene_search = function(sce , genes_base = NULL, n_genes_total , batch = NULL, n.
   genes_all = genes_base
   while(length(genes_all) < n_genes_total){
     gene = add_gene_to_current_selection(sce , stat_all, genes = genes_all , batch = batch , n.neigh = n.neigh, nPC = nPC, p = p)
+    #print(as.character(gene))
     genes_all = c(genes_all , as.character(gene))
   }
   out = data.frame(rank = c(1:length(genes_all)) , gene = genes_all)
