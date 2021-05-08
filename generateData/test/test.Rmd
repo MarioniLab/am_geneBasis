@@ -13,9 +13,32 @@ output:
 # load libraries we are going to use
 
 
-library(Matrix)
-library(scran)
+
+library(SingleCellExperiment)
+library(igraph)
+library(batchelor)
 library(stats)
+library(BiocNeighbors)
+library(tibble)
+library(reshape2)
+library(plyr)
+library(dplyr)
+library(scran)
+library(batchelor)
+library(stringr)
+library(BiocSingular)
+library(BiocParallel)
+
+root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
+source(paste0(root.dir, "am_geneBasis/functions/main_functions.R"))
+source(paste0(root.dir, "am_geneBasis/functions/visualization_functions.R"))
+
+system = "melanoma"
+# read sce 
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+sce = retain_only_hvgs(sce , n = 5000)
+
+sim = generateSimilarity(sce, k = 50, batchFactor = factor(sce$sample), HVGs = rownames(sce))
 
 ```
 
