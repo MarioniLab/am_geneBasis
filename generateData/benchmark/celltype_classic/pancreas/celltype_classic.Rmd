@@ -158,18 +158,20 @@ genes = lapply(1:length(genes_scmer_batched) , function(i){
 
 stat_scmer_batched = lapply(c(1:length(genes)) , function(i){
   current.genes = genes[[i]]
-  stat.per_n_genes = lapply(1:length(current.genes) , function(j){
-    
+   stat.per_n_genes = lapply(1:length(current.genes) , function(j){
     current.stat.all = suppressWarnings( get_celltypes_stat(sce , current.genes[[j]] , batch = "sample", n.neigh = 10 , option = "all") )
-    current.stat.all$type = names(current.genes)[j]
-    current.stat.all$n_genes = length(current.genes[[j]])
-    current.stat.all$option = "all"
-    
+    if (!is.null(current.stat.all)){
+      current.stat.all$type = names(current.genes)[j]
+      current.stat.all$n_genes = length(current.genes[[j]])
+      current.stat.all$option = "all"
+    }
     current.stat.markers = suppressWarnings( get_celltypes_stat(sce , current.genes[[j]] , batch = "sample", n.neigh = 10 , option = "markers") )
-    current.stat.markers$type = names(current.genes)[j]
-    current.stat.markers$n_genes = length(current.genes[[j]])
-    current.stat.markers$option = "markers"
-    
+    if (!is.null(current.stat.markers)){
+      
+      current.stat.markers$type = names(current.genes)[j]
+      current.stat.markers$n_genes = length(current.genes[[j]])
+      current.stat.markers$option = "markers"
+    }
     current.stat = rbind(current.stat.all , current.stat.markers)
     
     return(current.stat)
@@ -197,18 +199,22 @@ genes = lapply(1:length(genes_scmer_unbatched) , function(i){
 
 stat_scmer_unbatched = lapply(c(1:length(genes)) , function(i){
   current.genes = genes[[i]]
-  stat.per_n_genes = lapply(1:length(current.genes) , function(j){
+   stat.per_n_genes = lapply(1:length(current.genes) , function(j){
     current.stat.all = suppressWarnings( get_celltypes_stat(sce , current.genes[[j]] , batch = "sample", n.neigh = 10 , option = "all") )
-    current.stat.all$type = names(current.genes)[j]
-    current.stat.all$n_genes = length(current.genes[[j]])
-    current.stat.all$option = "all"
-    
+    if (!is.null(current.stat.all)){
+      current.stat.all$type = names(current.genes)[j]
+      current.stat.all$n_genes = length(current.genes[[j]])
+      current.stat.all$option = "all"
+    }
     current.stat.markers = suppressWarnings( get_celltypes_stat(sce , current.genes[[j]] , batch = "sample", n.neigh = 10 , option = "markers") )
-    current.stat.markers$type = names(current.genes)[j]
-    current.stat.markers$n_genes = length(current.genes[[j]])
-    current.stat.markers$option = "markers"
-    
+    if (!is.null(current.stat.markers)){
+      
+      current.stat.markers$type = names(current.genes)[j]
+      current.stat.markers$n_genes = length(current.genes[[j]])
+      current.stat.markers$option = "markers"
+    }
     current.stat = rbind(current.stat.all , current.stat.markers)
+    
     return(current.stat)
   })
   stat.per_n_genes = do.call(rbind , stat.per_n_genes)
@@ -234,19 +240,22 @@ genes = lapply(1:length(genes_scgenefit) , function(i){
 
 stat_scgenefit = lapply(c(1:length(genes)) , function(i){
   current.genes = genes[[i]]
-  stat.per_n_genes = lapply(1:length(current.genes) , function(j){
-    
+ stat.per_n_genes = lapply(1:length(current.genes) , function(j){
     current.stat.all = suppressWarnings( get_celltypes_stat(sce , current.genes[[j]] , batch = "sample", n.neigh = 10 , option = "all") )
-    current.stat.all$type = names(current.genes)[j]
-    current.stat.all$n_genes = length(current.genes[[j]])
-    current.stat.all$option = "all"
-    
+    if (!is.null(current.stat.all)){
+      current.stat.all$type = names(current.genes)[j]
+      current.stat.all$n_genes = length(current.genes[[j]])
+      current.stat.all$option = "all"
+    }
     current.stat.markers = suppressWarnings( get_celltypes_stat(sce , current.genes[[j]] , batch = "sample", n.neigh = 10 , option = "markers") )
-    current.stat.markers$type = names(current.genes)[j]
-    current.stat.markers$n_genes = length(current.genes[[j]])
-    current.stat.markers$option = "markers"
-    
+    if (!is.null(current.stat.markers)){
+      
+      current.stat.markers$type = names(current.genes)[j]
+      current.stat.markers$n_genes = length(current.genes[[j]])
+      current.stat.markers$option = "markers"
+    }
     current.stat = rbind(current.stat.all , current.stat.markers)
+    
     return(current.stat)
   })
   stat.per_n_genes = do.call(rbind , stat.per_n_genes)
