@@ -40,7 +40,7 @@ system = "pancreas"
 # read sce 
 sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
 sce$cell = colnames(sce)
-sce = retain_only_hvgs(sce , n = 10000)
+#sce = retain_only_hvgs(sce , n = 10000)
 
 ```
 
@@ -116,10 +116,10 @@ genes_scgenefit = lapply(n_genes , function(str){
 
 
 samples = unique(sce$sample)
-
+hvgs_10000 = get_hvgs(sce, n = 10000)
 neighs.all = lapply(samples , function(sample){
   current.sce = sce[, sce$sample == sample]
-  current.neighs.all = get_mapping(current.sce , genes = rownames(current.sce), batch = NULL, n.neigh = "all", nPC = 50 , get.dist = T , type = "together")
+  current.neighs.all = get_mapping(current.sce , genes = hvgs_10000, batch = NULL, n.neigh = "all", nPC = 50 , get.dist = T , type = "together")
   distances = current.neighs.all$distances
   distances_scaled = t( apply(distances , 1 , function(x) scale(x)) )
   rownames(distances_scaled) = rownames(distances)
