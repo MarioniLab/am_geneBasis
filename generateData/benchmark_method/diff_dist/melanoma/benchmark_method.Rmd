@@ -26,7 +26,7 @@ library(BiocSingular)
 library(BiocParallel)
 library(SingleCellExperiment)
 library(BiocStyle)
-ncores = 10
+ncores = 9
 mcparam = MulticoreParam(workers = ncores)
 register(mcparam)
 set.seed(32)
@@ -41,7 +41,8 @@ system = "melanoma"
 sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
 #sce = retain_only_hvgs(sce , n = 10000)
 
-n_genes.grid = seq(10,250,10)
+
+n_genes.grid = seq(25,250,25)
 
 ```
 
@@ -55,9 +56,9 @@ n_genes.grid = seq(10,250,10)
 gene_selections.files = list.files(path=paste0(root.dir , "data/gene_selection__diff_p/" , system , "/"))
 genes = lapply(gene_selections.files , function(current.file){
   out = readRDS(paste0(root.dir , "data/gene_selection__diff_p/" , system , "/" , current.file))
-  return(as.character(out))
+  return(as.character(out$gene))
 })
-names(genes) = c(0:5, Inf)
+names(genes) = c(1:5, Inf)
 
 
 ```
@@ -68,23 +69,33 @@ names(genes) = c(0:5, Inf)
 ```{r cell-score, message = FALSE}
 
 
-hvgs_5000 = as.character(get_hvgs(sce , n = 5000))
-neighs.all = get_mapping(sce , assay = "logcounts", genes = hvgs_5000, batch = "sample", n.neigh = "all", nPC = 50 , get.dist = T , type = "together")
-
-# z-scale
-distances = neighs.all$distances
-distances_scaled = t( apply(distances , 1 , function(x) scale(x)) )
-rownames(distances_scaled) = rownames(distances)
-neighs.all$distances = distances_scaled
+samples = unique(sce$sample)
+hvgs_10000 = get_hvgs(sce, n = 10000)
+neighs.all = lapply(samples , function(sample){
+  current.sce = sce[, sce$sample == sample]
+  current.neighs.all = get_mapping(current.sce , genes = hvgs_10000, batch = NULL, n.neigh = "all", nPC = 50 , get.dist = T , type = "together")
+  distances = current.neighs.all$distances
+  distances_scaled = t( apply(distances , 1 , function(x) scale(x)) )
+  rownames(distances_scaled) = rownames(distances)
+  current.neighs.all$distances = distances_scaled
+  return(current.neighs.all)
+})
+names(neighs.all) = samples
 
 
 stat_cell_score = bplapply(n_genes.grid , function(n_genes){
   stat.per_n_genes = lapply(1:length(genes) , function(i){
-    current.genes = genes[[i]]
-    current.stat = suppressWarnings( get_preservation_score_simple(sce , neighs.all = neighs.all , assay = "logcounts" , genes.all = rownames(sce) , 
-                                  genes.compare = current.genes[1:n_genes], batch = "sample", n.neigh = 5 , nPC.all = 50 , nPC.compare = 50) )
+    current.genes = genes[[i]][1:n_genes]
+    current.stat = lapply(samples , function(sample){
+      current.sce = sce[, sce$sample == sample]
+      current.neighs.all = neighs.all[[which(names(neighs.all) == sample)]]
+      current.stat = suppressWarnings( get_preservation_score_simple(current.sce , neighs.all = current.neighs.all , genes.all = rownames(current.sce) , 
+                                  genes.compare = current.genes, batch = NULL, n.neigh = 5 , nPC.all = 50 , nPC.compare = 50) )
+    })
+    current.stat = do.call(rbind , current.stat)
+    
+    current.stat$type = names(genes)[i]
     current.stat$n_genes = n_genes
-    current.stat$p = names(genes)[i]
     return(current.stat)
   })
   stat.per_n_genes = do.call(rbind , stat.per_n_genes)
@@ -120,10 +131,15 @@ get_celltypes_stat = function(sce , genes , batch = "sample", n.neigh = 5){
 
 stat_celltype = bplapply(n_genes.grid , function(n_genes){
   stat.per_n_genes = lapply(1:length(genes) , function(i){
-    current.genes = genes[[i]]
-    current.stat = suppressWarnings( get_celltypes_stat(sce , current.genes[1:n_genes] , batch = "sample", n.neigh = 10 ) )
+    current.genes = genes[[i]][1:n_genes]
+    current.stat = lapply(samples , function(sample){
+      current.sce = sce[, sce$sample == sample]
+      current.neighs.all = neighs.all[[which(names(neighs.all) == sample)]]
+      current.stat = suppressWarnings( get_celltypes_stat(sce , current.genes , batch = "sample", n.neigh = 10 ) )
+    })
+    current.stat = do.call(rbind , current.stat)
+    current.stat$type = names(genes)[i]
     current.stat$n_genes = n_genes
-    current.stat$p = names(genes)[i]
     return(current.stat)
   })
   stat.per_n_genes = do.call(rbind , stat.per_n_genes)
@@ -141,11 +157,10 @@ saveRDS(stat_celltype , file = paste0(root.dir , "data/benchmark_method/diff_dis
 ```{r gene-score, message = FALSE}
 
 
-genes.predict = as.character(get_hvgs(sce , n = 3000))
-hvgs_5000 = as.character(get_hvgs(sce , n = 5000))
-stat_gene_score_all = suppressWarnings( get_distr_dist(sce, genes = hvgs_5000, assay = "logcounts" , batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = genes.predict , type = "corr") ) 
+genes.predict = as.character(get_hvgs(sce , n = 5000))
+hvgs_10000 = as.character(get_hvgs(sce , n = 5000))
+stat_gene_score_all = suppressWarnings( get_distr_dist(sce, genes = hvgs_10000, assay = "logcounts" , batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = genes.predict , type = "corr") ) 
 colnames(stat_gene_score_all) = c("gene" , "corr_all")
-
 
 
 stat_gene_score = bplapply(n_genes.grid , function(n_genes){

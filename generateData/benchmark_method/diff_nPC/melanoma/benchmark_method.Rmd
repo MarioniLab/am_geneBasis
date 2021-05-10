@@ -35,12 +35,11 @@ set.seed(32)
 root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
 source(paste0(root.dir, "am_geneBasis/functions/main_functions.R"))
 
-system = "pancreas"
+system = "melanoma"
 
 # read sce 
 sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
 #sce = retain_only_hvgs(sce , n = 10000)
-sce$cell = colnames(sce)
 
 
 n_genes.grid = seq(25,250,25)
@@ -49,17 +48,19 @@ n_genes.grid = seq(25,250,25)
 
 # Get gene selections
 
-
 ```{r read-selection-gene-basis, message = FALSE}
 
 
 # read gene selection 
-gene_selections.files = list.files(path=paste0(root.dir , "data/gene_selection__diff_p/" , system , "/"))
+gene_selections.files = list.files(path=paste0(root.dir , "data/gene_selection__optional_PCA/" , system , "/"))
 genes = lapply(gene_selections.files , function(current.file){
-  out = readRDS(paste0(root.dir , "data/gene_selection__diff_p/" , system , "/" , current.file))
+  out = readRDS(paste0(root.dir , "data/gene_selection__optional_PCA/" , system , "/" , current.file))
   return(as.character(out$gene))
 })
-names(genes) = c(1:5, Inf)
+
+genes_null = readRDS(paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection.Rds"))
+genes[[length(genes) + 1]] = as.character(out$genes_null)
+names(genes) = c(10,100,25,50,0)
 
 
 ```
@@ -103,7 +104,7 @@ stat_cell_score = bplapply(n_genes.grid , function(n_genes){
   return(stat.per_n_genes)
 }, BPPARAM = mcparam)
 stat_cell_score = do.call(rbind , stat_cell_score)
-saveRDS(stat_cell_score , file = paste0(root.dir , "data/benchmark_method/diff_dist/" , system , "/cell_score.Rds"))
+saveRDS(stat_cell_score , file = paste0(root.dir , "data/benchmark_method/diff_nPC/" , system , "/cell_score.Rds"))
 
 
 
@@ -147,7 +148,7 @@ stat_celltype = bplapply(n_genes.grid , function(n_genes){
   return(stat.per_n_genes)
 }, BPPARAM = mcparam)
 stat_celltype = do.call(rbind , stat_celltype)
-saveRDS(stat_celltype , file = paste0(root.dir , "data/benchmark_method/diff_dist/" , system , "/celltype_classic.Rds"))
+saveRDS(stat_celltype , file = paste0(root.dir , "data/benchmark_method/diff_nPC/" , system , "/celltype_classic.Rds"))
 
 
 
@@ -178,7 +179,7 @@ stat_gene_score = bplapply(n_genes.grid , function(n_genes){
 stat_gene_score = do.call(rbind , stat_gene_score)
 stat_gene_score = merge(stat_gene_score , stat_gene_score_all , all.x = T , all.y = F)
 stat_gene_score$corr_ratio = stat_gene_score$corr/stat_gene_score$corr_all
-saveRDS(stat_gene_score , file = paste0(root.dir , "data/benchmark_method/diff_dist/" , system , "/gene_score.Rds"))
+saveRDS(stat_gene_score , file = paste0(root.dir , "data/benchmark_method/diff_nPC/" , system , "/gene_score.Rds"))
 
 
 ```
