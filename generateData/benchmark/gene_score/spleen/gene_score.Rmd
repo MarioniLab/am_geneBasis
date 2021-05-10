@@ -116,7 +116,8 @@ genes_scgenefit = lapply(n_genes , function(str){
 ```{r corr-all, message = FALSE}
 
 
-stat_gene_score = suppressWarnings( get_corr_per_gene(sce, genes = rownames(sce), batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce)) ) 
+hvgs_5000 = as.character(get_hvgs(sce , n = 5000))
+stat_gene_score = suppressWarnings( get_corr_per_gene(sce, genes = hvgs_5000, batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = hvgs_5000 ) ) 
 colnames(stat_gene_score) = c("gene" , "corr_all")
   
 
@@ -138,12 +139,12 @@ stat_scmer_batched = bplapply(c(1:length(genes)) , function(i){
   current.genes = genes[[i]]
   stat.per_n_genes = lapply(c(1:length(current.genes)) , function(j){
     
-    current.stat.nPC_50 = suppressWarnings( get_corr_per_gene(sce, genes = current.genes[[j]], batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce)) ) 
+    current.stat.nPC_50 = suppressWarnings( get_corr_per_gene(sce, genes = current.genes[[j]], batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = hvgs_5000 ) ) 
     current.stat.nPC_50$type = names(current.genes)[j]
     current.stat.nPC_50$n_genes = length(current.genes[[j]])
     current.stat.nPC_50$nPC = 50
     
-    current.stat.nPC_all = suppressWarnings( get_corr_per_gene(sce, genes = current.genes[[j]], batch = "sample" , n.neigh = 5 , nPC = length(current.genes[[j]]) - 1 , genes.predict = rownames(sce)) ) 
+    current.stat.nPC_all = suppressWarnings( get_corr_per_gene(sce, genes = current.genes[[j]], batch = "sample" , n.neigh = 5 , nPC = length(current.genes[[j]]) - 1 , genes.predict = hvgs_5000 ) ) 
     current.stat.nPC_all$type = names(current.genes)[j]
     current.stat.nPC_all$n_genes = length(current.genes[[j]])
     current.stat.nPC_all$nPC = "all"
@@ -180,12 +181,12 @@ stat_scmer_unbatched = bplapply(c(1:length(genes)) , function(i){
   current.genes = genes[[i]]
   stat.per_n_genes = lapply(1:length(current.genes) , function(j){
     
-    current.stat.nPC_50 = suppressWarnings( get_corr_per_gene(sce, genes = current.genes[[j]], batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce)) ) 
+    current.stat.nPC_50 = suppressWarnings( get_corr_per_gene(sce, genes = current.genes[[j]], batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = hvgs_5000 ) ) 
     current.stat.nPC_50$type = names(current.genes)[j]
     current.stat.nPC_50$n_genes = length(current.genes[[j]])
     current.stat.nPC_50$nPC = 50
     
-    current.stat.nPC_all = suppressWarnings( get_corr_per_gene(sce, genes = current.genes[[j]], batch = "sample" , n.neigh = 5 , nPC = length(current.genes[[j]]) - 1 , genes.predict = rownames(sce)) ) 
+    current.stat.nPC_all = suppressWarnings( get_corr_per_gene(sce, genes = current.genes[[j]], batch = "sample" , n.neigh = 5 , nPC = length(current.genes[[j]]) - 1 , genes.predict = hvgs_5000 ) ) 
     current.stat.nPC_all$type = names(current.genes)[j]
     current.stat.nPC_all$n_genes = length(current.genes[[j]])
     current.stat.nPC_all$nPC = "all"
@@ -220,12 +221,12 @@ stat_scgenefit = bplapply(c(1:length(genes)) , function(i){
   current.genes = genes[[i]]
   stat.per_n_genes = lapply(1:length(current.genes) , function(j){
     
-    current.stat.nPC_50 = suppressWarnings( get_corr_per_gene(sce, genes = current.genes[[j]], batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce)) ) 
+    current.stat.nPC_50 = suppressWarnings( get_corr_per_gene(sce, genes = current.genes[[j]], batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = hvgs_5000 ) ) 
     current.stat.nPC_50$type = names(current.genes)[j]
     current.stat.nPC_50$n_genes = length(current.genes[[j]])
     current.stat.nPC_50$nPC = 50
     
-    current.stat.nPC_all = suppressWarnings( get_corr_per_gene(sce, genes = current.genes[[j]], batch = "sample" , n.neigh = 5 , nPC = length(current.genes[[j]]) - 1 , genes.predict = rownames(sce)) ) 
+    current.stat.nPC_all = suppressWarnings( get_corr_per_gene(sce, genes = current.genes[[j]], batch = "sample" , n.neigh = 5 , nPC = length(current.genes[[j]]) - 1 , genes.predict = hvgs_5000 ) ) 
     current.stat.nPC_all$type = names(current.genes)[j]
     current.stat.nPC_all$n_genes = length(current.genes[[j]])
     current.stat.nPC_all$nPC = "all"
@@ -244,6 +245,7 @@ saveRDS(stat_scgenefit , file = paste0(root.dir , "data/benchmark/gene_score/" ,
 
 
 ```
+
 
 # Session Info
 
