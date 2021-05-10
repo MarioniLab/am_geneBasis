@@ -59,7 +59,7 @@ genes = lapply(gene_selections.files , function(current.file){
 })
 
 genes_null = readRDS(paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection.Rds"))
-genes[[length(genes) + 1]] = as.character(out$genes_null)
+genes[[length(genes) + 1]] = as.character(genes_null$gene)
 names(genes) = c(10,100,25,50,0)
 
 
