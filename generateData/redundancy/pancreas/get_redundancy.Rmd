@@ -44,6 +44,7 @@ sce$cell = colnames(sce)
 ```
 
 
+
 # Get gene selections
 
 ## geneBasis
@@ -88,12 +89,14 @@ get_celltypes_stat = function(sce , genes , batch = "sample", n.neigh = 5){
 
 
 stat = bplapply(n_genes.grid , function(n_genes){
-  current.genes = genes[1:n_genes]
-  stat.all = get_celltypes_stat = function(sce , genes = current.genes, batch = "sample", n.neigh = 5)
+  current.genes = as.character(genes_alsu[1:n_genes])
+  stat.all = get_celltypes_stat(sce , genes = current.genes, batch = "sample", n.neigh = 5)
   colnames(stat.all) = c("celltype" , "frac_correctly_mapped_all")  
   stat.per_gene = lapply(current.genes , function(gene){
-    current.stat = get_celltypes_stat = function(sce , genes = setdiff(current.genes,gene) , batch = "sample", n.neigh = 5)
+    print(gene)
+    current.stat = get_celltypes_stat(sce , genes = setdiff(current.genes,gene) , batch = "sample", n.neigh = 5)
     current.stat$gene = gene  
+    return(current.stat)
   })
   stat.per_gene = do.call(rbind , stat.per_gene)
   stat.per_gene = merge(stat.per_gene , stat.all , all.x = T)
