@@ -134,12 +134,7 @@ get_celltypes_stat = function(sce , genes , batch = "sample", n.neigh = 5){
 stat_celltype = bplapply(n_genes.grid , function(n_genes){
   stat.per_n_genes = lapply(1:length(genes) , function(i){
     current.genes = genes[[i]][1:n_genes]
-    current.stat = lapply(samples , function(sample){
-      current.sce = sce[, sce$sample == sample]
-      current.neighs.all = neighs.all[[which(names(neighs.all) == sample)]]
-      current.stat = suppressWarnings( get_celltypes_stat(sce , current.genes , batch = "sample", n.neigh = 10 ) )
-    })
-    current.stat = do.call(rbind , current.stat)
+    current.stat = suppressWarnings( get_celltypes_stat(sce , current.genes , batch = "sample", n.neigh = 10 ) )
     current.stat$type = names(genes)[i]
     current.stat$n_genes = n_genes
     return(current.stat)
