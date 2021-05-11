@@ -152,14 +152,14 @@ saveRDS(stat_celltype , file = paste0(root.dir , "data/benchmark_method/diff_dis
 
 
 hvgs_5000 = as.character(get_hvgs(sce , n = 5000))
-stat_gene_score_all = suppressWarnings( get_corr_per_gene(sce, genes = hvgs_5000, batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = hvgs_5000 , type = "corr") ) 
+stat_gene_score_all = suppressWarnings( get_corr_per_gene(sce, genes = hvgs_5000, batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = hvgs_5000 ) ) 
 colnames(stat_gene_score_all) = c("gene" , "corr_all")
 
 
 stat_gene_score = bplapply(n_genes.grid , function(n_genes){
   stat.per_n_genes = lapply(1:length(genes) , function(i){
     current.genes = genes[[i]]
-    current.stat = suppressWarnings( get_corr_per_gene(sce , current.genes[1:n_genes] , batch = "sample", n.neigh = 5 , nPC= 50 , genes.predict = hvgs_5000 , type = "corr" ) )
+    current.stat = suppressWarnings( get_corr_per_gene(sce , current.genes[1:n_genes] , batch = "sample", n.neigh = 5 , nPC= 50 , genes.predict = hvgs_5000 ) )
     current.stat$n_genes = n_genes
     current.stat$p = names(genes)[i]
     return(current.stat)
