@@ -54,4 +54,4 @@ t1 = time.time()
 t = t1-t0
 rows.append([args.n_samples , args.min_disp , args.n_threads , args.lambda_reg , len(current_adata.obs) , len(current_adata.var_names) , len(current_genes), t])
 df = pd.DataFrame(rows, columns=["n_processed_samples", "min_disp", "n_threads", "lambda" , "n_cells" , "n_genes_init", "n_genes_selected", "time"])
-df.to_csv(save_dir + 'stat_batched_' + str(t1) + '.csv', header=True, index=None, sep=',')
+df.to_csv(save_dir + 'stat_unbatched_' + str(t1) + '.csv', header=True, index=None, sep=',')
