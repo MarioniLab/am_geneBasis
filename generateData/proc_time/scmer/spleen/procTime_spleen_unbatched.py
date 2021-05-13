@@ -52,6 +52,6 @@ model.fit(current_adata.X, batches=current_adata.obs['sample'].values)
 current_genes = current_adata.var_names[model.get_mask()].tolist()
 t1 = time.time()
 t = t1-t0
-rows.append([current_n_samples_to_process , current_min_disp , current_n_threads , current_lambda , len(current_adata.obs) , len(current_adata.var_names) , len(current_genes), t])
+rows.append([args.n_samples , args.min_disp , args.n_threads , args.lambda_reg , len(current_adata.obs) , len(current_adata.var_names) , len(current_genes), t])
 df = pd.DataFrame(rows, columns=["n_processed_samples", "min_disp", "n_threads", "lambda" , "n_cells" , "n_genes_init", "n_genes_selected", "time"])
 df.to_csv(save_dir + 'stat_batched_' + str(t1) + '.csv', header=True, index=None, sep=',')
