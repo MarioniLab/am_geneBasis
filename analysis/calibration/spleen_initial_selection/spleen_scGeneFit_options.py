@@ -47,7 +47,7 @@ current_genes = genes[current_markers]
 save_dir = root_dir + 'calibration/spleen_init_settings_scGeneFit/' + method + '/'
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
-save_file = save_dir + 'nGenes_' + str(len(current_genes)) + '_eps_' + str(current_eps) +'.txt'
+save_file = save_dir + 'nGenes_' + str(len(current_genes)) + '_eps_' + str(args.eps) +'.txt'
 with open(save_file, 'w') as f:
     for item in current_genes:
         f.write("%s\n" % item)
@@ -59,7 +59,7 @@ current_genes = genes[current_markers]
 save_dir = root_dir + 'calibration/spleen_init_settings_scGeneFit/' + method + '/'
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
-save_file = save_dir + 'nGenes_' + str(len(current_genes)) + '_eps_' + str(current_eps) +'.txt'
+save_file = save_dir + 'nGenes_' + str(len(current_genes)) + '_eps_' + str(args.eps) +'.txt'
 with open(save_file, 'w') as f:
     for item in current_genes:
         f.write("%s\n" % item)
@@ -71,7 +71,7 @@ current_genes = genes[current_markers]
 save_dir = root_dir + 'calibration/spleen_init_settings_scGeneFit/' + method + '/'
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
-save_file = save_dir + 'nGenes_' + str(len(current_genes)) + '_eps_' + str(current_eps) +'.txt'
+save_file = save_dir + 'nGenes_' + str(len(current_genes)) + '_eps_' + str(args.eps) +'.txt'
 with open(save_file, 'w') as f:
     for item in current_genes:
         f.write("%s\n" % item)  
