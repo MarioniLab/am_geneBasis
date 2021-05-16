@@ -5,7 +5,7 @@ err_folder=${my_folder}/clust_err/geneBasis
 
 #SELECT SCRIPT
 #If you change this, you MUST update the wrapper's grep
-script_name=ct_spl
+script_name=cal_spl_scgenefit
 #CHOOSE PARAMETERS
 #RAM in megabytes
 memory=300000
