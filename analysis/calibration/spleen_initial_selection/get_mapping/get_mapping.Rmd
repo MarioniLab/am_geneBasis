@@ -1,0 +1,111 @@
+---
+title: "Pipeline to find optimal setting for scGeneFit for spleen data"
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+# Load dependencies
+
+```{r load, message = FALSE}
+
+
+library(SingleCellExperiment)
+library(batchelor)
+library(stats)
+library(BiocNeighbors)
+library(tibble)
+library(reshape2)
+library(plyr)
+library(dplyr)
+library(scran)
+library(batchelor)
+library(stringr)
+library(BiocSingular)
+library(BiocParallel)
+library(SingleCellExperiment)
+library(BiocStyle)
+ncores = 7
+mcparam = MulticoreParam(workers = ncores)
+register(mcparam)
+set.seed(32)
+
+#root.dir = "/Users/alsu/Develop/geneBasis/"
+root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
+source(paste0(root.dir, "am_geneBasis/functions/main_functions.R"))
+
+system = "spleen"
+
+# read sce 
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+sce$cell = colnames(sce)
+sce = sce[, !sce$celltype %in% c("Unknown")]
+
+
+```
+
+
+# Get gene selections from scGene-Fit
+
+```{r read-selection-sc-gene-fit, message = FALSE}
+
+methods = c("centers" , "pairwise" , "pairwise_centers")
+
+markers = lapply(methods , function(method){
+  files_per_method = list.files(path = paste0( root.dir , "data/calibration/spleen_init_settings_scGeneFit/" , method , "/" ))
+  markers_per_method = lapply(files_per_method , function(current.file){
+    current.markers = read.table(paste0(root.dir , "data/calibration/spleen_init_settings_scGeneFit/" , method , "/" , current.file) , header = F)
+    current.id = str_split(current.file , "_")[[1]]
+    current.eps = as.numeric( str_remove(current.id[4] , ".txt") )
+    current.stat = data.frame(gene = current.markers$V1 , n_genes = length(current.markers$V1) , eps = current.eps , method = method)
+    current.stat$id = paste0(current.stat$method , "_" , current.stat$n_genes , "_" , current.stat$eps)
+    return(current.stat)
+  })
+  markers_per_method = do.call(rbind , markers_per_method)
+  return(markers_per_method)
+})
+markers = do.call(rbind , markers)
+
+
+```
+
+# Get celltype mapping
+
+```{r get-celltype-mapping, message = FALSE}
+
+
+get_celltypes_stat = function(sce , genes , batch = "sample", n.neigh = 5, nPC = 50){
+  neighs = suppressWarnings( get_mapping(sce , genes = genes, batch = batch, n.neigh = n.neigh, nPC = nPC , get.dist = F , type = "together"))
+  if (!is.null(neighs)){
+    meta = as.data.frame(colData(sce))
+    current.mapping = data.frame(cell = rownames(neighs) ,
+                                 celltype = sapply(1:nrow(neighs) , function(i) meta$celltype[meta$cell == rownames(neighs)[i]]) ,
+                                 mapped_celltype = sapply(1:nrow(neighs), function(i) getmode(meta$celltype[match(neighs[i,] , meta$cell)] , 1:n.neigh) ))
+    return(current.mapping)
+    }
+  else {
+    return(NULL)
+  }
+}
+
+mappings = bplapply(unique(markers$id) , function(id){
+  current.markers = markers[markers$id == id , ]
+  current.mapping = get_celltypes_stat(sce , genes = current.markers$gene)
+  current.mapping$id = id
+  current.mapping = merge(current.mapping , unique(markers[, c("id" , "n_genes" , "eps" , "method")]))
+  return(current.mapping)
+})
+mappings = do.call(rbind , mappings)
+saveRDS(mappings, file = paste0(root.dir , "data/calibration/spleen_init_settings_scGeneFit/celltype_mappings.Rds"))
+
+```
+
+
+
+
+# Session Info
+
+```{r sessinf}
+sessionInfo()
+```
