@@ -91,11 +91,11 @@ get_celltypes_stat = function(sce , genes , batch = "sample", n.neigh = 5, nPC =
 
 mappings = bplapply(unique(markers$id) , function(id){
   current.markers = markers[markers$id == id , ]
-  current.mapping = get_celltypes_stat(sce , genes = current.markers$gene)
+  current.mapping = get_celltypes_stat(sce , genes = as.character( current.markers$gene) )
   current.mapping$id = id
   current.mapping = merge(current.mapping , unique(markers[, c("id" , "n_genes" , "eps" , "method")]))
   return(current.mapping)
-})
+}, BPPARAM = mcparam)
 mappings = do.call(rbind , mappings)
 saveRDS(mappings, file = paste0(root.dir , "data/calibration/spleen_init_settings_scGeneFit/celltype_mappings.Rds"))
 
