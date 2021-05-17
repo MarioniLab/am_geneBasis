@@ -376,6 +376,146 @@ get_expr_real_and_neighbors = function(sce , genes , assay = "logcounts" , batch
 }
 
 
+
+get_z_scaled_distances_single_batch = function(sce , genes.all = rownames(sce) , n.neigh = 5 , nPC.all = 50){
+  neighs.all = get_mapping(sce , genes = genes.all, batch = NULL, n.neigh = "all", nPC = nPC.all , get.dist = T)
+  distances = neighs.all$distances
+  distances_scaled = t( apply(distances , 1 , function(x) scale(x)) )
+  rownames(distances_scaled) = rownames(distances)
+  neighs.all$distances = distances_scaled
+  return(neighs.all)
+}
+
+get_z_scaled_distances = function(sce , genes.all = rownames(sce) , batch = NULL, n.neigh = 5 , nPC.all = 50){
+  if (is.null(batch)){
+    out = get_z_scaled_distances_single_batch(sce , genes.all = genes.all , n.neigh = n.neigh , nPC.all = nPC.all)
+    return(out)
+  }
+  else {
+    meta = as.data.frame(colData(sce))
+    batchFactor = factor(meta[, colnames(meta) == batch])
+    neighs.all = lapply(unique(batchFactor) , function(current.batch){
+      idx = which(batchFactor == current.batch)
+      current.sce = sce[, idx]
+      out =  get_z_scaled_distances_single_batch(current.sce , genes.all = genes.all , n.neigh = n.neigh , nPC.all = nPC.all)
+    })
+    names(neighs.all) = unique(batchFactor)
+    return(neighs.all)
+  }
+}
+
+
+get_preservation_score_single_batch = function(sce , neighs.all = NULL ,  genes.all = rownames(sce) , 
+                                               genes.compare , n.neigh = 5 , nPC.all = 50 , nPC.compare = 200){
+  if (is.null(neighs.all)){
+    neighs.all = get_z_scaled_distances(sce, genes.all = genes.all, batch = NULL, n.neigh = n.neigh, nPC.all = nPC.all)
+  }
+  neighs.compare = get_mapping(sce , genes = genes.compare, batch = NULL, n.neigh = n.neigh, nPC = nPC.compare)
+  neighs.all.cells_mapped = neighs.all$cells_mapped
+  neighs.all.distances = neighs.all$distances
+  n.cells = ncol(sce)
+  
+  score = lapply(1:nrow(neighs.compare) , function(i){
+    cells = neighs.all.cells_mapped[i,]
+    idx_all = c(1:n.neigh)
+    idx_compare = which(cells %in% neighs.compare[i,] )
+    
+    dist_all = neighs.all.distances[i, idx_all]
+    dist_compare = neighs.all.distances[i, idx_compare]
+    current.score = median(-dist_compare)/median(-dist_all)
+    out = data.frame(score = current.score )
+    return(out)
+  })
+  score = do.call(rbind , score)
+  score$cell = rownames(neighs.compare)
+  return(score)
+}
+
+
+get_preservation_score = function(sce , neighs.all = NULL ,  genes.all = rownames(sce) , 
+                                               genes.compare , batch = "sample" ,n.neigh = 5 , nPC.all = 50 , nPC.compare = 200){
+  if (is.null(batch)){
+    out = get_preservation_score_single_batch(sce , neighs.all = neighs.all ,  genes.all = genes.all, 
+                                                         genes.compare = genes.compare, n.neigh = n.neigh , nPC.all = nPC.all , nPC.compare = nPC.compare)
+    return(out)
+  }
+  else {
+    if (is.null(neighs.all)){
+      neighs.all = get_z_scaled_distances(sce , genes.all = genes.all , batch = batch, n.neigh = n.neigh, nPC.all = nPC.all)
+    }
+    meta = as.data.frame(colData(sce))
+    batchFactor = factor(meta[, colnames(meta) == batch])
+    score = lapply(unique(batchFactor) , function(current.batch){
+      idx = which(batchFactor == current.batch)
+      current.sce = sce[, idx]
+      current.neighs.all = neighs.all[[which(names(neighs.all) == current.batch)]]
+      out = get_preservation_score_single_batch(current.sce , neighs.all = current.neighs.all , genes.all = genes.all , 
+                                                genes.compare = genes.compare, n.neigh = n.neigh , nPC.all = nPC.all, nPC.compare = nPC.compare)
+      return(out)
+    })
+    score = do.call(rbind, score)
+    return(score)
+  }
+}
+
+
+
+get_preservation_score_simple = function(sce , neighs.all = NULL ,  genes.all = rownames(sce) , 
+                                         genes.compare , batch = "sample", n.neigh = 5 , nPC.all = 50 , nPC.compare = 200){
+  
+  if (is.null(neighs.all)){
+    if (is.null(batch)){
+      neighs.all = get_mapping(sce , genes = genes.all, batch = NULL, n.neigh = "all", nPC = nPC.all , get.dist = T)
+    }
+    else {
+      meta = as.data.frame(colData(sce))
+      batchFactor = factor(meta[, colnames(meta) == batch])
+      neighs.all = lapply(unique(batchFactor) , function(current.batch){
+        idx = which(batchFactor == current.batch)
+        current.sce = sce[, idx]
+        current.neighs.all = get_mapping(current.sce , genes = genes.all, batch = NULL, n.neigh = "all", nPC = nPC.all , get.dist = T)
+      })
+      names(neighs.all) = unique(batchFactor)
+    }
+  }
+  
+  
+  
+  neighs.compare = get_mapping(sce , genes = genes.compare, batch = batch, n.neigh = n.neigh, nPC = nPC.compare , type = "together")
+  if (!is.null(neighs.compare)){
+    if (is.null(neighs.all)){
+      neighs.all = get_mapping(sce , genes = genes.all, batch = batch, n.neigh = "all", nPC = nPC.all , get.dist = T , type = "together")
+    }
+    neighs.all.cells_mapped = neighs.all$cells_mapped
+    neighs.all.distances = neighs.all$distances
+    n.cells = ncol(sce)
+    
+    score = lapply(1:nrow(neighs.compare) , function(i){
+      cells = neighs.all.cells_mapped[i,]
+      idx_all = c(1:n.neigh)
+      idx_compare = which(cells %in% neighs.compare[i,] )
+      
+      dist_all = neighs.all.distances[i, idx_all]
+      dist_compare = neighs.all.distances[i, idx_compare]
+      current.score = median(-dist_compare)/median(-dist_all)
+      
+      #current.bandwidth = mean(neighs.all.distances[i, ])
+      #dist_all = exp(-1*dist_all/current.bandwidth)
+      #dist_compare = exp(-1*dist_compare/current.bandwidth)
+      #current.score = median(dist_compare)/median(dist_all)
+      out = data.frame(score = current.score )
+      return(out)
+    })
+    score = do.call(rbind , score)
+    score$cell = rownames(neighs.compare)
+    return(score)
+  }
+  else {
+    return(NULL)
+  }
+}
+
+
 get_preservation_score_simple = function(sce , neighs.all = NULL ,  genes.all = rownames(sce) , 
                                   genes.compare , batch = "sample", n.neigh = 5 , nPC.all = 50 , nPC.compare = 200){
   neighs.compare = get_mapping(sce , genes = genes.compare, batch = batch, n.neigh = n.neigh, nPC = nPC.compare , type = "together")
@@ -414,7 +554,7 @@ get_preservation_score_simple = function(sce , neighs.all = NULL ,  genes.all = 
 
 
 
-get_mapping_2_external_dataset = function(sce_reference , sce_query , cluster_id , genes, nPC = 100, n.neigh = 5, skip.first = F){
+get_mapping_2_external_dataset = function(sce_reference , sce_query , cluster_id , genes, nPC = 100, n.neigh = 5, skip.first = F, cosine = F){
   genes = intersect(genes,rownames(sce_reference))
   genes = intersect(genes,rownames(sce_query))
   
@@ -423,10 +563,12 @@ get_mapping_2_external_dataset = function(sce_reference , sce_query , cluster_id
   sce_query = sce_query[genes , ]
   sce_query = sce_query[order(rownames(sce_query)), ]
   
-  assay(sce_reference , "cosineNorm") = cosineNorm(logcounts(sce_reference))
-  assay(sce_query , "cosineNorm") = cosineNorm(logcounts(sce_query))
+  if (cosine){
+    assay(sce_reference , "logcounts") = cosineNorm(logcounts(sce_reference))
+    assay(sce_query , "logcounts") = cosineNorm(logcounts(sce_query))
+  }
   
-  sce_joint = cbind(assay(sce_query, "cosineNorm"), assay(sce_reference, "cosineNorm"))
+  sce_joint = cbind(assay(sce_query, "logcounts"), assay(sce_reference, "logcounts"))
   batchFactor = factor(c(as.character(sce_query$sample), as.character(sce_reference$sample)))
   
   mbpca = multiBatchPCA(sce_joint, batch = batchFactor, d = nPC)
@@ -506,7 +648,7 @@ generateSimilarity = function(SCE, k = 50, batchFactor = NULL, HVGs = NULL) {
   return(graph_sim)
 }
 
-getSubsetUncertainty = function(SCE,
+getSubsetUncertainty = function(SCE, batchFactor.sim = NULL,
                                 querySCE = NULL,
                                 subsetGenes = NULL,
                                 k = 50, 
@@ -567,7 +709,7 @@ getSubsetUncertainty = function(SCE,
   }
   
   # extract similarity of the subsetted genes
-  subset_sim = generateSimilarity(SCE, HVGs = rownames(jointSCE))
+  subset_sim = generateSimilarity(SCE, batchFactor = batchFactor.sim, HVGs = rownames(jointSCE))
   
   # concatenate and batch correct the reference and query datasets (if applicable)
   jointSCE <- logNormCounts(jointSCE)
@@ -623,3 +765,27 @@ getSubsetUncertainty = function(SCE,
     return(uncertainty_scores)
   }
 }
+
+
+compare_gene_selections = function(sce , genes , genes_to_compare , corr.thresh = 1, rank.thresh = 1000){
+  genes = genes[genes$rank <= rank.thresh , ]
+  genes_to_compare = genes_to_compare[genes_to_compare$rank <= rank.thresh,]
+  sce = sce[rownames(sce) %in% unique( c(as.character(genes$gene) , as.character(genes_to_compare$gene)) ) ,]
+  counts = as.matrix(logcounts(sce))
+  corr_stat = as.data.frame( cor(t(counts), method = "pearson") )
+  
+  stat_genes = lapply(1:nrow(genes) , function(i){
+    current.corr_stat = corr_stat[, colnames(corr_stat) %in% genes_to_compare$gene]
+    current.corr = current.corr_stat[rownames(current.corr_stat) == genes$gene[i], ]
+    out = data.frame(corr = max(current.corr) , gene.which = colnames(current.corr_stat)[which.max(current.corr)])
+    return(out)
+  })
+  stat_genes = do.call(rbind , stat_genes)
+  genes = cbind(genes , stat_genes)
+  genes = genes[genes$corr <= corr.thresh , ]
+  
+  return(genes)
+}
+
+
+
