@@ -128,6 +128,9 @@ get_cell_score_stat = function(genes , nPC){
       if (is.null(nPC)){
         current.stat$nPC = "all"
       }
+      else {
+        current.stat$nPC = nPC
+      }
       current.stat$type = names(current.genes)[j]
       current.stat$n_genes = length(current.genes[[j]])
       return(current.stat)
