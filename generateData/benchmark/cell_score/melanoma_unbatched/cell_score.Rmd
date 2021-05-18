@@ -115,8 +115,7 @@ genes_scgenefit = lapply(n_genes , function(str){
 
 samples = unique(sce$sample)
 hvgs_10000 = get_hvgs(sce, n = 10000)
-neighs.all = get_z_scaled_distances(sce , genes.all = hvgs_10000 , batch = NULL, n.neigh = 5 , nPC.all = 50)
-
+neighs.all = get_z_scaled_distances(sce , genes.all = hvgs_10000 , batch = "sample", n.neigh = 5 , nPC.all = 50)
 
 
 get_cell_score_stat = function(genes , nPC){
@@ -125,8 +124,10 @@ get_cell_score_stat = function(genes , nPC){
     print(length(current.genes))
     stat.per_n_genes = lapply(1:length(current.genes) , function(j){
       current.stat = suppressWarnings( get_preservation_score(sce , neighs.all = neighs.all ,  genes.all = hvgs_10000, 
-                                                 genes.compare = current.genes[[j]], batch = NULL ,n.neigh = 5 , nPC.all = 50 , nPC.compare = nPC) )
-      current.stat$nPC = nPC
+                                                 genes.compare = current.genes[[j]], batch = "sample" ,n.neigh = 5 , nPC.all = 50 , nPC.compare = nPC) )
+      if (is.null(nPC)){
+        current.stat$nPC = "all"
+      }
       current.stat$type = names(current.genes)[j]
       current.stat$n_genes = length(current.genes[[j]])
       return(current.stat)
