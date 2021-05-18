@@ -35,11 +35,10 @@ set.seed(32)
 root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
 source(paste0(root.dir, "am_geneBasis/functions/main_functions.R"))
 
-system = "spleen"
+system = "melanoma"
 
 # read sce 
 sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
-sce$cell = colnames(sce)
 #sce = retain_only_hvgs(sce, n = 10000)
 genes.predict = as.character(get_hvgs(sce , n = 3000))
 
@@ -53,7 +52,7 @@ genes.predict = as.character(get_hvgs(sce , n = 3000))
 
 ```{r read-selection-gene-basis, message = FALSE}
 
-genes_alsu = readRDS(paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection.Rds"))
+genes_alsu = readRDS(paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection_unbatched.Rds"))
 genes_alsu = as.character(genes_alsu$gene)
 
 ```
@@ -118,7 +117,7 @@ genes_scgenefit = lapply(n_genes , function(str){
 
 
 hvgs_10000 = as.character(get_hvgs(sce , n = 10000))
-stat_gene_score = suppressWarnings( get_corr_per_gene(sce, genes = hvgs_10000, batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = hvgs_10000 ) ) 
+stat_gene_score = suppressWarnings( get_corr_per_gene(sce, genes = hvgs_10000, batch = NULL , n.neigh = 5 , nPC = 50 , genes.predict = hvgs_10000 ) ) 
 colnames(stat_gene_score) = c("gene" , "corr_all")
   
 
@@ -127,7 +126,7 @@ get_gene_score_stat = function(stat , nPC){
     current.genes = genes[[i]]
     print(length(current.genes))
     stat.per_n_genes = lapply(1:length(current.genes) , function(j){
-      current.stat = suppressWarnings( get_corr_per_gene(sce , genes = current.genes[[j]], batch = "sample" , n.neigh = 5 , nPC = nPC , genes.predict = hvgs_10000 ) )
+      current.stat = suppressWarnings( get_corr_per_gene(sce , genes = current.genes[[j]], batch = NULL , n.neigh = 5 , nPC = nPC , genes.predict = hvgs_10000 ) )
       if (is.null(nPC)){
         current.stat$nPC = "all"
       }
