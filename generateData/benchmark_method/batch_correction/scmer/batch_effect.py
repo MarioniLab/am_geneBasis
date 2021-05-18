@@ -58,7 +58,7 @@ sc.pp.scale(current_adata, max_value=10)
 model = scmer.UmapL1(lasso=args.lambda_reg, ridge=0., n_pcs=50, perplexity=100., use_beta_in_Q=True, n_threads=3, pca_seed=2020)
 model.fit(current_adata.X, batches=current_adata.obs['sample'].values)
 current_genes = current_adata.var_names[model.get_mask()].tolist()
-save_file = save_dir + 'nGenes_' + str(len(current_genes)) + '_n_', str(args.n_samples_discard_blood) , '.txt'
+save_file = save_dir + 'nGenes_' + str(len(current_genes)) + '_n_' + str(args.n_samples_discard_blood) , '.txt'
 with open(save_file, 'w') as f:
     for item in current_genes:
         f.write("%s\n" % item)
