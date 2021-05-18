@@ -131,6 +131,9 @@ get_gene_score_stat = function(stat , nPC){
       if (is.null(nPC)){
         current.stat$nPC = "all"
       }
+      else {
+        current.stat$nPC = nPC
+      }
       current.stat$type = names(current.genes)[j]
       current.stat$n_genes = length(current.genes[[j]])
       return(current.stat)
@@ -139,7 +142,7 @@ get_gene_score_stat = function(stat , nPC){
     return(stat.per_n_genes)
   }, BPPARAM = mcparam)
   gene_score_stat = do.call(rbind , gene_score_stat)
-  return(cell_score_stat)
+  return(gene_score_stat)
 }
 
 
@@ -158,8 +161,8 @@ genes = lapply(1:length(genes_scmer_batched) , function(i){
   return(out)
 })
 
-stat_scmer_batched.nPC_50 = get_cell_score_stat(genes , nPC = 50)
-stat_scmer_batched.nPC_all = get_cell_score_stat(genes , nPC = NULL)
+stat_scmer_batched.nPC_50 = get_gene_score_stat(genes , nPC = 50)
+stat_scmer_batched.nPC_all = get_gene_score_stat(genes , nPC = NULL)
 stat_scmer_batched = rbind(stat_scmer_batched.nPC_50 , stat_scmer_batched.nPC_all)
 saveRDS(stat_scmer_batched , file = paste0(root.dir , "data/benchmark/gene_score/" , system , "/gene_score__scmer_batched.Rds"))
 
@@ -179,8 +182,8 @@ genes = lapply(1:length(genes_scmer_unbatched) , function(i){
   return(out)
 })
 
-stat_scmer_unbatched.nPC_50 = get_cell_score_stat(genes , nPC = 50)
-stat_scmer_unbatched.nPC_all = get_cell_score_stat(genes , nPC = NULL)
+stat_scmer_unbatched.nPC_50 = get_gene_score_stat(genes , nPC = 50)
+stat_scmer_unbatched.nPC_all = get_gene_score_stat(genes , nPC = NULL)
 stat_scmer_unbatched = rbind(stat_scmer_unbatched.nPC_50 , stat_scmer_unbatched.nPC_all)
 saveRDS(stat_scmer_unbatched , file = paste0(root.dir , "data/benchmark/gene_score/" , system , "/gene_score__scmer_unbatched.Rds"))
 
@@ -199,8 +202,8 @@ genes = lapply(1:length(genes_scgenefit) , function(i){
   return(out)
 })
 
-stat_scgenefit.nPC_50 = get_cell_score_stat(genes , nPC = 50)
-stat_scgenefit.nPC_all = get_cell_score_stat(genes , nPC = NULL)
+stat_scgenefit.nPC_50 = get_gene_score_stat(genes , nPC = 50)
+stat_scgenefit.nPC_all = get_gene_score_stat(genes , nPC = NULL)
 stat_scgenefit = rbind(stat_scgenefit.nPC_50 , stat_scgenefit.nPC_all)
 saveRDS(stat_scgenefit , file = paste0(root.dir , "data/benchmark/gene_score/" , system , "/gene_score__scgenefit.Rds"))
 
