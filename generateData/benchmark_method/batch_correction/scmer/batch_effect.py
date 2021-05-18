@@ -25,7 +25,7 @@ root_dir = '/nfs/research1/marioni/alsu/geneBasis/data/'
 
 adata = sc.read_h5ad(root_dir + 'scRNA_datasets/' + system + '/sce_' + system + '.h5ad')
 samples = adata.obs["sample"].unique()
-
+samples_list = samples.tolist()
 celltypes_2retract = ["Erythroid1" , "Erythroid2" , "Erythroid3" , "Blood progenitors 1" , "Blood progenitors 2"]
 
 save_dir = root_dir + 'gene_selection_batch_effect/' + system + '/scmer/'
