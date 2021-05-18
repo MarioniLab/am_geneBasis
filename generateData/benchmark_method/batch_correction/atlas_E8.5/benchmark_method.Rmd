@@ -1,0 +1,91 @@
+---
+title: "Pipeline to see whether batch correcting selects imbalanced sample"
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+# Load dependencies
+
+```{r load, message = FALSE}
+
+
+library(SingleCellExperiment)
+library(batchelor)
+library(stats)
+library(BiocNeighbors)
+library(tibble)
+library(reshape2)
+library(plyr)
+library(dplyr)
+library(scran)
+library(batchelor)
+library(stringr)
+library(BiocSingular)
+library(BiocParallel)
+library(SingleCellExperiment)
+library(BiocStyle)
+ncores = 5
+mcparam = MulticoreParam(workers = ncores)
+register(mcparam)
+set.seed(32)
+
+#root.dir = "/Users/alsu/Develop/geneBasis/"
+root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
+source(paste0(root.dir, "am_geneBasis/functions/main_functions.R"))
+
+system = "atlas_E8.5"
+
+# read sce 
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+# reduce search - discard obviously uninteresting genes
+sce = retain_only_hvgs(sce, n = 10000, var.thresh = 0)
+  
+# discard mitochondrial
+rownames.sce = rowData(sce)[,2]
+idx = which(!grepl("mt-" , rownames.sce) & !grepl("MT-" , rownames.sce) & !grepl("Mt-" , rownames.sce))
+sce = sce[idx,]
+
+  
+```
+
+# Get gene selections
+
+
+```{r read-selection-gene-basis, message = FALSE}
+
+
+celltypes.2retract = c("Erythroid1" , "Erythroid2" , "Erythroid3" , "Blood progenitors 1" , "Blood progenitors 2")
+samples = unique(sce$sample)
+
+
+n_genes_total = 100
+genes = bplapply(0:length(samples), function(i){
+  updated_sce = lapply(samples , function(sample){
+    idx = which(sample == samples)
+    if (idx <= i){
+      current.sce = sce[, sce$sample == sample & !sce$celltype %in% celltypes.2retract]
+    }
+    else {
+      current.sce = sce[, sce$sample == sample]
+    }
+    return(current.sce)
+  })
+  updated_sce = do.call(cbind , updated_sce)
+  
+  current.genes = gene_search(updated_sce , genes_base = NULL, n_genes_total = n_genes_total, batch = "sample", n.neigh = 5, p = 3, K = 5, nPC = NULL)
+  saveRDS(current.genes , paste0(root.dir , "data/gene_selection_batch_effect/" , system , "/" , "gene_selection_", i, ".Rds"))
+  return(NULL)
+})
+
+
+```
+
+
+
+# Session Info
+
+```{r sessinf}
+sessionInfo()
+```
