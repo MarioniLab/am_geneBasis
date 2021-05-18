@@ -75,7 +75,7 @@ genes = bplapply(0:length(samples), function(i){
   updated_sce = do.call(cbind , updated_sce)
   
   current.genes = gene_search(updated_sce , genes_base = NULL, n_genes_total = n_genes_total, batch = "sample", n.neigh = 5, p = 3, K = 5, nPC = NULL)
-  saveRDS(current.genes , paste0(root.dir , "data/gene_selection_batch_effect/" , system , "/" , "gene_selection_", i, ".Rds"))
+  saveRDS(current.genes , paste0(root.dir , "data/gene_selection__batch_effect/" , system , "/" , "gene_selection_", i, ".Rds"))
   return(NULL)
 })
 
