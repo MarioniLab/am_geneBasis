@@ -129,12 +129,12 @@ genes_scmer_unbatched_updated = lapply(n_genes , function(str){
 
 option = "centers"
 
-scgenefit_centers.files = list.files(path = paste0( root.dir , "data/scGeneFit_res/" , system , "/" , option , "/" ))
-n_genes = sapply(scgenefit_centers.files , function(str) str_replace_all(str,  ".txt" , ""))
-n_genes = sapply(n_genes , function(str) str_replace_all(str,  "nGenes_" , ""))
-n_genes = sort(as.numeric(n_genes))
+# scgenefit_centers.files = list.files(path = paste0( root.dir , "data/scGeneFit_res/" , system , "/" , option , "/" ))
+# n_genes = sapply(scgenefit_centers.files , function(str) str_replace_all(str,  ".txt" , ""))
+# n_genes = sapply(n_genes , function(str) str_replace_all(str,  "nGenes_" , ""))
+# n_genes = sort(as.numeric(n_genes))
 
-n_genes = seq(20,240,20)
+n_genes = seq(10,250,20)
 genes_scgenefit = lapply(n_genes , function(str){
   out = read.table(paste0( root.dir , "data/scGeneFit_res/" , system , "/" , option , "/nGenes_" , str , ".txt") , header = F)
   genes = out$V1
