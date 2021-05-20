@@ -249,7 +249,7 @@ saveRDS(stat_scmer_unbatched , file = paste0(root.dir , "data/benchmark/gene_sco
 
 ## Alsu VS scmer-unbatched - updated
 
-```{r score-vs-scmer-batched-updated, message = FALSE}
+```{r score-vs-scmer-unbatched-updated, message = FALSE}
 
 
 genes = lapply(1:length(genes_scmer_unbatched_updated) , function(i){
