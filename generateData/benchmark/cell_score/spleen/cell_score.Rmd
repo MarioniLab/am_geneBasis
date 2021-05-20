@@ -45,7 +45,6 @@ sce$cell = colnames(sce)
 ```
 
 
-
 # Get gene selections
 
 ## geneBasis
@@ -82,6 +81,38 @@ n_genes = sort(as.numeric(n_genes))
 
 genes_scmer_unbatched = lapply(n_genes , function(str){
   out = read.table(paste0( root.dir , "data/scmer_res_selected/" , system , "/unbatched/nGenes_" , str , ".txt") , header = F)
+  genes = out$V1
+  return(genes)
+})
+
+
+```
+
+## SCMER - on wider search grid
+
+```{r read-selection-scmer-updated, message = FALSE}
+
+
+# batched
+scmer_batched.files = list.files(path = paste0( root.dir , "data/scmer_res_selected/" , system , "_higher_mean/batched/" ))
+n_genes = sapply(scmer_batched.files , function(str) str_replace_all(str,  ".txt" , ""))
+n_genes = sapply(n_genes , function(str) str_replace_all(str,  "nGenes_" , ""))
+n_genes = sort(as.numeric(n_genes))
+
+genes_scmer_batched_updated = lapply(n_genes , function(str){
+  out = read.table(paste0( root.dir , "data/scmer_res_selected/" , system , "_higher_mean/batched/nGenes_" , str , ".txt") , header = F)
+  genes = out$V1
+  return(genes)
+})
+
+# unbatched
+scmer_unbatched.files = list.files(path = paste0( root.dir , "data/scmer_res_selected/" , system , "_higher_mean/unbatched/" ))
+n_genes = sapply(scmer_unbatched.files , function(str) str_replace_all(str,  ".txt" , ""))
+n_genes = sapply(n_genes , function(str) str_replace_all(str,  "nGenes_" , ""))
+n_genes = sort(as.numeric(n_genes))
+
+genes_scmer_unbatched_updated = lapply(n_genes , function(str){
+  out = read.table(paste0( root.dir , "data/scmer_res_selected/" , system , "_higher_mean/unbatched/nGenes_" , str , ".txt") , header = F)
   genes = out$V1
   return(genes)
 })
@@ -162,10 +193,33 @@ genes = lapply(1:length(genes_scmer_batched) , function(i){
 stat_scmer_batched.nPC_50 = get_cell_score_stat(genes , nPC = 50)
 stat_scmer_batched.nPC_all = get_cell_score_stat(genes , nPC = NULL)
 stat_scmer_batched = rbind(stat_scmer_batched.nPC_50 , stat_scmer_batched.nPC_all)
+stat_scmer_batched$type = factor(stat_scmer_batched$type, levels = c("geneBasis" , "SCMER" , "hvgs"))
 saveRDS(stat_scmer_batched , file = paste0(root.dir , "data/benchmark/cell_score/" , system , "/cell_score__scmer_batched.Rds"))
 
 
 ```
+
+## Alsu VS scmer-batched - updated
+
+```{r score-vs-scmer-batched-updated, message = FALSE}
+
+
+genes = lapply(1:length(genes_scmer_batched_updated) , function(i){
+  current.genes_scmer = genes_scmer_batched_updated[[i]]
+  n_genes = length(current.genes_scmer)
+  out = list("geneBasis" = as.character(genes_alsu[1:n_genes]) , "SCMER" = as.character(current.genes_scmer) , "hvgs" = as.character(get_hvgs(sce,n=n_genes)))
+  return(out)
+})
+
+stat_scmer_batched.nPC_50 = get_cell_score_stat(genes , nPC = 50)
+stat_scmer_batched.nPC_all = get_cell_score_stat(genes , nPC = NULL)
+stat_scmer_batched = rbind(stat_scmer_batched.nPC_50 , stat_scmer_batched.nPC_all)
+stat_scmer_batched$type = factor(stat_scmer_batched$type, levels = c("geneBasis" , "SCMER" , "hvgs"))
+saveRDS(stat_scmer_batched , file = paste0(root.dir , "data/benchmark/cell_score/" , system , "/cell_score__scmer_batched_updated.Rds"))
+
+
+```
+
 
 ## Alsu VS scmer-unbatched
 
@@ -175,17 +229,40 @@ saveRDS(stat_scmer_batched , file = paste0(root.dir , "data/benchmark/cell_score
 genes = lapply(1:length(genes_scmer_unbatched) , function(i){
   current.genes_scmer = genes_scmer_unbatched[[i]]
   n_genes = length(current.genes_scmer)
-  out = list("alsu" = as.character(genes_alsu[1:n_genes]) , "scmer_batched" = as.character(current.genes_scmer) , "hvgs" = as.character(get_hvgs(sce,n=n_genes)))
+  out = list("geneBasis" = as.character(genes_alsu[1:n_genes]) , "SCMER" = as.character(current.genes_scmer) , "hvgs" = as.character(get_hvgs(sce,n=n_genes)))
   return(out)
 })
 
 stat_scmer_unbatched.nPC_50 = get_cell_score_stat(genes , nPC = 50)
 stat_scmer_unbatched.nPC_all = get_cell_score_stat(genes , nPC = NULL)
 stat_scmer_unbatched = rbind(stat_scmer_unbatched.nPC_50 , stat_scmer_unbatched.nPC_all)
+stat_scmer_unbatched$type = factor(stat_scmer_unbatched$type, levels = c("geneBasis" , "SCMER" , "hvgs"))
 saveRDS(stat_scmer_unbatched , file = paste0(root.dir , "data/benchmark/cell_score/" , system , "/cell_score__scmer_unbatched.Rds"))
 
 
 ```
+
+## Alsu VS scmer-unbatched - updated
+
+```{r score-vs-scmer-unbatched-updated, message = FALSE}
+
+
+genes = lapply(1:length(genes_scmer_unbatched_updated) , function(i){
+  current.genes_scmer = genes_scmer_unbatched_updated[[i]]
+  n_genes = length(current.genes_scmer)
+  out = list("geneBasis" = as.character(genes_alsu[1:n_genes]) , "SCMER" = as.character(current.genes_scmer) , "hvgs" = as.character(get_hvgs(sce,n=n_genes)))
+  return(out)
+})
+
+stat_scmer_unbatched.nPC_50 = get_cell_score_stat(genes , nPC = 50)
+stat_scmer_unbatched.nPC_all = get_cell_score_stat(genes , nPC = NULL)
+stat_scmer_unbatched = rbind(stat_scmer_unbatched.nPC_50 , stat_scmer_unbatched.nPC_all)
+stat_scmer_unbatched$type = factor(stat_scmer_unbatched$type, levels = c("geneBasis" , "SCMER" , "hvgs"))
+saveRDS(stat_scmer_unbatched , file = paste0(root.dir , "data/benchmark/cell_score/" , system , "/cell_score__scmer_unbatched_updated.Rds"))
+
+
+```
+
 
 ## Alsu VS scGeneFit
 
@@ -195,7 +272,7 @@ saveRDS(stat_scmer_unbatched , file = paste0(root.dir , "data/benchmark/cell_sco
 genes = lapply(1:length(genes_scgenefit) , function(i){
   current.genes_scgenefit = genes_scgenefit[[i]]
   n_genes = length(current.genes_scgenefit)
-  out = list("alsu" = as.character(genes_alsu[1:n_genes]) , "scgenefit" = as.character(current.genes_scgenefit) , "hvgs" = as.character(get_hvgs(sce , n_genes)), "random" = sample(rownames(sce) , n_genes))
+  out = list("geneBasis" = as.character(genes_alsu[1:n_genes]) , "scgenefit" = as.character(current.genes_scgenefit) , "hvgs" = as.character(get_hvgs(sce , n_genes)))
   return(out)
 })
 
@@ -203,6 +280,7 @@ genes = lapply(1:length(genes_scgenefit) , function(i){
 stat_scgenefit.nPC_50 = get_cell_score_stat(genes , nPC = 50)
 stat_scgenefit.nPC_all = get_cell_score_stat(genes , nPC = NULL)
 stat_scgenefit = rbind(stat_scgenefit.nPC_50 , stat_scgenefit.nPC_all)
+stat_scgenefit$type = factor(stat_scgenefit$type, levels = c("geneBasis" , "scgenefit" , "hvgs"))
 saveRDS(stat_scgenefit , file = paste0(root.dir , "data/benchmark/cell_score/" , system , "/cell_score__scgenefit.Rds"))
 
 
