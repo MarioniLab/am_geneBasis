@@ -94,11 +94,13 @@ genes_scmer_unbatched = lapply(n_genes , function(str){
 
 
 option = "centers"
+# 
+# scgenefit_centers.files = list.files(path = paste0( root.dir , "data/scGeneFit_res/" , system , "/" , option , "/" ))
+# n_genes = sapply(scgenefit_centers.files , function(str) str_replace_all(str,  ".txt" , ""))
+# n_genes = sapply(n_genes , function(str) str_replace_all(str,  "nGenes_" , ""))
+# n_genes = sort(as.numeric(n_genes))
 
-scgenefit_centers.files = list.files(path = paste0( root.dir , "data/scGeneFit_res/" , system , "/" , option , "/" ))
-n_genes = sapply(scgenefit_centers.files , function(str) str_replace_all(str,  ".txt" , ""))
-n_genes = sapply(n_genes , function(str) str_replace_all(str,  "nGenes_" , ""))
-n_genes = sort(as.numeric(n_genes))
+n_genes = seq(10,250,20)
 
 genes_scgenefit = lapply(n_genes , function(str){
   out = read.table(paste0( root.dir , "data/scGeneFit_res/" , system , "/" , option , "/nGenes_" , str , ".txt") , header = F)
@@ -114,12 +116,11 @@ genes_scgenefit = lapply(n_genes , function(str){
 ```{r celltype-mapping, message = FALSE}
 
 
-markers = get_markers(sce , test = "binom" , type = "some")
+markers = suppressWarnings(get_markers(sce , test = "binom" , type = "some"))
 
-
-get_celltypes_stat = function(sce , genes , batch = "sample", n.neigh = 5, option = "all"){
+get_celltypes_stat_single_id = function(sce , genes , batch = "sample", n.neigh = 5, option = "all"){
   if (option == "markers"){
-    genes = genes[genes %in% markers$gene]
+    genes = genes[genes %in% unique(markers$gene)]
   }
   if (length(genes) > 1){
     nPC = 50
@@ -140,6 +141,26 @@ get_celltypes_stat = function(sce , genes , batch = "sample", n.neigh = 5, optio
   }
 }
 
+get_celltypes_stat = function(genes , option){
+  celltype_stat = bplapply(c(1:length(genes)) , function(i){
+    current.genes = genes[[i]]
+    print(length(current.genes))
+    stat.per_n_genes = lapply(1:length(current.genes) , function(j){
+      current.stat = suppressWarnings( get_celltypes_stat_single_id(sce , genes = current.genes[[j]] , batch = "sample" ,n.neigh = 5 , option = option) )
+      current.stat$option = option
+      current.stat$type = names(current.genes)[j]
+      current.stat$n_genes = length(current.genes[[j]])
+      return(current.stat)
+    })
+    stat.per_n_genes = do.call(rbind , stat.per_n_genes)
+    return(stat.per_n_genes)
+  }, BPPARAM = mcparam)
+  celltype_stat = do.call(rbind , celltype_stat)
+  return(celltype_stat)
+}
+
+
+
 
 ```
 
@@ -156,30 +177,10 @@ genes = lapply(1:length(genes_scmer_batched) , function(i){
 })
 
 
-stat_scmer_batched = lapply(c(1:length(genes)) , function(i){
-  current.genes = genes[[i]]
-   stat.per_n_genes = lapply(1:length(current.genes) , function(j){
-    current.stat.all = suppressWarnings( get_celltypes_stat(sce , current.genes[[j]] , batch = "sample", n.neigh = 10 , option = "all") )
-    if (!is.null(current.stat.all)){
-      current.stat.all$type = names(current.genes)[j]
-      current.stat.all$n_genes = length(current.genes[[j]])
-      current.stat.all$option = "all"
-    }
-    current.stat.markers = suppressWarnings( get_celltypes_stat(sce , current.genes[[j]] , batch = "sample", n.neigh = 10 , option = "markers") )
-    if (!is.null(current.stat.markers)){
-      
-      current.stat.markers$type = names(current.genes)[j]
-      current.stat.markers$n_genes = length(current.genes[[j]])
-      current.stat.markers$option = "markers"
-    }
-    current.stat = rbind(current.stat.all , current.stat.markers)
-    
-    return(current.stat)
-  })
-  stat.per_n_genes = do.call(rbind , stat.per_n_genes)
-  return(stat.per_n_genes)
-})
-stat_scmer_batched = do.call(rbind , stat_scmer_batched)
+stat_scmer_batched.all = get_celltypes_stat(genes , option = "all")
+stat_scmer_batched.markers = get_celltypes_stat(genes , option = "markers")
+stat_scmer_batched = rbind(stat_scmer_batched.all , stat_scmer_batched.markers)
+stat_scmer_batched$type = factor(stat_scmer_batched$type, levels = c("geneBasis" , "SCMER" , "hvgs"))
 saveRDS(stat_scmer_batched , file = paste0(root.dir , "data/benchmark/celltype_classic/" , system , "/celltype_classic__scmer_batched.Rds"))
 
 
@@ -197,30 +198,10 @@ genes = lapply(1:length(genes_scmer_unbatched) , function(i){
   return(out)
 })
 
-stat_scmer_unbatched = lapply(c(1:length(genes)) , function(i){
-  current.genes = genes[[i]]
-   stat.per_n_genes = lapply(1:length(current.genes) , function(j){
-    current.stat.all = suppressWarnings( get_celltypes_stat(sce , current.genes[[j]] , batch = "sample", n.neigh = 10 , option = "all") )
-    if (!is.null(current.stat.all)){
-      current.stat.all$type = names(current.genes)[j]
-      current.stat.all$n_genes = length(current.genes[[j]])
-      current.stat.all$option = "all"
-    }
-    current.stat.markers = suppressWarnings( get_celltypes_stat(sce , current.genes[[j]] , batch = "sample", n.neigh = 10 , option = "markers") )
-    if (!is.null(current.stat.markers)){
-      
-      current.stat.markers$type = names(current.genes)[j]
-      current.stat.markers$n_genes = length(current.genes[[j]])
-      current.stat.markers$option = "markers"
-    }
-    current.stat = rbind(current.stat.all , current.stat.markers)
-    
-    return(current.stat)
-  })
-  stat.per_n_genes = do.call(rbind , stat.per_n_genes)
-  return(stat.per_n_genes)
-})
-stat_scmer_unbatched = do.call(rbind , stat_scmer_unbatched)
+stat_scmer_unbatched.all = get_celltypes_stat(genes , option = "all")
+stat_scmer_unbatched.markers = get_celltypes_stat(genes , option = "markers")
+stat_scmer_unbatched = rbind(stat_scmer_unbatched.all , stat_scmer_unbatched.markers)
+stat_scmer_unbatched$type = factor(stat_scmer_unbatched$type, levels = c("geneBasis" , "SCMER" , "hvgs"))
 saveRDS(stat_scmer_unbatched , file = paste0(root.dir , "data/benchmark/celltype_classic/" , system , "/celltype_classic__scmer_unbatched.Rds"))
 
 
@@ -234,34 +215,14 @@ saveRDS(stat_scmer_unbatched , file = paste0(root.dir , "data/benchmark/celltype
 genes = lapply(1:length(genes_scgenefit) , function(i){
   current.genes_scgenefit = genes_scgenefit[[i]]
   n_genes = length(current.genes_scgenefit)
-  out = list("alsu" = as.character(genes_alsu[1:n_genes]) , "scgenefit" = as.character(current.genes_scgenefit), "hvgs" = as.character(get_hvgs(sce , n_genes)) , "random" = sample(rownames(sce) , n_genes))
+  out = list("geneBasis" = as.character(genes_alsu[1:n_genes]) , "scgenefit" = as.character(current.genes_scgenefit), "hvgs" = as.character(get_hvgs(sce , n_genes)) )
   return(out)
 })
 
-stat_scgenefit = lapply(c(1:length(genes)) , function(i){
-  current.genes = genes[[i]]
- stat.per_n_genes = lapply(1:length(current.genes) , function(j){
-    current.stat.all = suppressWarnings( get_celltypes_stat(sce , current.genes[[j]] , batch = "sample", n.neigh = 10 , option = "all") )
-    if (!is.null(current.stat.all)){
-      current.stat.all$type = names(current.genes)[j]
-      current.stat.all$n_genes = length(current.genes[[j]])
-      current.stat.all$option = "all"
-    }
-    current.stat.markers = suppressWarnings( get_celltypes_stat(sce , current.genes[[j]] , batch = "sample", n.neigh = 10 , option = "markers") )
-    if (!is.null(current.stat.markers)){
-      
-      current.stat.markers$type = names(current.genes)[j]
-      current.stat.markers$n_genes = length(current.genes[[j]])
-      current.stat.markers$option = "markers"
-    }
-    current.stat = rbind(current.stat.all , current.stat.markers)
-    
-    return(current.stat)
-  })
-  stat.per_n_genes = do.call(rbind , stat.per_n_genes)
-  return(stat.per_n_genes)
-})
-stat_scgenefit = do.call(rbind , stat_scgenefit)
+stat_scgenefit.all = get_celltypes_stat(genes , option = "all")
+stat_scgenefit.markers = get_celltypes_stat(genes , option = "markers")
+stat_scgenefit = rbind(stat_scgenefit.all , stat_scgenefit.markers)
+stat_scgenefit$type = factor(stat_scgenefit$type, levels = c("geneBasis" , "SCMER" , "hvgs"))
 saveRDS(stat_scgenefit , file = paste0(root.dir , "data/benchmark/celltype_classic/" , system , "/celltype_classic__scgenefit.Rds"))
 
 
