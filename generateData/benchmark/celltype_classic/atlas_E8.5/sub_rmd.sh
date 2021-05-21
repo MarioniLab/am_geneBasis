@@ -8,10 +8,10 @@ err_folder=${my_folder}/clust_err/geneBasis
 script_name=ct_emb
 #CHOOSE PARAMETERS
 #RAM in megabytes
-memory=200000
+memory=300000
 r_command="rusage[mem=${memory}]"
 #num_processors
-nproc=1
+nproc=6
 
 smg=/nfs/research1/marioni/alsu/singularity/R1.simg
 script=/nfs/research1/marioni/alsu/geneBasis/am_geneBasis/generateData/benchmark/celltype_classic/atlas_E8.5/run_rmd.R

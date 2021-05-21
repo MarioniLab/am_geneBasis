@@ -171,7 +171,7 @@ get_celltypes_stat = function(genes , option){
 genes = lapply(1:length(genes_scmer_batched) , function(i){
   current.genes_scmer = genes_scmer_batched[[i]]
   n_genes = length(current.genes_scmer)
-  out = list("alsu" = as.character(genes_alsu[1:n_genes]) , "scmer_batched" = as.character(current.genes_scmer), "hvgs" = as.character(get_hvgs(sce , n_genes)) , "random" = sample(rownames(sce) , n_genes))
+  out = list("geneBasis" = as.character(genes_alsu[1:n_genes]) , "SCMER" = as.character(current.genes_scmer), "hvgs" = as.character(get_hvgs(sce , n_genes)) )
   return(out)
 })
 
@@ -193,7 +193,7 @@ saveRDS(stat_scmer_batched , file = paste0(root.dir , "data/benchmark/celltype_c
 genes = lapply(1:length(genes_scmer_unbatched) , function(i){
   current.genes_scmer = genes_scmer_unbatched[[i]]
   n_genes = length(current.genes_scmer)
-  out = list("alsu" = as.character(genes_alsu[1:n_genes]) , "scmer_batched" = as.character(current.genes_scmer), "hvgs" = as.character(get_hvgs(sce , n_genes)) , "random" = sample(rownames(sce) , n_genes))
+  out = list("geneBasis" = as.character(genes_alsu[1:n_genes]) , "SCMER" = as.character(current.genes_scmer), "hvgs" = as.character(get_hvgs(sce , n_genes)) )
   return(out)
 })
 
@@ -221,7 +221,7 @@ genes = lapply(1:length(genes_scgenefit) , function(i){
 stat_scgenefit.all = get_celltypes_stat(genes , option = "all")
 stat_scgenefit.markers = get_celltypes_stat(genes , option = "markers")
 stat_scgenefit = rbind(stat_scgenefit.all , stat_scgenefit.markers)
-stat_scgenefit$type = factor(stat_scgenefit$type, levels = c("geneBasis" , "SCMER" , "hvgs"))
+stat_scgenefit$type = factor(stat_scgenefit$type, levels = c("geneBasis" , "scgenefit" , "hvgs"))
 saveRDS(stat_scgenefit , file = paste0(root.dir , "data/benchmark/celltype_classic/" , system , "/celltype_classic__scgenefit.Rds"))
 
 
