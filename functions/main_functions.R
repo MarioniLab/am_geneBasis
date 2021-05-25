@@ -46,8 +46,10 @@ get_hvgs = function(sce, n = NULL, var.thresh = 0){
   require(scran)
   dec.sce = scran::modelGeneVar(sce)
   hvg.genes = scran::getTopHVGs(dec.sce, var.threshold = var.thresh)
-  if (!is.null(n) & n < length(hvg.genes)){
-    hvg.genes = scran::getTopHVGs(dec.sce, n = n)
+  if (!is.null(n)){
+    if (n < length(hvg.genes)){
+      hvg.genes = scran::getTopHVGs(dec.sce, n = n)
+    }
   }
   return(hvg.genes)
 }
@@ -336,11 +338,13 @@ add_first_gene = function(sce , stat_all, batch = NULL , n.neigh = 5, p = 3 , K 
 }
   
 
-gene_search = function(sce , genes_base = NULL, n_genes_total , batch = NULL, n.neigh = 5, p = 3, K = 5, nPC = NULL){
+gene_search = function(sce , genes_base = NULL, n_genes_total , batch = NULL, n.neigh = 5, p = 3, K = 5, nPC = NULL, stat_all = NULL){
   # get baseline stat-all
-  stat_all = suppressWarnings( get_lp_norm_dist(sce, genes = rownames(sce), batch = batch , n.neigh = n.neigh , nPC = 50 , 
-                                                genes.predict = rownames(sce) , p = p) )
-  colnames(stat_all) = c("gene" , "dist_all")
+  if (is.null(stat_all)){
+    stat_all = suppressWarnings( get_lp_norm_dist(sce, genes = rownames(sce), batch = batch , n.neigh = n.neigh , nPC = 50 , 
+                                                  genes.predict = rownames(sce) , p = p) )
+    colnames(stat_all) = c("gene" , "dist_all")
+  }
   
   # add first gene if selection is empty
   if (is.null(genes_base)){
