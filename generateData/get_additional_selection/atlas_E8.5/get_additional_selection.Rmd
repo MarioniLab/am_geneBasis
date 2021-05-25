@@ -1,0 +1,141 @@
+---
+title: "Gene selection."
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+
+#Introduction & method
+
+
+```{r load, message = FALSE}
+# load libraries we are going to use
+
+library(Matrix)
+library(scran)
+library(scater)
+library(batchelor)
+library(knitr)
+library(reshape2)
+library(edgeR)
+library(ggplot2)
+library(BiocSingular)
+library(BiocParallel)
+library(BiocNeighbors)
+library(SingleCellExperiment)
+library(dplyr)
+library(BiocStyle)
+library(stats)
+ncores = 5
+mcparam = MulticoreParam(workers = ncores)
+register(mcparam)
+set.seed(32)
+
+root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
+source(paste0(root.dir , "am_geneBasis/functions/main_functions.R"))
+
+system = "atlas_E8.5"
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+
+# reduce search - discard obviously uninteresting genes
+sce = retain_only_hvgs(sce, n = 10000, var.thresh = 0)
+  
+# discard mitochondrial
+rownames.sce = rowData(sce)[,2]
+idx = which(!grepl("mt-" , rownames.sce) & !grepl("MT-" , rownames.sce) & !grepl("Mt-" , rownames.sce))
+sce = sce[idx,]
+
+
+```
+
+# Get initial selections
+
+```{r get-initial-selections, message = FALSE}
+
+
+markers = get_markers(sce , test = "t" , type = "some")
+k = 20
+initial_selections = lapply(1:k , function(i){
+  celltypes_2.profile = sample(unique(markers$celltype) , round(length(unique(markers$celltype))/2))
+  genes = lapply(celltypes_2.profile , function(celltype){
+    current.gene = sample( as.character(markers$gene[markers$celltype == celltype]) , 1)
+    return(current.gene)
+  })
+  out = list(celltype = celltypes_2.profile, gene = unlist(genes) , n_genes = length(unique(unlist(genes))))
+  return(out)
+})
+saveRDS(initial_selections , file = paste0(root.dir , "data/additional_selections/" , system , "/initial_selections.Rds"))
+
+
+```
+
+# Add missing genes
+
+```{r add-missing-selections, message = FALSE}
+
+
+stat_all = suppressWarnings( get_lp_norm_dist(sce, genes = rownames(sce), batch = "sample" , n.neigh = 5 , nPC = 50 , 
+                                                genes.predict = rownames(sce) , p = 3) )
+colnames(stat_all) = c("gene" , "dist_all")
+
+
+additional_selections = bplapply(1:k, function(i){
+  current.genes = gene_search(sce , genes_base = as.character(unique(initial_selections[[i]]$gene)), n_genes_total = 50, batch = "sample" , stat_all = stat_all)
+  return(current.genes)
+}, BPPARAM = mcparam)
+saveRDS(additional_selections , file = paste0(root.dir , "data/additional_selections/" , system , "/additional_selections.Rds"))
+
+
+```
+
+# Get celltype mappings using the selections
+
+```{r get-mappings, message = FALSE}
+
+
+
+get_celltypes_stat = function(sce , genes , batch = "sample", n.neigh = 5){
+  nPC = 50
+  neighs = suppressWarnings( get_mapping(sce , genes = genes, batch = batch, n.neigh = n.neigh, nPC = nPC , get.dist = F , type = "together"))
+  if (!is.null(neighs)){
+    meta = as.data.frame(colData(sce))
+    current.mapping = data.frame(cell = rownames(neighs) ,
+                                 celltype = sapply(1:nrow(neighs) , function(i) meta$celltype[meta$cell == rownames(neighs)[i]]) ,
+                                 mapped_celltype = sapply(1:nrow(neighs), function(i) getmode(meta$celltype[match(neighs[i,] , meta$cell)] , 1:n.neigh) ))
+    return(current.mapping)
+  }
+  else {
+    return(NULL)
+  }
+}
+
+
+mappings = bplapply(1:k , function(i){
+  current.genes = additional_selections[[i]]
+  n_genes.start = initial_selections[[i]]$n_genes
+  n_genes.grid = c(n_genes.start:50)
+  
+  mappings_per_selection = lapply(n_genes.grid , function(n_genes){
+    current.mapping = get_celltypes_stat(sce, genes = as.character( current.genes[1:n_genes]) , batch = "sample")
+    current.mapping$n_genes = n_genes
+    current.mapping$id = i
+    return(current.mapping)
+  })
+  mappings_per_selection = do.call(rbind , mappings_per_selection)
+  return(mappings_per_selection)
+}, BPPARAM = mcparam)
+mappings = do.call(rbind, mappings)
+
+saveRDS(additional_selections , file = paste0(root.dir , "data/additional_selections/" , system , "/mappings.Rds"))
+
+
+```
+
+
+#Session Info
+
+```{r sessinf}
+sessionInfo()
+```
