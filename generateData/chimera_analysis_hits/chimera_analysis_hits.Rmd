@@ -41,14 +41,20 @@ source(paste0(root.dir, "am_geneBasis/functions/visualization_functions.R"))
 
 # read sce 
 system = "atlas_E8.5"
+print("1")
 sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
 rownames(sce) = rowData(sce)[,2]
-
+print("2")
 # add rowdata w normal gene names
 rowdata = as.data.frame(rowData(sce))
 colnames(rowdata) = c("gene" , "gene_symbol")
-print("1")
+print("3")
 
+```
+
+# check
+
+```{r co-expr-hits, message = FALSE}
 # read gene selection
 genes_atlas_E8.5 = readRDS(paste0(root.dir , "data/gene_selection/" , "atlas_E8.5" , "/gene_selection.Rds"))
 genes_atlas_E8.5 = merge(genes_atlas_E8.5 , rowdata )
