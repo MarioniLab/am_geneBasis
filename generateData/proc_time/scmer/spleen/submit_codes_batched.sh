@@ -16,16 +16,16 @@ memory=120000
 
 n_samples_init=(1 2 3 4 5 6)
 min_disp=(0 0.25 0.5)
-n_threads=(1 3 6 9)
+n_threads=9
 lambdas=(0.0002 0.0004 0.0006 0.0008 0.001 0.0015 0.002 0.0025 0.003)
 
-for n_samples in 6
+for n_samples in 1 2 3 4 5 6
 do
-	for min_disp in 0
+	for min_disp in 0.5 0.25 0
 	do
 		for n_threads in 9
 		do
-			for lambda in 0.0002
+			for lambda in 0.0001 0.00015 0.0002 0.00025 0.0003 0.00035 0.0005 0.0007
 			do
 				script_name=proc_scmer_spl_bat
 				bsub -e ${err_folder}/${script_name} \
