@@ -1,0 +1,156 @@
+---
+title: "Pipeline to choose metric (hopefully lol) for final gene selection."
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+
+* p.s. script is dirty and quick for one time run
+# Load dependencies
+
+```{r load, message = FALSE}
+
+
+library(SingleCellExperiment)
+library(ggplot2)
+library(ggpubr)
+library(viridis)
+library(wesanderson)
+library(igraph)
+library(batchelor)
+library(stats)
+library(BiocNeighbors)
+library(tibble)
+library(reshape2)
+library(plyr)
+library(dplyr)
+library(scran)
+library(batchelor)
+library(uwot)
+library(stringr)
+library(BiocSingular)
+library(scater)
+library(BiocParallel)
+library(dplyr)
+library(BiocStyle)
+ncores = 10
+mcparam = MulticoreParam(workers = ncores)
+register(mcparam)
+set.seed(32)
+
+
+#root.dir = "/Users/alsu/Develop/geneBasis/"
+root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
+source(paste0(root.dir, "am_geneBasis/functions/main_functions.R"))
+source(paste0(root.dir, "am_geneBasis/functions/visualization_functions.R"))
+
+figures.dir = paste0(root.dir , "figures/cell_state/" , "embryo_chimera", "/")
+
+# read sce 
+system = "atlas_E8.5"
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+rownames(sce) = rowData(sce)[,2]
+
+# add rowdata w normal gene names
+rowdata = as.data.frame(rowData(sce))
+colnames(rowdata) = c("gene" , "gene_symbol")
+
+get_selection_stat = function(system , bool = ""){
+  genes = readRDS(paste0(root.dir , "data/gene_selection/" , system , "/gene_selection" , bool , ".Rds"))
+  genes = merge(genes , rowdata )
+  genes = genes[, c( "gene_symbol" , "rank")]
+  colnames(genes) = c("gene" , "rank")
+  genes = genes[order(genes$rank) , ]
+}
+
+# read gene selections
+genes_atlas_E8.5 = get_selection_stat("atlas_E8.5")
+genes_WT_chimera_true = get_selection_stat("atlas_E8.5_chimera_WT" , "_TRUE")
+genes_WT_chimera_false = get_selection_stat("atlas_E8.5_chimera_WT" , "_FALSE")
+genes_tal1_chimera_true = get_selection_stat("atlas_E8.5_tal1" , "_TRUE")
+genes_tal1_chimera_false = get_selection_stat("atlas_E8.5_tal1" , "_FALSE")
+
+
+celltype_cols = celltype_colors[[which( names(celltype_colors) == "atlas_E8.5" )]]
+
+
+```
+
+
+# Compare selections
+
+## WT - VS - chimeras
+
+### In chimeras but not wt
+
+```{r load, message = FALSE}
+
+
+corr.thresh = 1
+
+genes = list("wt_chimera_false" = genes_WT_chimera_false , "wt_chimera_true" = genes_WT_chimera_true , "tal1_false" = genes_tal1_chimera_false , "tal1_true" = genes_tal1_chimera_true)
+stat = lapply(1:length(genes) , function(i){
+  current.genes = genes[[i]]
+  current.stat = compare_gene_selections(sce , current.genes , genes_atlas_E8.5 , corr.thresh = corr.thresh, rank.thresh = 250)
+  current.stat$id = names(genes)[i]
+  return(current.stat)
+})
+stat = do.call(rbind , stat)
+stat = stat[stat$rank <= 200 , ]
+
+
+corr.thresh = .5
+stat = stat[stat$corr <= corr.thresh , ]
+# select genes that pop in all 3
+tab = table(stat$gene)
+genes_consistent = names(tab)[tab >= 3]
+
+
+# find co-expressed genes for 
+systems = c("atlas_E8.5_chimera_WT" , "atlas_E8.5_tal1")
+corr_stat = lapply(systems , function(system){
+  sce_system = sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system  , ".Rds"))
+  stat_per_system = lapply(c(T,F) , function(bool){
+    current.sce = sce_system[, sce_system$tomato == bool]
+    rownames(current.sce) = rowData(current.sce)[,2]
+    current.sce = retain_only_hvgs(current.sce , n=10000)
+    
+    current.stat = lapply(genes_consistent , function(gene){
+      current.log = as.numeric(logcounts(current.sce[gene , ]))
+      out = bplapply(1:nrow(current.sce) , function(j){
+        return(data.frame(gene = rownames(current.sce)[j] , corr = cor(as.numeric(logcounts(current.sce[j , ])) , current.log)))
+      }, BPPARAM = mcparam)
+      out = do.call(rbind , out)
+      out = out[out$corr < 1 , ]
+      out = out[order(out$corr, decreasing = T) , ]
+      out$original.gene = current.gene
+      return(out[1:5,])
+    })
+    current.stat = do.call(rbind , current.stat)
+    current.stat$bool = bool
+    return(current.stat)
+  })
+  stat_per_system = do.call(rbind ,stat_per_system)
+  stat_per_system$system = system
+  return(stat_per_system)
+})
+corr_stat = do.call(rbind , corr_stat)
+saveRDS(corr_stat , file = paste0(root.dir , "data/chimera_stat/corr_stat_hits.Rds"))
+
+
+
+
+```
+
+
+
+
+
+
+# Session Info
+
+```{r sessinf}
+sessionInfo()
+```
