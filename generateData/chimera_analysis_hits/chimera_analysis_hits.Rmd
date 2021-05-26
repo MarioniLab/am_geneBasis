@@ -54,7 +54,7 @@ print("3")
 
 # check
 
-```{r co-expr-hits, message = FALSE}
+```{r check, message = FALSE}
 # read gene selection
 genes_atlas_E8.5 = readRDS(paste0(root.dir , "data/gene_selection/" , "atlas_E8.5" , "/gene_selection.Rds"))
 genes_atlas_E8.5 = merge(genes_atlas_E8.5 , rowdata )
