@@ -12,7 +12,7 @@ script_name=chim
 memory=200000
 r_command="rusage[mem=${memory}]"
 #num_processors
-nproc=10
+nproc=1
 
 smg=/nfs/research1/marioni/alsu/singularity/R1.simg
 script=/nfs/research1/marioni/alsu/geneBasis/am_geneBasis/generateData/chimera_analysis_hits/run_rmd.R
