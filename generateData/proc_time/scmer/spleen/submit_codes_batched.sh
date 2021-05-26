@@ -21,11 +21,11 @@ lambdas=(0.0002 0.0004 0.0006 0.0008 0.001 0.0015 0.002 0.0025 0.003)
 
 for n_samples in 6
 do
-	for min_disp in 0.5 0.25 0
+	for min_disp in 0
 	do
-		for n_threads in 6 9
+		for n_threads in 9
 		do
-			for lambda in 0.0004 0.0006 0.0008 0.001 0.0015 0.002 0.0025 0.003
+			for lambda in 0.0002
 			do
 				script_name=proc_scmer_spl_bat
 				bsub -e ${err_folder}/${script_name} \
