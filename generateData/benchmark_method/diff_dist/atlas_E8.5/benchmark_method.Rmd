@@ -76,10 +76,9 @@ neighs.all = get_z_scaled_distances(sce , genes.all = hvgs_10000 , batch = "samp
 get_cell_score_stat = function(genes){
   cell_score_stat = bplapply(c(1:length(genes)) , function(i){
     current.genes = genes[[i]]
-    print(length(current.genes))
     stat.per_n_genes = lapply(n_genes.grid , function(n_genes){
       current.stat = suppressWarnings( get_preservation_score(sce , neighs.all = neighs.all ,  genes.all = hvgs_10000, 
-                                                 genes.compare = current.genes[1:n_genes], batch = "sample" ,n.neigh = 5 , nPC.all = NULL , nPC.compare = nPC) )
+                                                 genes.compare = current.genes[1:n_genes], batch = "sample" ,n.neigh = 5 , nPC.all = 50 , nPC.compare = NULL) )
       current.stat$type = names(genes)[i]
       current.stat$n_genes = n_genes
       return(current.stat)
@@ -91,6 +90,8 @@ get_cell_score_stat = function(genes){
   return(cell_score_stat)
 }
 cell_score_stat = get_cell_score_stat(genes)
+
+
 saveRDS(cell_score_stat , file = paste0(root.dir , "data/benchmark_method/diff_dist/" , system , "/cell_score.Rds"))
 
 

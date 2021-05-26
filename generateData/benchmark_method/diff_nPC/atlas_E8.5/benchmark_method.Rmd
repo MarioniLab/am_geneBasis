@@ -80,7 +80,7 @@ get_cell_score_stat = function(genes){
     print(length(current.genes))
     stat.per_n_genes = lapply(n_genes.grid , function(n_genes){
       current.stat = suppressWarnings( get_preservation_score(sce , neighs.all = neighs.all ,  genes.all = hvgs_10000, 
-                                                 genes.compare = current.genes[1:n_genes], batch = "sample" ,n.neigh = 5 , nPC.all = NULL , nPC.compare = nPC) )
+                                                 genes.compare = current.genes[1:n_genes], batch = "sample" ,n.neigh = 5 , nPC.all = 50 , nPC.compare = NULL) )
       current.stat$type = names(genes)[i]
       current.stat$n_genes = n_genes
       return(current.stat)
