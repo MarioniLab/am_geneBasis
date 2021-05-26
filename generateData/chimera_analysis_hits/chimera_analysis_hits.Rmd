@@ -81,11 +81,9 @@ celltype_cols = celltype_colors[[which( names(celltype_colors) == "atlas_E8.5" )
 
 # Compare selections
 
-## WT - VS - chimeras
+## In chimeras but not wt
 
-### In chimeras but not wt
-
-```{r load, message = FALSE}
+```{r co-exprression, message = FALSE}
 
 
 corr.thresh = 1
