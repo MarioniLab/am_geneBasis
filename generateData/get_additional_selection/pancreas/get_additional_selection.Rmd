@@ -52,6 +52,8 @@ sce = sce[idx,]
 initial_selections = readRDS(paste0(root.dir , "data/additional_selections/" , system , "/initial_selections.Rds"))
 additional_selections = readRDS(paste0(root.dir , "data/additional_selections/" , system , "/additional_selections.Rds"))
 
+k = 20
+
 ```
 
 # Get initial selections
