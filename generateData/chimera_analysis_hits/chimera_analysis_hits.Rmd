@@ -105,7 +105,7 @@ corr.thresh = .5
 stat = stat[stat$corr <= corr.thresh , ]
 # select genes that pop in all 3
 tab = table(stat$gene)
-genes_consistent = names(tab)[tab >= 3]
+genes_consistent = names(tab)[tab == 4]
 
 
 # find co-expressed genes for 
