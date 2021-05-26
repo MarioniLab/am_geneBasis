@@ -29,7 +29,7 @@ library(scater)
 library(BiocStyle)
 library(BiocParallel)
 library(stats)
-ncores = 10
+ncores = 1
 mcparam = MulticoreParam(workers = ncores)
 register(mcparam)
 set.seed(32)
@@ -47,6 +47,7 @@ rownames(sce) = rowData(sce)[,2]
 # add rowdata w normal gene names
 rowdata = as.data.frame(rowData(sce))
 colnames(rowdata) = c("gene" , "gene_symbol")
+print("1")
 
 # read gene selection
 genes_atlas_E8.5 = readRDS(paste0(root.dir , "data/gene_selection/" , "atlas_E8.5" , "/gene_selection.Rds"))
@@ -54,31 +55,35 @@ genes_atlas_E8.5 = merge(genes_atlas_E8.5 , rowdata )
 genes_atlas_E8.5 = genes_atlas_E8.5[, c( "gene_symbol" , "rank")]
 colnames(genes_atlas_E8.5) = c("gene" , "rank")
 genes_atlas_E8.5 = genes_atlas_E8.5[order(genes_atlas_E8.5$rank) , ]
+print("2")
 
 genes_WT_chimera_false = readRDS(paste0(root.dir , "data/gene_selection/" , "atlas_E8.5_chimera_WT" , "/gene_selection_TRUE.Rds"))
 genes_WT_chimera_false = merge(genes_WT_chimera_false , rowdata )
 genes_WT_chimera_false = genes_WT_chimera_false[, c( "gene_symbol" , "rank")]
 colnames(genes_WT_chimera_false) = c("gene" , "rank")
 genes_WT_chimera_false = genes_WT_chimera_false[order(genes_WT_chimera_false$rank) , ]
+print("3")
 
 genes_WT_chimera_true = readRDS(paste0(root.dir , "data/gene_selection/" , "atlas_E8.5_chimera_WT" , "/gene_selection_FAlSE.Rds"))
 genes_WT_chimera_true = merge(genes_WT_chimera_true , rowdata )
 genes_WT_chimera_true = genes_WT_chimera_true[, c( "gene_symbol" , "rank")]
 colnames(genes_WT_chimera_true) = c("gene" , "rank")
 genes_WT_chimera_true = genes_WT_chimera_true[order(genes_WT_chimera_true$rank) , ]
+print("4")
 
 genes_tal1_chimera_true = readRDS(paste0(root.dir , "data/gene_selection/" , "atlas_E8.5_tal1" , "/gene_selection_TRUE.Rds"))
 genes_tal1_chimera_true = merge(genes_tal1_chimera_true , rowdata )
 genes_tal1_chimera_true = genes_tal1_chimera_true[, c( "gene_symbol" , "rank")]
 colnames(genes_tal1_chimera_true) = c("gene" , "rank")
 genes_tal1_chimera_true = genes_tal1_chimera_true[order(genes_tal1_chimera_true$rank) , ]
+print("5")
 
 genes_tal1_chimera_false = readRDS(paste0(root.dir , "data/gene_selection/" , "atlas_E8.5_tal1" , "/gene_selection_FALSE.Rds"))
 genes_tal1_chimera_false = merge(genes_tal1_chimera_false , rowdata )
 genes_tal1_chimera_false = genes_tal1_chimera_false[, c( "gene_symbol" , "rank")]
 colnames(genes_tal1_chimera_false) = c("gene" , "rank")
 genes_tal1_chimera_false = genes_tal1_chimera_false[order(genes_tal1_chimera_false$rank) , ]
-
+print("6")
 
 
 ```
