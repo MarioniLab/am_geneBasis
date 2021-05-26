@@ -103,9 +103,9 @@ corr_stat = lapply(systems , function(system){
     
     current.stat = lapply(genes , function(gene){
       current.log = as.numeric(logcounts(current.sce[gene , ]))
-      out = lapply(1:nrow(current.sce) , function(j){
+      out = bplapply(1:nrow(current.sce) , function(j){
         return(data.frame(gene = rownames(current.sce)[j] , corr = cor(as.numeric(logcounts(current.sce[j , ])) , current.log)))
-      })
+      }, BPPARAM = mcparam)
       out = do.call(rbind , out)
       out = out[out$corr < 1]
       out = out[order(out$corr, decreasing = T) , ]
