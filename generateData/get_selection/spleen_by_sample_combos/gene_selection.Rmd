@@ -61,7 +61,7 @@ genes = bplapply(n_samples.grid , function(n_samples){
   # discard mitochondrial
   rownames.sce = rownames(current.sce)
   idx = which(!grepl("mt-" , rownames.sce) & !grepl("MT-" , rownames.sce) & !grepl("Mt-" , rownames.sce))
-  current.sce = sce[idx,]
+  current.sce = current.sce[idx,]
   if (n_samples == 1){
     current.genes = gene_search(current.sce , genes_base = NULL, n_genes_total = n_genes_total, batch = NULL, n.neigh = 5, p = 3, K = 5, nPC = NULL)
   }
