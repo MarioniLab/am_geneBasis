@@ -26,7 +26,7 @@ library(BiocSingular)
 library(BiocParallel)
 library(SingleCellExperiment)
 library(BiocStyle)
-ncores = 9
+ncores = 5
 mcparam = MulticoreParam(workers = ncores)
 register(mcparam)
 set.seed(32)
@@ -66,46 +66,35 @@ names(genes) = c(10,100,25,50,0)
 ```
 
 
-# Neighborhood preservation score (per cell)
+# Neighborhood preservation score (per cell) - set up function
 
-```{r cell-score, message = FALSE}
+```{r neigh-all, message = FALSE}
 
-# 
-# samples = unique(sce$sample)
-# hvgs_10000 = get_hvgs(sce, n = 10000)
-# neighs.all = lapply(samples , function(sample){
-#   current.sce = sce[, sce$sample == sample]
-#   current.neighs.all = get_mapping(current.sce , genes = hvgs_10000, batch = NULL, n.neigh = "all", nPC = 50 , get.dist = T , type = "together")
-#   distances = current.neighs.all$distances
-#   distances_scaled = t( apply(distances , 1 , function(x) scale(x)) )
-#   rownames(distances_scaled) = rownames(distances)
-#   current.neighs.all$distances = distances_scaled
-#   return(current.neighs.all)
-# })
-# names(neighs.all) = samples
-# 
-# 
-# stat_cell_score = bplapply(n_genes.grid , function(n_genes){
-#   stat.per_n_genes = lapply(1:length(genes) , function(i){
-#     current.genes = genes[[i]][1:n_genes]
-#     current.stat = lapply(samples , function(sample){
-#       current.sce = sce[, sce$sample == sample]
-#       current.neighs.all = neighs.all[[which(names(neighs.all) == sample)]]
-#       current.stat = suppressWarnings( get_preservation_score_simple(current.sce , neighs.all = current.neighs.all , genes.all = rownames(current.sce) , 
-#                                   genes.compare = current.genes, batch = NULL, n.neigh = 5 , nPC.all = 50 , nPC.compare = 50) )
-#     })
-#     current.stat = do.call(rbind , current.stat)
-#     
-#     current.stat$type = names(genes)[i]
-#     current.stat$n_genes = n_genes
-#     return(current.stat)
-#   })
-#   stat.per_n_genes = do.call(rbind , stat.per_n_genes)
-#   return(stat.per_n_genes)
-# }, BPPARAM = mcparam)
-# stat_cell_score = do.call(rbind , stat_cell_score)
-# saveRDS(stat_cell_score , file = paste0(root.dir , "data/benchmark_method/diff_nPC/" , system , "/cell_score.Rds"))
 
+samples = unique(sce$sample)
+hvgs_10000 = get_hvgs(sce, n = 10000)
+neighs.all = get_z_scaled_distances(sce , genes.all = hvgs_10000 , batch = NULL, n.neigh = 5 , nPC.all = 50)
+
+
+get_cell_score_stat = function(genes){
+  cell_score_stat = bplapply(c(1:length(genes)) , function(i){
+    current.genes = genes[[i]]
+    print(length(current.genes))
+    stat.per_n_genes = lapply(n_genes.grid , function(n_genes){
+      current.stat = suppressWarnings( get_preservation_score(sce , neighs.all = neighs.all ,  genes.all = hvgs_10000, 
+                                                 genes.compare = current.genes[1:n_genes], batch = NULL ,n.neigh = 5 , nPC.all = 50 , nPC.compare = NULL) )
+      current.stat$type = names(genes)[i]
+      current.stat$n_genes = n_genes
+      return(current.stat)
+    })
+    stat.per_n_genes = do.call(rbind , stat.per_n_genes)
+    return(stat.per_n_genes)
+  }, BPPARAM = mcparam)
+  cell_score_stat = do.call(rbind , cell_score_stat)
+  return(cell_score_stat)
+}
+cell_score_stat = get_cell_score_stat(genes)
+saveRDS(cell_score_stat , file = paste0(root.dir , "data/benchmark_method/diff_nPC/" , system , "/cell_score.Rds"))
 
 
 ```
@@ -115,35 +104,35 @@ names(genes) = c(10,100,25,50,0)
 ```{r celltype-mapping, message = FALSE}
 
 
-get_celltypes_stat = function(sce , genes , batch = "sample", n.neigh = 5){
-  nPC = 2*length(unique(sce$celltype))
-  neighs = suppressWarnings( get_mapping(sce , genes = genes, batch = batch, n.neigh = n.neigh, nPC = nPC , get.dist = F , type = "together"))
-  if (!is.null(neighs)){
-    meta = as.data.frame(colData(sce))
-    current.mapping = data.frame(cell = rownames(neighs) ,
-                               celltype = sapply(1:nrow(neighs) , function(i) meta$celltype[meta$cell == rownames(neighs)[i]]) ,
-                               mapped_celltype = sapply(1:nrow(neighs), function(i) getmode(meta$celltype[match(neighs[i,] , meta$cell)] , 1:n.neigh) ))
-    return(current.mapping)
-  }
-  else {
-    return(NULL)
-  }
-}
-
-
-stat_celltype = bplapply(n_genes.grid , function(n_genes){
-  stat.per_n_genes = lapply(1:length(genes) , function(i){
-    current.genes = genes[[i]][1:n_genes]
-    current.stat = suppressWarnings( get_celltypes_stat(sce , current.genes , batch = "sample", n.neigh = 10 ) )
-    current.stat$type = names(genes)[i]
-    current.stat$n_genes = n_genes
-    return(current.stat)
-  })
-  stat.per_n_genes = do.call(rbind , stat.per_n_genes)
-  return(stat.per_n_genes)
-}, BPPARAM = mcparam)
-stat_celltype = do.call(rbind , stat_celltype)
-saveRDS(stat_celltype , file = paste0(root.dir , "data/benchmark_method/diff_nPC/" , system , "/celltype_classic.Rds"))
+# get_celltypes_stat = function(sce , genes , batch = "sample", n.neigh = 5){
+#   nPC = 2*length(unique(sce$celltype))
+#   neighs = suppressWarnings( get_mapping(sce , genes = genes, batch = batch, n.neigh = n.neigh, nPC = nPC , get.dist = F , type = "together"))
+#   if (!is.null(neighs)){
+#     meta = as.data.frame(colData(sce))
+#     current.mapping = data.frame(cell = rownames(neighs) ,
+#                                celltype = sapply(1:nrow(neighs) , function(i) meta$celltype[meta$cell == rownames(neighs)[i]]) ,
+#                                mapped_celltype = sapply(1:nrow(neighs), function(i) getmode(meta$celltype[match(neighs[i,] , meta$cell)] , 1:n.neigh) ))
+#     return(current.mapping)
+#   }
+#   else {
+#     return(NULL)
+#   }
+# }
+# 
+# 
+# stat_celltype = bplapply(n_genes.grid , function(n_genes){
+#   stat.per_n_genes = lapply(1:length(genes) , function(i){
+#     current.genes = genes[[i]][1:n_genes]
+#     current.stat = suppressWarnings( get_celltypes_stat(sce , current.genes , batch = "sample", n.neigh = 10 ) )
+#     current.stat$type = names(genes)[i]
+#     current.stat$n_genes = n_genes
+#     return(current.stat)
+#   })
+#   stat.per_n_genes = do.call(rbind , stat.per_n_genes)
+#   return(stat.per_n_genes)
+# }, BPPARAM = mcparam)
+# stat_celltype = do.call(rbind , stat_celltype)
+# saveRDS(stat_celltype , file = paste0(root.dir , "data/benchmark_method/diff_nPC/" , system , "/celltype_classic.Rds"))
 
 
 
@@ -154,31 +143,35 @@ saveRDS(stat_celltype , file = paste0(root.dir , "data/benchmark_method/diff_nPC
 ```{r gene-score, message = FALSE}
 
 
-hvgs_5000 = as.character(get_hvgs(sce , n = 5000))
-stat_gene_score_all = suppressWarnings( get_corr_per_gene(sce, genes = hvgs_5000, batch = "sample" , n.neigh = 5 , nPC = 50 , genes.predict = hvgs_5000 ) ) 
+
+hvgs_10000 = as.character(get_hvgs(sce , n = 10000))
+stat_gene_score_all = suppressWarnings( get_corr_per_gene(sce, genes = hvgs_10000, batch =NULL, n.neigh = 5 , nPC = 50 , genes.predict = hvgs_10000 ) ) 
 colnames(stat_gene_score_all) = c("gene" , "corr_all")
+  
 
-
-stat_gene_score = bplapply(n_genes.grid , function(n_genes){
-  stat.per_n_genes = lapply(1:length(genes) , function(i){
+get_gene_score_stat = function(genes){
+  gene_score_stat = bplapply(c(1:length(genes)) , function(i){
     current.genes = genes[[i]]
-    current.stat = suppressWarnings( get_corr_per_gene(sce , current.genes[1:n_genes] , batch = "sample", n.neigh = 5 , nPC= 50 , genes.predict = hvgs_5000 ) )
-    current.stat$n_genes = n_genes
-    current.stat$p = names(genes)[i]
-    return(current.stat)
-  })
-  stat.per_n_genes = do.call(rbind , stat.per_n_genes)
-  return(stat.per_n_genes)
-}, BPPARAM = mcparam)
-stat_gene_score = do.call(rbind , stat_gene_score)
-stat_gene_score = merge(stat_gene_score , stat_gene_score_all , all.x = T , all.y = F)
-stat_gene_score$corr_ratio = stat_gene_score$corr/stat_gene_score$corr_all
-saveRDS(stat_gene_score , file = paste0(root.dir , "data/benchmark_method/diff_nPC/" , system , "/gene_score.Rds"))
+    print(length(current.genes))
+    stat.per_n_genes = lapply(n_genes.grid , function(n_genes){
+      current.stat = suppressWarnings( get_corr_per_gene(sce , genes = current.genes[1:n_genes], batch = NULL, n.neigh = 5 , nPC = NULL , genes.predict = hvgs_10000 ) )
+      current.stat$type = names(genes)[i]
+      current.stat$n_genes = n_genes
+      return(current.stat)
+    })
+    stat.per_n_genes = do.call(rbind , stat.per_n_genes)
+    return(stat.per_n_genes)
+  }, BPPARAM = mcparam)
+  gene_score_stat = do.call(rbind , gene_score_stat)
+  gene_score_stat = merge(gene_score_stat , stat_gene_score_all)
+  gene_score_stat$corr_ratio = gene_score_stat$corr/gene_score_stat$corr_all
+  return(gene_score_stat)
+}
 
+gene_score_stat = get_gene_score_stat(genes)
+saveRDS(gene_score_stat , file = paste0(root.dir , "data/benchmark_method/diff_nPC/" , system , "/gene_score.Rds"))
 
 ```
-
-
 
 # Session Info
 
