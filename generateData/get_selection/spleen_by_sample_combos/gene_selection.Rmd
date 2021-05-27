@@ -1,0 +1,83 @@
+---
+title: "Gene selection."
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+
+#Introduction & method
+
+
+```{r load, message = FALSE}
+# load libraries we are going to use
+
+library(Matrix)
+library(scran)
+library(scater)
+library(batchelor)
+library(knitr)
+library(reshape2)
+library(edgeR)
+library(ggplot2)
+library(BiocSingular)
+library(BiocParallel)
+library(BiocNeighbors)
+library(SingleCellExperiment)
+library(dplyr)
+library(BiocStyle)
+library(stats)
+ncores = 5
+mcparam = MulticoreParam(workers = ncores)
+register(mcparam)
+set.seed(32)
+
+#root.dir = "/Users/alsu/Develop/geneBasis/"
+root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
+source(paste0(root.dir , "am_geneBasis/functions/main_functions.R"))
+
+
+system = "spleen"
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+sce$cell = colnames(sce)
+samples = unique(sce$sample)
+
+
+```
+
+
+# Iterative gene search
+
+```{r iterative-gene-search, message = FALSE}
+
+
+n_genes_total = 150
+
+n_samples.grid = c(1:5)
+genes = bplapply(n_samples.grid , function(n_samples){
+  current.sce = sce[, sce$sample %in% samples[1:n_samples]]
+  current.sce = retain_only_hvgs(current.sce, n = 10000, var.thresh = 0)
+  # discard mitochondrial
+  rownames.sce = rownames(current.sce)
+  idx = which(!grepl("mt-" , rownames.sce) & !grepl("MT-" , rownames.sce) & !grepl("Mt-" , rownames.sce))
+  current.sce = sce[idx,]
+  if (n_samples == 1){
+    current.genes = gene_search(current.sce , genes_base = NULL, n_genes_total = n_genes_total, batch = NULL, n.neigh = 5, p = 3, K = 5, nPC = NULL)
+  }
+  else {
+    current.genes = gene_search(current.sce , genes_base = NULL, n_genes_total = n_genes_total, batch = "sample", n.neigh = 5, p = 3, K = 5, nPC = NULL)
+  }
+  return(current.genes)
+}, BPPARAM = mcparam)
+names(genes) = n_samples.grid
+saveRDS(genes , paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection_by_samples", ".Rds"))
+
+
+```
+
+#Session Info
+
+```{r sessinf}
+sessionInfo()
+```
