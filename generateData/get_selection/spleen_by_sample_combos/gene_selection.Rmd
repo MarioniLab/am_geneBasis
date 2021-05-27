@@ -28,7 +28,7 @@ library(SingleCellExperiment)
 library(dplyr)
 library(BiocStyle)
 library(stats)
-ncores = 5
+ncores = 6
 mcparam = MulticoreParam(workers = ncores)
 register(mcparam)
 set.seed(32)
@@ -51,27 +51,42 @@ samples = unique(sce$sample)
 
 ```{r iterative-gene-search, message = FALSE}
 
+# 
+# n_genes_total = 150
+# 
+# n_samples.grid = c(1:5)
+# genes = bplapply(n_samples.grid , function(n_samples){
+#   current.sce = sce[, sce$sample %in% samples[1:n_samples]]
+#   current.sce = retain_only_hvgs(current.sce, n = 10000, var.thresh = 0)
+#   # discard mitochondrial
+#   rownames.sce = rownames(current.sce)
+#   idx = which(!grepl("mt-" , rownames.sce) & !grepl("MT-" , rownames.sce) & !grepl("Mt-" , rownames.sce))
+#   current.sce = current.sce[idx,]
+#   if (n_samples == 1){
+#     current.genes = gene_search(current.sce , genes_base = NULL, n_genes_total = n_genes_total, batch = NULL, n.neigh = 5, p = 3, K = 5, nPC = NULL)
+#   }
+#   else {
+#     current.genes = gene_search(current.sce , genes_base = NULL, n_genes_total = n_genes_total, batch = "sample", n.neigh = 5, p = 3, K = 5, nPC = NULL)
+#   }
+#   return(current.genes)
+# }, BPPARAM = mcparam)
+# names(genes) = n_samples.grid
+# saveRDS(genes , paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection_by_samples", ".Rds"))
+# 
 
 n_genes_total = 150
-
-n_samples.grid = c(1:5)
-genes = bplapply(n_samples.grid , function(n_samples){
-  current.sce = sce[, sce$sample %in% samples[1:n_samples]]
+genes = bplapply(samples , function(sample){
+  current.sce = sce[, sce$sample == sample]
   current.sce = retain_only_hvgs(current.sce, n = 10000, var.thresh = 0)
   # discard mitochondrial
   rownames.sce = rownames(current.sce)
   idx = which(!grepl("mt-" , rownames.sce) & !grepl("MT-" , rownames.sce) & !grepl("Mt-" , rownames.sce))
   current.sce = current.sce[idx,]
-  if (n_samples == 1){
-    current.genes = gene_search(current.sce , genes_base = NULL, n_genes_total = n_genes_total, batch = NULL, n.neigh = 5, p = 3, K = 5, nPC = NULL)
-  }
-  else {
-    current.genes = gene_search(current.sce , genes_base = NULL, n_genes_total = n_genes_total, batch = "sample", n.neigh = 5, p = 3, K = 5, nPC = NULL)
-  }
+  current.genes = gene_search(current.sce , genes_base = NULL, n_genes_total = n_genes_total, batch = NULL, n.neigh = 5, p = 3, K = 5, nPC = NULL)
+  saveRDS(current.genes , paste0(root.dir , "data/gene_selection/" , system , "/by_sample/" , "gene_selection_sample_", sample, ".Rds"))
   return(current.genes)
 }, BPPARAM = mcparam)
-names(genes) = n_samples.grid
-saveRDS(genes , paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection_by_samples", ".Rds"))
+
 
 
 ```

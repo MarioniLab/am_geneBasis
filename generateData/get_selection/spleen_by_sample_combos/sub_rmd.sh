@@ -9,10 +9,10 @@ script_name=genes_spl_comb
 
 #CHOOSE PARAMETERS
 #RAM in megabytes
-memory=600000
+memory=350000
 r_command="rusage[mem=${memory}]"
 #num_processors
-nproc=5
+nproc=6
 
 smg=/nfs/research1/marioni/alsu/singularity/R1.simg
 script=/nfs/research1/marioni/alsu/geneBasis/am_geneBasis/generateData/get_selection/spleen_by_sample_combos/run_rmd.R
