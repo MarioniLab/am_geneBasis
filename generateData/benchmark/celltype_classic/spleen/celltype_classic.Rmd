@@ -132,7 +132,7 @@ option = "centers"
 # n_genes = sapply(n_genes , function(str) str_replace_all(str,  "nGenes_" , ""))
 # n_genes = sort(as.numeric(n_genes))
 
-n_genes = seq(10,250,20)
+n_genes = seq(10,100,10)
 
 genes_scgenefit = lapply(n_genes , function(str){
   out = read.table(paste0( root.dir , "data/scGeneFit_res/" , system , "/" , option , "/nGenes_" , str , ".txt") , header = F)
@@ -200,20 +200,20 @@ get_celltypes_stat = function(genes , option){
 
 ```{r score-vs-scmer-batched, message = FALSE}
 
-
-genes = lapply(1:length(genes_scmer_batched) , function(i){
-  current.genes_scmer = genes_scmer_batched[[i]]
-  n_genes = length(current.genes_scmer)
-  out = list("geneBasis" = as.character(genes_alsu[1:n_genes]) , "SCMER" = as.character(current.genes_scmer), "hvgs" = as.character(get_hvgs(sce , n_genes)) )
-  return(out)
-})
-
-
-stat_scmer_batched.all = get_celltypes_stat(genes , option = "all")
-stat_scmer_batched.markers = get_celltypes_stat(genes , option = "markers")
-stat_scmer_batched = rbind(stat_scmer_batched.all , stat_scmer_batched.markers)
-stat_scmer_batched$type = factor(stat_scmer_batched$type, levels = c("geneBasis" , "SCMER" , "hvgs"))
-saveRDS(stat_scmer_batched , file = paste0(root.dir , "data/benchmark/celltype_classic/" , system , "/celltype_classic__scmer_batched.Rds"))
+# 
+# genes = lapply(1:length(genes_scmer_batched) , function(i){
+#   current.genes_scmer = genes_scmer_batched[[i]]
+#   n_genes = length(current.genes_scmer)
+#   out = list("geneBasis" = as.character(genes_alsu[1:n_genes]) , "SCMER" = as.character(current.genes_scmer), "hvgs" = as.character(get_hvgs(sce , n_genes)) )
+#   return(out)
+# })
+# 
+# 
+# stat_scmer_batched.all = get_celltypes_stat(genes , option = "all")
+# stat_scmer_batched.markers = get_celltypes_stat(genes , option = "markers")
+# stat_scmer_batched = rbind(stat_scmer_batched.all , stat_scmer_batched.markers)
+# stat_scmer_batched$type = factor(stat_scmer_batched$type, levels = c("geneBasis" , "SCMER" , "hvgs"))
+# saveRDS(stat_scmer_batched , file = paste0(root.dir , "data/benchmark/celltype_classic/" , system , "/celltype_classic__scmer_batched.Rds"))
 
 
 ```
@@ -222,19 +222,19 @@ saveRDS(stat_scmer_batched , file = paste0(root.dir , "data/benchmark/celltype_c
 
 ```{r score-vs-scmer-batched-updated, message = FALSE}
 
-
-genes = lapply(1:length(genes_scmer_batched_updated) , function(i){
-  current.genes_scmer = genes_scmer_batched_updated[[i]]
-  n_genes = length(current.genes_scmer)
-  out = list("geneBasis" = as.character(genes_alsu[1:n_genes]) , "SCMER" = as.character(current.genes_scmer) , "hvgs" = as.character(get_hvgs(sce,n=n_genes)))
-  return(out)
-})
-
-stat_scmer_batched.all = get_celltypes_stat(genes , option = "all")
-stat_scmer_batched.markers = get_celltypes_stat(genes , option = "markers")
-stat_scmer_batched = rbind(stat_scmer_batched.all , stat_scmer_batched.markers)
-stat_scmer_batched$type = factor(stat_scmer_batched$type, levels = c("geneBasis" , "SCMER" , "hvgs"))
-saveRDS(stat_scmer_batched , file = paste0(root.dir , "data/benchmark/celltype_classic/" , system , "/celltype_classic__scmer_batched_updated.Rds"))
+# 
+# genes = lapply(1:length(genes_scmer_batched_updated) , function(i){
+#   current.genes_scmer = genes_scmer_batched_updated[[i]]
+#   n_genes = length(current.genes_scmer)
+#   out = list("geneBasis" = as.character(genes_alsu[1:n_genes]) , "SCMER" = as.character(current.genes_scmer) , "hvgs" = as.character(get_hvgs(sce,n=n_genes)))
+#   return(out)
+# })
+# 
+# stat_scmer_batched.all = get_celltypes_stat(genes , option = "all")
+# stat_scmer_batched.markers = get_celltypes_stat(genes , option = "markers")
+# stat_scmer_batched = rbind(stat_scmer_batched.all , stat_scmer_batched.markers)
+# stat_scmer_batched$type = factor(stat_scmer_batched$type, levels = c("geneBasis" , "SCMER" , "hvgs"))
+# saveRDS(stat_scmer_batched , file = paste0(root.dir , "data/benchmark/celltype_classic/" , system , "/celltype_classic__scmer_batched_updated.Rds"))
 
 
 ```
