@@ -1,0 +1,312 @@
+---
+title: "geneBasis, mouseEmbryo, extended workflow."
+author:
+  - Alsu Missarova
+output:
+  BiocStyle::html_document:
+    toc_float: true
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+  BiocStyle::pdf_document: default
+package: geneBasisR
+vignette: >
+  %\VignetteIndexEntry{geneBasis_mouseEmbryo_extended}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+
+library(geneBasisR)
+library(SingleCellExperiment)
+library(tibble)
+library(ggplot2)
+library(wesanderson)
+library(ggcorrplot)
+library(ggpubr)
+
+```
+
+# Introduction
+
+`geneBasis` is an iterative greedy approach for gene selection. It strives a gene selection that will preserve transcriptional relationships between cells, represented as kNN-graphs.
+
+
+Here we exemplify how `geneBasis` can be utilized for library design. First, we design a library of designated size from scratch. We then estimate the quality of designed library and provide a workflow that can be used to investigate cells and/or genes that are not explained with the selected library. Finally, we provide the estimation of the redundancy of the library for cell type mapping.
+
+# Load data
+
+We will be working with mouse embryo, E8.5. Initial filtering for uninteresting genes was already performed (to see how genes can be pre-filtered, see Vignette for spleen).
+
+```{r load-data}
+
+data("sce_mouseEmbryo", package = "geneBasisR")
+
+# Fetch meta-data and umap coordinates, merge together
+meta = as.data.frame(colData(sce_mouseEmbryo))
+umaps = as.data.frame(reducedDim(sce_mouseEmbryo, "UMAP"))
+umaps = rownames_to_column(umaps, var = "cell")
+meta = merge(meta, umaps)
+
+# Fetch colour scheme for celltypes from meta-data
+celltype_colors_df = unique(meta[, c("celltype" , "colour")])
+celltype_colors = c(paste0("#",as.character(celltype_colors_df$colour)))
+names(celltype_colors) = as.character(celltype_colors_df$celltype)
+
+```
+
+# Cell type composition for mouse embryo
+
+Let's see which cell types (and in which quantities) we observe in mouse embryo.
+
+```{r umap-ct, fig.wide = TRUE, fig.cap = "Cell type composition."}
+
+# celltype composition
+tab = as.data.frame(table(sce_mouseEmbryo$celltype))
+colnames(tab) = c("celltype" , "n")
+tab = tab[order(tab$n) , ]
+tab$celltype = factor(tab$celltype , levels = tab$celltype)
+p1 = ggplot(tab , aes(x = celltype , y = log2(n) , fill = celltype)) +
+  geom_bar(stat = "identity" , position = "dodge") +
+  scale_fill_manual(values = celltype_colors) +
+  theme_classic() +
+  theme(axis.text.x = element_blank()) +
+  labs(y = "log2(# cells)", x = "Cell type")
+
+# UMAP
+p2 = ggplot(meta , aes(x = x , y = y , col = celltype)) +
+  geom_point(size=1,alpha = .9) +
+  scale_color_manual(values = celltype_colors) +
+  theme_classic() +
+  labs(x = "UMAP-1" , y = "UMAP-2") +
+  ggtitle("UMAP")
+
+# combine
+p = ggarrange(p1,p2, common.legend = T)
+p
+
+
+```
+
+# Select library of size 50
+
+To select library, use `gene_search`. 
+
+We will not print intermediate outputs for this run (by setting `verbose=FALSE`).
+We also use `sample` as batch identification. 
+
+```{r gene-search}
+ 
+n_genes_total = 50
+genes_stat = gene_search(sce_mouseEmbryo , n_genes_total = n_genes_total, batch = "sample", verbose = F)
+genes = genes_stat$gene
+
+
+```
+
+# Evaluation of the library
+
+We estimate the quality of the library using `evaluate_library`.
+
+## Gene and cell scores convergence - as functions of n-genes
+
+Here, to be less wordy, we refer to cell neighborhood preservation score as cell score; gene prediction score as gene score.
+
+```{r cell-gene-score-stat, fig.wide = TRUE, fig.cap="Cell and gene scores - as functions of n-genes."}
+
+
+stat = evaluate_library(sce_mouseEmbryo, genes, genes.all = rownames(sce_mouseEmbryo), batch = "sample", library.size_type = "series", n_genes.step = 10,
+                        return.cell_score_stat = T, return.gene_score_stat = T, return.celltype_stat = T, verbose = F)
+
+p1 = ggplot(stat$cell_score_stat , aes(x = n_genes , y = cell_score, fill = n_genes)) +
+  geom_boxplot() +
+  scale_fill_manual(values = wes_palette("Zissou1", length(levels(stat$cell_score_stat$n_genes)), type = "continuous")) +
+  ylim(c(-.2,1)) +
+  theme_classic() +
+  labs(y = "Cell neighborhood preservation score" , x = "# genes") +
+  theme(legend.position = "none")
+p2 = ggplot(stat$gene_score_stat , aes(x = n_genes , y = gene_score, fill = n_genes)) +
+  geom_boxplot() +
+  scale_fill_manual(values = wes_palette("Zissou1", length(levels(stat$gene_score_stat$n_genes)), type = "continuous")) +
+  ylim(c(0,1)) +
+  theme_classic() +
+  labs(y = "Gene prediction score" , x = "# genes") +
+  theme(legend.position = "none")
+
+p = ggarrange(p1,p2,ncol=2)
+p
+
+
+
+```
+
+We suggest that these plots can be useful to make a decision at which number of genes cell and gene score distributions converge (more relevant for higher number of genes).
+
+In our example, we observe that distributions do not converge yet and therefore we suggest that 50 genes is not above optimal size for the library.
+
+## Cell type mapping 
+
+Let's see how well we can map cell types using selected library.
+
+### Confusion matrix
+
+Cell type mapping for a single library can be computed separately using `get_celltype_mapping`. We also included plotting fucntion that returns heatmap for the confusion matrix: `plot_mapping_heatmap`.
+
+
+```{r celltype-mapping-confusion, fig.wide = TRUE,  fig.height=10, fig.cap="Cell type confusion matrix."}
+
+
+celltype_mapping = get_celltype_mapping(sce_mouseEmbryo , genes, batch = "sample", return.stat = F)
+p = plot_mapping_heatmap(celltype_mapping$mapping, title = "Cell type confusion matrix")
+p
+
+
+```
+
+### Cell type mapping accuracy - as a function of n-genes
+
+```{r celltype-mapping-trend, fig.wide = TRUE, fig.cap="Cell type mapping accuracy - as a function of n-genes."}
+
+
+pal = wes_palette("Zissou1" , length(levels(stat$celltype_stat)) , type = "continuous")
+p = ggplot(stat$celltype_stat, aes( x = as.character( n_genes ), y = frac_correctly_mapped , col = "black")) +
+  geom_point(size=1.5) +
+  facet_wrap(~celltype) +
+  #scale_color_manual(values = celltype_colors) +
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  theme_classic() +
+  theme(legend.position = "none") +
+  labs(y = "Fraction of cells mapped correctly", x = "# genes")
+  ggtitle("Cell type mapping accuracy")
+p
+
+```
+
+## Cell score - distribution per cell type 
+
+Let's assess whether certain cell types are consistently 'under-preserved' by looking at the distribution of cell scores across cell types.
+
+```{r cell-score-by-ct-mapping, fig.wide = TRUE,  fig.cap="Cell score per cell type."}
+
+
+cell_score_stat = stat$cell_score_stat[stat$cell_score_stat$n_genes == n_genes_total , ] 
+cell_score_stat = merge(cell_score_stat, meta) 
+
+p = ggplot(cell_score_stat , aes(x = celltype , y = cell_score, fill = celltype)) + 
+  geom_boxplot() + 
+  scale_fill_manual(values = celltype_colors) + 
+  theme_classic() + 
+  labs(y = "Cell neighborhood preservation score" , x = "# genes") + 
+  theme(legend.position = "none") + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) 
+p 
+
+
+``` 
+
+We see that PGCs in average have lower scores. This is expected since we have only 8 PGC cells and our toy library is of very limited size. We also observe that a decent fraction of PGCs do not map correctly to the same cell type (Fig. 3). We therefore suggest to increase number of genes to be selected or manually add PGC-specific markers into the library (especially if detecting PGCs is of high interest).
+
+
+### See which genes we do not predict well 
+
+Now let's assess which genes can not be predicted well from k-NN graph constructed with selected library. 
+
+We assign threshold for prediction score as 0.75 and look at the genes that have gene score < 0.75.
+
+#### Co-expression 
+
+Let's see if we observe a highly co-expressed gene set. The plotting function is included in the package: `plot_coexpression`.
+
+
+```{r coexpression-lowly-predicted-genes, fig.wide = TRUE,  fig.cap="Co-expression within lowly predicted genes."} 
+
+gene_score.thresh = 0.75 
+gene_score_stat = stat$gene_score_stat[stat$gene_score_stat$n_genes == n_genes_total , ] 
+
+genes_lowly_explained = gene_score_stat$gene[gene_score_stat$gene_score < gene_score.thresh] 
+
+p = plot_coexpression(sce_mouseEmbryo , genes_lowly_explained ) 
+p 
+
+
+``` 
+
+#### Average expression across cell types
+
+A function to plot a heatmap of average expression across is built in the library: `plot_expression_heatmap`.
+
+```{r avg-expression-heatmap-lowly-predicted-genes, fig.wide = TRUE, fig.cap="Average expression per cell type, lowly explained genes."}
+
+p = plot_expression_heatmap(sce_mouseEmbryo, genes_lowly_explained, value.type = "mean") 
+p 
+
+```
+
+We see that most of selected genes are cell state genes, expressed across most of the cell types. 
+
+Interestingly, we also see that strong PGC marker Dppa3 is not explained well. This is consistent with the observation from the above. 
+Additionally, blood progenitor marker F2rl2 is also not explained well, and this is also consistent with cell type confusion matrix from Fig. 3.
+
+We suggest that this workflow can facilitate the understanding which genes are 'missing' from the library and whether it is desirable to include them. 
+
+# Characterisation of library 
+
+Let's actually look into what genes we select.
+
+## What are the genes we are selecting - visual inspection
+
+Let's plot UMAPs, colored by expression of the selected genes, to have an intuitive grasp of what kind of genes we select. UMAPs can be easily plotted with provided function `plot_umaps_w_counts`. 
+
+```{r umaps-selected-genes, fig.wide = TRUE, fig.height=15, fig.cap="UMAPs of selected genes."}
+
+p = plot_umaps_w_counts(sce_mouseEmbryo, genes)
+p
+
+```
+
+Overall we see that most of the genes are expressed in some transcriptional regions but not others (i.e. like cell type markers behavior). 
+
+Additionally, some genes seem to be expressed across the whole manifold and are representative of a cell state (Ube2c, Cdc20, Xist, etc).
+
+## Average expression across cell types and co-expression 
+
+Let's look a bit more systematically into how cell type specific are expressions of the selected genes.
+
+```{r general-stat-heatmap-avg-expression, fig.wide = TRUE, fig.cap="Average expression per cell type."}
+
+p = plot_expression_heatmap(sce_mouseEmbryo, genes, value.type = "mean") 
+p 
+
+``` 
+
+## Estimation of redundancy 
+
+Finally, let's estimate the redundancy of the library on gene/celltype level: for each gene, we temporarily remove it from the library and compare  the accuracies of cell type mappings with and without removed gene (per cell type). 
+
+The function to get this stat is `get_redundancy_stat`. We also provide the function that will plot the results as a heatmap: `plot_redundancy_stat`. Red corresponds to cases where cell type mapping accuracy drops with the removal of the gene, green - where cell type mapping accuracy increases with the removal of the gene (that can occur for cell type that were not well mapped to begin with).
+
+```{r redundancy-plot, fig.wide = TRUE, fig.cap="Redundancy heatmap."} 
+
+redundancy_stat = get_redundancy_stat(sce_mouseEmbryo, genes, genes_to_assess = genes, batch = "sample") 
+p = plot_redundancy_stat(redundancy_stat) 
+p 
+
+``` 
+
+From this analysis, we can conclude the particular relevance of some genes for some cell types e.g. Mest for Blood progenitors 1, Hbb-y for Erythroid2.
+
+This line of analysis also allows to estimate overall redundancy of the library which is useful when planning seq-FISH experiments.
+
+
+#Session Info
+```{r sessinf}
+sessionInfo()
+```
