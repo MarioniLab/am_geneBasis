@@ -68,8 +68,6 @@ genes_tal1_chimera_true = get_selection_stat("atlas_E8.5_tal1" , "_TRUE")
 genes_tal1_chimera_false = get_selection_stat("atlas_E8.5_tal1" , "_FALSE")
 
 
-celltype_cols = celltype_colors[[which( names(celltype_colors) == "atlas_E8.5" )]]
-
 
 ```
 
@@ -80,31 +78,32 @@ celltype_cols = celltype_colors[[which( names(celltype_colors) == "atlas_E8.5" )
 
 ```{r co-exprression, message = FALSE}
 
+# 
+# corr.thresh = 1
+# 
+# genes = list("wt_chimera_false" = genes_WT_chimera_false , "wt_chimera_true" = genes_WT_chimera_true , "tal1_false" = genes_tal1_chimera_false , "tal1_true" = genes_tal1_chimera_true)
+# stat = lapply(1:length(genes) , function(i){
+#   current.genes = genes[[i]]
+#   current.stat = compare_gene_selections(sce , current.genes , genes_atlas_E8.5 , corr.thresh = corr.thresh, rank.thresh = 250)
+#   current.stat$id = names(genes)[i]
+#   return(current.stat)
+# })
+# stat = do.call(rbind , stat)
+# stat = stat[stat$rank <= 200 , ]
+# 
+# 
+# corr.thresh = .5
+# stat = stat[stat$corr <= corr.thresh , ]
+# # select genes that pop in all 3
+# tab = table(stat$gene)
+# genes_consistent = names(tab)[tab == 4]
 
-corr.thresh = 1
-
-genes = list("wt_chimera_false" = genes_WT_chimera_false , "wt_chimera_true" = genes_WT_chimera_true , "tal1_false" = genes_tal1_chimera_false , "tal1_true" = genes_tal1_chimera_true)
-stat = lapply(1:length(genes) , function(i){
-  current.genes = genes[[i]]
-  current.stat = compare_gene_selections(sce , current.genes , genes_atlas_E8.5 , corr.thresh = corr.thresh, rank.thresh = 250)
-  current.stat$id = names(genes)[i]
-  return(current.stat)
-})
-stat = do.call(rbind , stat)
-stat = stat[stat$rank <= 200 , ]
-
-
-corr.thresh = .5
-stat = stat[stat$corr <= corr.thresh , ]
-# select genes that pop in all 3
-tab = table(stat$gene)
-genes_consistent = names(tab)[tab == 4]
-
+genes_consistent = c("Cbx3" , "Rpgrip1")
 
 # find co-expressed genes for 
 systems = c("atlas_E8.5_chimera_WT" , "atlas_E8.5_tal1")
 corr_stat = lapply(systems , function(system){
-  sce_system = sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system  , ".Rds"))
+  sce_system = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system  , ".Rds"))
   stat_per_system = lapply(c(T,F) , function(bool){
     current.sce = sce_system[, sce_system$tomato == bool]
     rownames(current.sce) = rowData(current.sce)[,2]
@@ -118,7 +117,7 @@ corr_stat = lapply(systems , function(system){
       out = do.call(rbind , out)
       out = out[out$corr < 1 , ]
       out = out[order(out$corr, decreasing = T) , ]
-      out$original.gene = current.gene
+      out$original.gene = gene
       return(out[1:5,])
     })
     current.stat = do.call(rbind , current.stat)
@@ -131,8 +130,6 @@ corr_stat = lapply(systems , function(system){
 })
 corr_stat = do.call(rbind , corr_stat)
 saveRDS(corr_stat , file = paste0(root.dir , "data/chimera_stat/corr_stat_hits.Rds"))
-
-
 
 
 ```
