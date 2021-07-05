@@ -28,7 +28,7 @@ library(SingleCellExperiment)
 library(dplyr)
 library(BiocStyle)
 library(stats)
-ncores = 5
+ncores = 7
 mcparam = MulticoreParam(workers = ncores)
 register(mcparam)
 set.seed(32)
@@ -36,7 +36,6 @@ set.seed(32)
 #root.dir = "/Users/alsu/Develop/geneBasis/"
 root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
 source(paste0(root.dir , "am_geneBasis/functions/main_functions.R"))
-
 
 system = "spleen"
 sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
@@ -50,37 +49,107 @@ meta = as.data.frame(colData(sce))
 
 ```{r iterative-gene-search, message = FALSE}
 
+# 
+# proc_time_add_genes = function(sce , stat = NULL, genes_base = NULL, assay = "logcounts", n_genes_total = 150, batch , p = 3){
+#   t0 = proc.time()
+#   if (is.null(stat)){
+#     stat = suppressWarnings( get_lp_norm_dist(sce, genes = rownames(sce), assay = assay, batch = batch , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , p = p) )
+#     colnames(stat) = c("gene" , "dist.all")
+#   }
+#   t1 = proc.time()
+#   t = c(t1[["elapsed"]] - t0[["elapsed"]])
+#   
+#   genes_all = genes_base
+#   while(length(genes_all) < n_genes_total){
+#     
+#     stat_genes = suppressWarnings( get_lp_norm_dist(sce , genes = genes_all , assay = assay , batch = batch, n.neigh = 5 , nPC = NULL , genes.predict = rownames(sce) , p = p) )
+#     colnames(stat_genes) = c("gene" , "dist")   
+#     stat_genes = stat_genes[!stat_genes$gene %in% genes_all , ] 
+#     stat_genes = merge(stat_genes , stat)
+#     
+#     stat_genes$dist.ratio = stat_genes$dist - stat_genes$dist.all 
+#       
+#     idx = which(stat_genes$dist.ratio == max(stat_genes$dist.ratio))
+#     gene = stat_genes$gene[idx[1]]
+#     genes_all = c(genes_all , as.character(gene))
+#     current.t = proc.time()
+#     t = c(t , current.t[["elapsed"]] - t0[["elapsed"]])
+#   }
+#   #out = genes_all
+#   return(t)
+# }
+# 
+# n.grid = rev(seq(1000,10000,1000))
+# 
+# samples = unique(sce$sample)
+# stat = bplapply(n.grid , function(n){
+#   stat.per_n_genes_init = lapply(c(1:length(samples)) , function(n_samples){
+#   
+#     current.sce = retain_only_hvgs(sce[, sce$sample %in% samples[1:n_samples]], n = n, var.thresh = 0)
+#     rownames.sce = rownames(current.sce)
+#     idx = which(!grepl("mt-" , rownames.sce) & !grepl("MT-" , rownames.sce) & !grepl("Mt-" , rownames.sce))
+#     current.sce = current.sce[idx,]
+#     out = proc_time_add_genes(current.sce , n_genes_total = 250, batch = NULL)
+#     
+#     #if (n_samples == 1){
+#     #  out = proc_time_add_genes(current.sce , n_genes_total = 250, batch = NULL)
+#     #}
+#     #else {
+#     #  out = proc_time_add_genes(current.sce , n_genes_total = 250, batch = "sample")
+#     #}
+#     current.stat = data.frame(n_genes = seq(0,250,1) , time = out)  
+#     current.stat$n_genes_init = nrow(current.sce)
+#     current.stat$n_samples = n_samples
+#     current.stat$n_cells = ncol(current.sce)
+#     return(current.stat)
+#   })
+#   stat.per_n_genes_init = do.call(rbind , stat.per_n_genes_init)
+#   return(stat.per_n_genes_init)
+# }, BPPARAM = mcparam)
+# stat = do.call(rbind , stat)
+# 
+# saveRDS(stat , file = paste0(root.dir , "data/processed_time/geneBasis/" , system , "/stat_unparalleled_batched.Rds"))
+# 
+# 
+
+```
 
 
-proc_time_add_genes = function(sce , stat = NULL, genes_base = NULL, assay = "logcounts", n_genes_total = 250, batch , p = 3){
+# Timing iterative gene search alternative
+
+```{r iterative-gene-search-alt, message = FALSE}
+
+
+
+proc_time_add_genes = function(sce , n_genes_total = 150, batch , p = 3){
   t0 = proc.time()
-  if (is.null(stat)){
-    stat = suppressWarnings( get_lp_norm_dist(sce, genes = rownames(sce), assay = assay, batch = batch , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , p = p) )
-    colnames(stat) = c("gene" , "dist.all")
-  }
+  
+  stat = suppressWarnings( get_lp_norm_dist_alternative(sce, genes = rownames(sce), batch = batch , n.neigh = 5 , nPC = 50 , genes.predict = rownames(sce) , p = p) )
+  colnames(stat) = c("gene" , "dist_all")
+    
+  genes_all = add_first_gene(sce , stat, batch = batch , n.neigh = 5, p = 3 , K = 5)
   t1 = proc.time()
   t = c(t1[["elapsed"]] - t0[["elapsed"]])
   
-  genes_all = genes_base
   while(length(genes_all) < n_genes_total){
     
-    stat_genes = suppressWarnings( get_lp_norm_dist(sce , genes = genes_all , assay = assay , batch = batch, n.neigh = 5 , nPC = NULL , genes.predict = rownames(sce) , p = p) )
+    stat_genes = suppressWarnings( get_lp_norm_dist_alternative(sce , genes = genes_all , batch = batch, n.neigh = 5 , nPC = NULL , genes.predict = rownames(sce) , p = p) )
     colnames(stat_genes) = c("gene" , "dist")   
     stat_genes = stat_genes[!stat_genes$gene %in% genes_all , ] 
     stat_genes = merge(stat_genes , stat)
     
-    stat_genes$dist.ratio = stat_genes$dist - stat_genes$dist.all 
+    stat_genes$dist_ratio = stat_genes$dist - stat_genes$dist_all 
       
-    idx = which(stat_genes$dist.ratio == max(stat_genes$dist.ratio))
+    idx = which(stat_genes$dist_ratio == max(stat_genes$dist_ratio))
     gene = stat_genes$gene[idx[1]]
     genes_all = c(genes_all , as.character(gene))
     current.t = proc.time()
     t = c(t , current.t[["elapsed"]] - t0[["elapsed"]])
   }
-  #out = genes_all
   return(t)
 }
-
+  
+  
 n.grid = rev(seq(1000,10000,1000))
 
 samples = unique(sce$sample)
@@ -91,15 +160,9 @@ stat = bplapply(n.grid , function(n){
     rownames.sce = rownames(current.sce)
     idx = which(!grepl("mt-" , rownames.sce) & !grepl("MT-" , rownames.sce) & !grepl("Mt-" , rownames.sce))
     current.sce = current.sce[idx,]
-    out = proc_time_add_genes(current.sce , n_genes_total = 250, batch = NULL)
+    out = proc_time_add_genes(current.sce , n_genes_total = 150, batch = NULL)
     
-    #if (n_samples == 1){
-    #  out = proc_time_add_genes(current.sce , n_genes_total = 250, batch = NULL)
-    #}
-    #else {
-    #  out = proc_time_add_genes(current.sce , n_genes_total = 250, batch = "sample")
-    #}
-    current.stat = data.frame(n_genes = seq(0,250,1) , time = out)  
+    current.stat = data.frame(n_genes = seq(1,150,1) , time = out)  
     current.stat$n_genes_init = nrow(current.sce)
     current.stat$n_samples = n_samples
     current.stat$n_cells = ncol(current.sce)
@@ -110,11 +173,12 @@ stat = bplapply(n.grid , function(n){
 }, BPPARAM = mcparam)
 stat = do.call(rbind , stat)
 
-saveRDS(stat , file = paste0(root.dir , "data/processed_time/geneBasis/" , system , "/stat_unparalleled_batched.Rds"))
+saveRDS(stat , file = paste0(root.dir , "data/processed_time/geneBasis/" , system , "/stat_unparalleled_batched_updated.Rds"))
 
 
 
 ```
+
 
 #Session Info
 

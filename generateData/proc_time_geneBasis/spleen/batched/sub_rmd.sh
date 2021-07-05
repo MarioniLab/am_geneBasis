@@ -12,7 +12,7 @@ script_name=time_spl_bat
 memory=500000
 r_command="rusage[mem=${memory}]"
 #num_processors
-nproc=5
+nproc=7
 
 smg=/nfs/research1/marioni/alsu/singularity/R1.simg
 script=/nfs/research1/marioni/alsu/geneBasis/am_geneBasis/generateData/proc_time_geneBasis/spleen/batched/run_rmd.R
