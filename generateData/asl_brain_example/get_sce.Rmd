@@ -1,0 +1,65 @@
+---
+title: "Mapping to the atlas"
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+#Introduction & method
+
+In this script we map cells from the FAS-affected embryos (+ 4 samples from the atlas experiment) onto our atlas.
+
+```{r load, message = FALSE}
+# load libraries we are going to use
+
+
+library(Matrix)
+library(scran)
+library(scater)
+library(batchelor)
+library(reshape2)
+library(BiocSingular)
+library(BiocParallel)
+library(BiocNeighbors)
+library(SingleCellExperiment)
+library(SingleCellExperiment)
+library(Seurat)
+library(SeuratObject)
+library(SingleCellExperiment)
+library(scran)
+library(scuttle)
+library(zellkonverter)
+set.seed(32)
+
+root.dir = "/nfs/research1/marioni/alsu/asl_genePanel"
+
+
+
+```
+
+# Read counts and meta
+
+```{r read-counts, message = FALSE}
+
+
+counts = read.csv(paste0(root.dir , "data/matrix.csv"))
+
+genes = colnames(counts)
+cells = rownames(counts)
+counts = as(t(counts[,2:ncol(counts)]) , "dgCMatrix")
+colnames(counts) = cells
+
+sce = SingleCellExperiment(list(counts=counts))
+saveRDS(sce, file = paste0(root.dir, "data/sce.Rds"))
+
+
+
+```
+
+
+#Session Info
+
+```{r sessinf}
+sessionInfo()
+```
