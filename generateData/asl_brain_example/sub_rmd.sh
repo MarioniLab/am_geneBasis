@@ -8,7 +8,7 @@ err_folder=${my_folder}/clust_err/geneBasis
 script_name=get_sce
 #CHOOSE PARAMETERS
 #RAM in megabytes
-memory=50000
+memory=80000
 r_command="rusage[mem=${memory}]"
 #num_processors
 nproc=1
