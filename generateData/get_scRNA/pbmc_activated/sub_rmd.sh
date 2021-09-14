@@ -17,7 +17,7 @@ nproc=7
 smg=/hps/software/users/marioni/alsu/singularity/alsu_image.simg
 script=/nfs/research/marioni/alsu/geneBasis/am_geneBasis/generateData/get_scRNA/pbmc_activated/run_rmd.R
 
-bsub -q standard -e ${err_folder}/${script_name} \
+bsub -q bigmem -e ${err_folder}/${script_name} \
 -o ${out_folder}/${script_name} \
 -M $memory -R $r_command -n $nproc -J ${script_name} \
 "singularity exec $smg Rscript $script"
