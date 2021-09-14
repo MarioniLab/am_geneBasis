@@ -1,0 +1,114 @@
+---
+title: "Get PBMC activated scRNA."
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+#Introduction & method
+
+In this script we map cells from the FAS-affected embryos (+ 4 samples from the atlas experiment) onto our atlas.
+
+```{r load, message = FALSE}
+# load libraries we are going to use
+
+
+library(Matrix)
+library(scran)
+library(scater)
+library(batchelor)
+library(reshape2)
+library(BiocSingular)
+library(BiocParallel)
+library(BiocNeighbors)
+library(SingleCellExperiment)
+library(Seurat)
+library(SeuratObject)
+library(scuttle)
+library(geneBasisR)
+ncores = 7
+mcparam = MulticoreParam(workers = ncores)
+register(mcparam)
+
+set.seed(32)
+
+#root.dir = "/nfs/research/marioni/alsu/geneBasis/"
+root.dir = "/Users/alsu/Develop/geneBasis/"
+
+system = "pbmc_activated"
+
+
+```
+
+
+# Read counts file
+
+```{r read-seurat, message = FALSE}
+
+
+counts = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/"  , "CZI.PBMC.RNA.matrix.Rds"))
+meta = read.csv(paste0(root.dir , "data/scRNA_datasets/" , system , "/"  , "CZI.PBMC.cell.annotations.csv"))
+colnames(meta)[colnames(meta) == "X"] = "cell"
+
+sce = SingleCellExperiment(assays = list("counts" = counts), colData = meta)  
+rm(counts)
+
+
+```
+
+
+# Add logcounts
+
+```{r add-logcounts, message = FALSE}
+
+
+sce = lapply(unique(sce$Donor_of_Origin) , function(current.batch){
+  print(current.batch)
+  current.sce = sce[, sce$Donor_of_Origin == current.batch]
+  clusters = quickCluster(current.sce, method="igraph", use.ranks=TRUE, d=50, min.mean=0.1)
+  current.sce = computeSumFactors(current.sce, clusters=clusters)
+  return(current.sce)
+}) 
+sce = do.call(multiBatchNorm , sce )
+sce = do.call(cbind, sce)
+
+
+saveRDS(sce, file = paste0(root.dir, "data/scRNA_datasets/" , system , "/sce_" , system, ".Rds"))
+
+
+
+```
+
+# Add UMAPs
+
+```{r add-umap, message = FALSE}
+
+
+# get hvgs
+sce_hvg = retain_informative_genes(sce, n = 5000)
+# get corrected pcs
+pcs = multiBatchPCA(logcounts(sce_hvg), batch = factor(sce$Donor_of_Origin), d = 50)
+pcs = do.call(reducedMNN, pcs)
+pcs = pcs$corrected
+# get umaps
+umaps = as.data.frame( uwot::umap(pcs , min_dist = 0.7) )
+rownames(umaps) = colnames(sce_hvg)
+colnames(umaps) = c("x" , "y")
+reducedDim(sce , "UMAP") = umaps
+
+
+saveRDS(sce, file = paste0(root.dir, "data/scRNA_datasets/" , system , "/sce_" , system, ".Rds"))
+
+
+
+
+```
+
+#Session Info
+
+```{r sessinf}
+
+sessionInfo()
+
+```
