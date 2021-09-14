@@ -1,5 +1,5 @@
 #INITIALISE FOLDERS
-my_folder=/nfs/research1/marioni/alsu
+my_folder=/nfs/research/marioni/alsu
 out_folder=${my_folder}/clust_out/geneBasis
 err_folder=${my_folder}/clust_err/geneBasis
 
