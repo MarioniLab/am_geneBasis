@@ -27,7 +27,7 @@ library(Seurat)
 library(SeuratObject)
 library(scuttle)
 library(geneBasisR)
-ncores = 7
+ncores = 4
 mcparam = MulticoreParam(workers = ncores)
 register(mcparam)
 

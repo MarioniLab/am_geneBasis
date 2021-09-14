@@ -9,10 +9,10 @@ script_name=sc_pbmc
 
 #CHOOSE PARAMETERS
 #RAM in megabytes
-memory=600000
+memory=350000
 r_command="rusage[mem=${memory}]"
 #num_processors
-nproc=7
+nproc=4
 
 smg=/hps/software/users/marioni/alsu/singularity/alsu_image.simg
 script=/nfs/research/marioni/alsu/geneBasis/am_geneBasis/generateData/get_scRNA/pbmc_activated/run_rmd.R
