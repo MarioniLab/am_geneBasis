@@ -33,8 +33,8 @@ register(mcparam)
 
 set.seed(32)
 
-#root.dir = "/nfs/research/marioni/alsu/geneBasis/"
-root.dir = "/Users/alsu/Develop/geneBasis/"
+root.dir = "/nfs/research/marioni/alsu/geneBasis/"
+#root.dir = "/Users/alsu/Develop/geneBasis/"
 
 system = "pbmc_activated"
 
@@ -72,10 +72,6 @@ sce = lapply(unique(sce$Donor_of_Origin) , function(current.batch){
 }) 
 sce = do.call(multiBatchNorm , sce )
 sce = do.call(cbind, sce)
-
-
-saveRDS(sce, file = paste0(root.dir, "data/scRNA_datasets/" , system , "/sce_" , system, ".Rds"))
-
 
 
 ```
