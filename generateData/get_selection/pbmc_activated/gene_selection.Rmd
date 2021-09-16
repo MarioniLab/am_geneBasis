@@ -1,0 +1,74 @@
+---
+title: "Gene selection."
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+
+#Introduction & method
+
+
+```{r load, message = FALSE}
+# load libraries we are going to use
+
+library(Matrix)
+library(scran)
+library(scater)
+library(batchelor)
+library(knitr)
+library(reshape2)
+library(edgeR)
+library(ggplot2)
+library(BiocSingular)
+library(BiocParallel)
+library(BiocNeighbors)
+library(SingleCellExperiment)
+library(dplyr)
+library(BiocStyle)
+library(stats)
+library(geneBasisR)
+ncores = 4
+mcparam = MulticoreParam(workers = ncores)
+register(mcparam)
+set.seed(32)
+
+#root.dir = "/Users/alsu/Develop/geneBasis/"
+root.dir = "/nfs/research/marioni/alsu/geneBasis/"
+#source(paste0(root.dir , "am_geneBasis/functions/main_functions.R"))
+
+system = "pbmc_activated"
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+
+
+```
+
+
+# Iterative gene search
+
+```{r iterative-gene-search, message = FALSE}
+
+
+n_genes_total = 250
+
+activation_status = c("Baseline", "CD3_CD28", "IgM_IgG", "LPS")
+
+genes = bplapply(activation_status , function(id){
+  current.sce = sce[, sce$HTO_Classification == id]
+  current.sce = retain_informative_genes(current.sce, var.thresh = 0)
+  
+  genes = gene_search(current.sce , genes_base = NULL, n_genes_total = n_genes_total, batch = "Donor_of_Origin")
+  saveRDS(genes , paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection_", id, ".Rds"))
+  return(NULL)
+}, BPPARAM = mcparam)
+
+
+
+```
+
+#Session Info
+
+```{r sessinf}
+sessionInfo()
+```
