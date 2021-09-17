@@ -51,10 +51,12 @@ get_sce = function(dir, type){
     sce = retain_informative_genes(sce)
     rowdata = rowData(sce)
     rownames(sce) = rowdata$Gene
+    sce = sce[!rownames(sce) %in% c("Zfand4") , ]
   }
   else {
     sce = sce[rownames(sce) %in% rownames(seqfish_cortex) , ]
     sce = retain_informative_genes(sce)
+    sce = sce[!rownames(sce) %in% c("Zfand4") , ]
   }
   return(sce)
 }
@@ -74,6 +76,7 @@ batches = c("orig.ident" , "DonorID" , "DonorID" , "DonorID" )
 types = c("Azimuth" , "Zeisel" , "Zeisel" , "Zeisel" , "Tasic")
 
 n_genes_total = 250
+
 genes = bplapply(1:length(dirs) , function(i){
   sce = get_sce(paste0("/nfs/research/marioni/alsu/External/" , dirs[i]) , types[i])
   if ( i < 5 ){
@@ -83,7 +86,7 @@ genes = bplapply(1:length(dirs) , function(i){
     current.genes = geneBasisR::gene_search(sce , genes_base = NULL, n_genes_total = n_genes_total, batch = NULL, n.neigh = 3, nPC.all = 50, nPC.selection = 50, verbose = F)
   }
   saveRDS(current.genes , paste0(root.dir , "data/gene_selection/" , "mouse_motorcortex" , "/" , "gene_selection_", names[i], ".Rds"))
-  return(NULL)
+  return(current.genes)
 }, BPPARAM = mcparam)
 
 
