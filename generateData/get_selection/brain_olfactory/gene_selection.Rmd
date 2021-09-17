@@ -39,23 +39,21 @@ root.dir = "/nfs/research/marioni/alsu/geneBasis/"
 
 message("out1")
 
-sce = readRDS(paste0("/nfs/research/marioni/alsu/External/Zeisel_mouseBrain/" , "olfactory", ".Rds"))
+#sce = readRDS(paste0("/nfs/research/marioni/alsu/External/Zeisel_mouseBrain/" , "olfactory", ".Rds"))
+sce = readRDS(paste0("/nfs/research/marioni/alsu/External/Azimuth/" , "mouse_motorcortex.rds"))
+
 
 # delete not relevant celltypes
-sce = sce[, !sce$Class %in% c("Blood" , "Excluded" , "Immune")]
-rowdata = rowData(sce)
-rownames(sce) = rowdata$Accession
-sce = retain_informative_genes(sce)
-rowdata = rowData(sce)
-rownames(sce) = rowdata$Gene
-
-message("out2")
+#sce = sce[, !sce$Class %in% c("Blood" , "Excluded" , "Immune")]
+#rowdata = rowData(sce)
+#rownames(sce) = rowdata$Accession
+#sce = retain_informative_genes(sce)
+#rowdata = rowData(sce)
+#rownames(sce) = rowdata$Gene
 
 # only leave the ones w/ entries in seqfish
 seqfish_olfactory = readRDS("/nfs/research/marioni/alsu/External/seqFISH_plus/seqfish_olfactory.Rds")
 sce = sce[rownames(sce) %in% rownames(seqfish_olfactory) , ]
-
-message("out3")
 
 ```
 
@@ -63,12 +61,12 @@ message("out3")
 
 ```{r iterative-gene-search, message = FALSE}
 
-
-n_genes_total = 250
-genes = geneBasisR::gene_search(sce , genes_base = NULL, n_genes_total = n_genes_total, batch = "DonorID", n.neigh = 5, nPC.all = 50, nPC.selection = 100, verbose = T)
-
-saveRDS(genes , paste0(root.dir , "data/gene_selection/" , "mouse_olfactory" , "/" , "gene_selection", ".Rds"))
-
+# 
+# n_genes_total = 250
+# genes = geneBasisR::gene_search(sce , genes_base = NULL, n_genes_total = n_genes_total, batch = "DonorID", n.neigh = 5, nPC.all = 50, nPC.selection = 100, verbose = T)
+# 
+# saveRDS(genes , paste0(root.dir , "data/gene_selection/" , "mouse_olfactory" , "/" , "gene_selection", ".Rds"))
+# 
 
 ```
 
