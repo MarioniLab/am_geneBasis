@@ -10,10 +10,10 @@ script_name=genes_cortex
 
 #CHOOSE PARAMETERS
 #RAM in megabytes
-memory=200000
+memory=400000
 r_command="rusage[mem=${memory}]"
 #num_processors
-nproc=1
+nproc=5
 
 smg=/hps/software/users/marioni/alsu/singularity/alsu_image.simg
 script=/nfs/research/marioni/alsu/geneBasis/am_geneBasis/generateData/get_selection/brain_cortex/run_rmd.R
