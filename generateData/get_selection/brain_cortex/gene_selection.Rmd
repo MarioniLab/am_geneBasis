@@ -42,8 +42,10 @@ seqfish_cortex = readRDS("/nfs/research/marioni/alsu/External/seqFISH_plus/seqfi
 
 get_sce = function(dir, type){
   sce = readRDS(dir)
+  
   if (type == "Zeisel"){
     sce = sce[ , !sce$Class %in% c("Blood" , "Excluded" , "Immune")]
+    sce = sce[rownames(sce) %in% rownames(seqfish_cortex) , ]
     rowdata = rowData(sce)
     rownames(sce) = rowdata$Accession
     sce = retain_informative_genes(sce)
@@ -51,10 +53,9 @@ get_sce = function(dir, type){
     rownames(sce) = rowdata$Gene
   }
   else {
+    sce = sce[rownames(sce) %in% rownames(seqfish_cortex) , ]
     sce = retain_informative_genes(sce)
   }
-  # only leave the ones w/ entries in seqfish
-  sce = sce[rownames(sce) %in% rownames(seqfish_cortex) , ]
   return(sce)
 }
 
