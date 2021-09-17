@@ -49,7 +49,7 @@ rownames(sce) = rowdata$Gene
 
 # only leave the ones w/ entries in seqfish
 seqfish_olfactory = readRDS("/nfs/research/marioni/alsu/External/seqFISH_plus/seqfish_olfactory.Rds")
-sce = sce[rownames(sce) %in% rownames(seqfish) , ]
+sce = sce[rownames(sce) %in% rownames(seqfish_olfactory) , ]
 
 
 ```

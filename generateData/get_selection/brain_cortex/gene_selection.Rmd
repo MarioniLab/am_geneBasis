@@ -38,9 +38,9 @@ set.seed(32)
 root.dir = "/nfs/research/marioni/alsu/geneBasis/"
 
 # only leave the ones w/ entries in seqfish
-seqfish = readRDS("/nfs/research/marioni/alsu/External/seqFISH_plus/seqfish_cortex.Rds")
+seqfish_cortex = readRDS("/nfs/research/marioni/alsu/External/seqFISH_plus/seqfish_cortex.Rds")
 
-get_sce = function(dir){
+get_sce = function(dir, type){
   sce = readRDS(dir)
   if (type == "Zeisel"){
     rowdata = rowData(sce)
@@ -54,7 +54,7 @@ get_sce = function(dir){
     sce = retain_informative_genes(sce)
   }
   # only leave the ones w/ entries in seqfish
-  sce = sce[rownames(sce) %in% rownames(seqfish) , ]
+  sce = sce[rownames(sce) %in% rownames(seqfish_cortex) , ]
   return(sce)
 }
 
@@ -70,11 +70,12 @@ get_sce = function(dir){
 dirs = c("Azimuth/mouse_motorcortex.rds" , "Zeisel_mouseBrain/cortex1.Rds" , "Zeisel_mouseBrain/cortex2.Rds" , 
          "Zeisel_mouseBrain/cortex3.Rds" , "Tasic_cortex/sce_brain_cortex.Rds")
 names = c("cortex_azimuth" , "cortex_zeisel_1" , "cortex_zeisel_2" , "cortex_zeisel_3" , "cortex_tasic" )
-batches = c("orig.ident" , "DonorID" , "DonorID" , "DonorID" , )
+batches = c("orig.ident" , "DonorID" , "DonorID" , "DonorID" )
+types = c("Azimuth" , "Zeisel" , "Zeisel" , "Zeisel" , "Tasic")
 
 n_genes_total = 250
 genes = bplapply(1:length(dirs) , function(i){
-  sce = get_sce(paste0("/nfs/research/marioni/alsu/External/" , dirs[i]))
+  sce = get_sce(paste0("/nfs/research/marioni/alsu/External/" , dirs[i]) , types[i])
   if ( i < 5 ){
     current.genes = geneBasisR::gene_search(sce , genes_base = NULL, n_genes_total = n_genes_total, batch = batches[i], n.neigh = 5, nPC.all = 50, nPC.selection = 100, verbose = F)
   }
