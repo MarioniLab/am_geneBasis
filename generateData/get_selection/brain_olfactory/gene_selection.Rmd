@@ -38,7 +38,7 @@ set.seed(32)
 root.dir = "/nfs/research/marioni/alsu/geneBasis/"
 
 
-sce = readRDS(paste0("/nfs/research/marioni/alsu/External/Zeisel_mouseBrain/" , "olfactory", ".rds"))
+sce = readRDS(paste0("/nfs/research/marioni/alsu/External/Zeisel_mouseBrain/" , "olfactory", ".Rds"))
 # delete not relevant celltypes
 sce = sce[, !sce$Class %in% c("Blood" , "Excluded" , "Immune")]
 rowdata = rowData(sce)
