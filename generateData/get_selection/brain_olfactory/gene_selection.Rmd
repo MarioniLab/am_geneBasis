@@ -38,8 +38,7 @@ set.seed(32)
 root.dir = "/nfs/research/marioni/alsu/geneBasis/"
 
 
-#sce = readRDS(paste0("/nfs/research/marioni/alsu/External/Zeisel_mouseBrain/" , "olfactory", ".Rds"))
-sce = readRDS(paste0("/Users//alsu/Develop/External/Zeisel_mouseBrain/" , "olfactory", ".Rds"))
+sce = readRDS(paste0("/nfs/research/marioni/alsu/External/Zeisel_mouseBrain/" , "olfactory", ".Rds"))
 
 # delete not relevant celltypes
 sce = sce[, !sce$Class %in% c("Blood" , "Excluded" , "Immune")]
@@ -50,8 +49,7 @@ rowdata = rowData(sce)
 rownames(sce) = rowdata$Gene
 
 # only leave the ones w/ entries in seqfish
-#seqfish_olfactory = readRDS("/nfs/research/marioni/alsu/External/seqFISH_plus/seqfish_olfactory.Rds")
-seqfish_olfactory = readRDS("/Users/alsu/Develop/External/seqFISH_plus/seqfish_olfactory.Rds")
+seqfish_olfactory = readRDS("/nfs/research/marioni/alsu/External/seqFISH_plus/seqfish_olfactory.Rds")
 sce = sce[rownames(sce) %in% rownames(seqfish_olfactory) , ]
 
 
