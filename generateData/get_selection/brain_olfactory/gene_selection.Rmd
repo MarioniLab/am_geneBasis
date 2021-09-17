@@ -37,6 +37,7 @@ set.seed(32)
 #root.dir = "/Users/alsu/Develop/geneBasis/"
 root.dir = "/nfs/research/marioni/alsu/geneBasis/"
 
+message("out1")
 
 sce = readRDS(paste0("/nfs/research/marioni/alsu/External/Zeisel_mouseBrain/" , "olfactory", ".Rds"))
 
@@ -48,10 +49,13 @@ sce = retain_informative_genes(sce)
 rowdata = rowData(sce)
 rownames(sce) = rowdata$Gene
 
+message("out2")
+
 # only leave the ones w/ entries in seqfish
 seqfish_olfactory = readRDS("/nfs/research/marioni/alsu/External/seqFISH_plus/seqfish_olfactory.Rds")
 sce = sce[rownames(sce) %in% rownames(seqfish_olfactory) , ]
 
+message("out3")
 
 ```
 
