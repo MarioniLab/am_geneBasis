@@ -84,7 +84,7 @@ genes = bplapply(1:length(dirs) , function(i){
   }
   saveRDS(current.genes , paste0(root.dir , "data/gene_selection/" , "mouse_motorcortex" , "/" , "gene_selection_", names[i], ".Rds"))
   return(NULL)
-}, BPPARAM = mcaparam)
+}, BPPARAM = mcparam)
 
 
 
