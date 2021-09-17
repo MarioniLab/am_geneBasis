@@ -1,0 +1,75 @@
+---
+title: "Gene selection."
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+
+#Introduction & method
+
+
+```{r load, message = FALSE}
+# load libraries we are going to use
+
+library(Matrix)
+library(scran)
+library(scater)
+library(batchelor)
+library(knitr)
+library(reshape2)
+library(edgeR)
+library(ggplot2)
+library(BiocSingular)
+library(BiocParallel)
+library(BiocNeighbors)
+library(SingleCellExperiment)
+library(dplyr)
+library(BiocStyle)
+library(stats)
+library(geneBasisR)
+#ncores = 5
+#mcparam = MulticoreParam(workers = ncores)
+#register(mcparam)
+set.seed(32)
+
+#root.dir = "/Users/alsu/Develop/geneBasis/"
+root.dir = "/nfs/research/marioni/alsu/geneBasis/"
+
+
+sce = readRDS(paste0("/nfs/research/marioni/alsu/External/Zeisel_mouseBrain/" , "olfactory", ".rds"))
+# delete not relevant celltypes
+sce = sce[, !sce$Class %in% c("Blood" , "Excluded" , "Immune")]
+rowdata = rowData(sce)
+rownames(sce) = rowdata$Accession
+sce = retain_informative_genes(sce)
+rowdata = rowData(sce)
+rownames(sce) = rowdata$Gene
+
+# only leave the ones w/ entries in seqfish
+seqfish_olfactory = readRDS("/nfs/research/marioni/alsu/External/seqFISH_plus/seqfish_olfactory.Rds")
+sce = sce[rownames(sce) %in% rownames(seqfish) , ]
+
+
+```
+
+# Iterative gene search
+
+```{r iterative-gene-search, message = FALSE}
+
+
+n_genes_total = 250
+genes = geneBasisR::gene_search(sce , genes_base = NULL, n_genes_total = n_genes_total, batch = "DonorID", n.neigh = 5, nPC.all = 50, nPC.selection = 100, verbose = F)
+saveRDS(genes , paste0(root.dir , "data/gene_selection/" , "mouse_olfactory" , "/" , "gene_selection", ".Rds"))
+
+
+```
+
+
+
+#Session Info
+
+```{r sessinf}
+sessionInfo()
+```
