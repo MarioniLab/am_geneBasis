@@ -41,15 +41,16 @@ sce = readRDS(paste0("/nfs/research/marioni/alsu/External/Zeisel_mouseBrain/" , 
 
 # delete not relevant celltypes
 sce = sce[, !sce$Class %in% c("Blood" , "Excluded")]
-rowdata = rowData(sce)
-rownames(sce) = rowdata$Accession
-sce = retain_informative_genes(sce)
-rowdata = rowData(sce)
-rownames(sce) = rowdata$Gene
 
 # only leave the ones w/ entries in seqfish
 seqfish_olfactory = readRDS("/nfs/research/marioni/alsu/External/seqFISH_plus/seqfish_olfactory.Rds")
-sce = sce[rownames(sce) %in% rownames(seqfish_olfactory) , ]
+
+unq_sce_genes = table(rownames(sce))
+unq_sce_genes = names(unq_sce_genes)[unq_sce_genes == 1]
+seqfish_genes = rownames(seqfish_olfactory)
+seqfish_genes = intersect(unq_sce_genes , seqfish_genes)
+sce = sce[rownames(sce) %in% seqfish_genes, ]
+
 
 ```
 
