@@ -44,20 +44,16 @@ get_sce = function(dir, type){
   sce = readRDS(dir)
   
   if (type == "Zeisel"){
-    sce = sce[ , !sce$Class %in% c("Blood" , "Excluded" , "Immune")]
-    sce = sce[rownames(sce) %in% rownames(seqfish_cortex) , ]
-    rowdata = rowData(sce)
-    rownames(sce) = rowdata$Accession
-    sce = retain_informative_genes(sce)
-    rowdata = rowData(sce)
-    rownames(sce) = rowdata$Gene
-    sce = sce[!rownames(sce) %in% c("Zfand4") , ]
+    sce = sce[ , !sce$Class %in% c("Blood" , "Excluded")]
   }
-  else {
-    sce = sce[rownames(sce) %in% rownames(seqfish_cortex) , ]
-    sce = retain_informative_genes(sce)
-    sce = sce[!rownames(sce) %in% c("Zfand4") , ]
-  }
+  
+  # unique genes that are in seqfish
+  unq_sce_genes = table(rownames(sce))
+  unq_sce_genes = names(unq_sce_genes)[unq_sce_genes == 1]
+  seqfish_genes = rownames(seqfish_cortex)
+  seqfish_genes = intersect(unq_sce_genes , seqfish_genes)
+  sce = sce[rownames(sce) %in% seqfish_genes, ]
+  
   return(sce)
 }
 
