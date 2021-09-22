@@ -28,8 +28,9 @@ library(SingleCellExperiment)
 library(dplyr)
 library(BiocStyle)
 library(stats)
+library(biomaRt)
 library(geneBasisR)
-ncores = 4
+ncores = 3
 mcparam = MulticoreParam(workers = ncores)
 register(mcparam)
 set.seed(32)
@@ -40,6 +41,28 @@ root.dir = "/nfs/research/marioni/alsu/geneBasis/"
 
 system = "pbmc_activated"
 sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+
+# change gene-ensembl to external
+human_ensembl = useMart("ensembl")
+human_ensembl = useDataset("hsapiens_gene_ensembl", mart = human_ensembl)
+gene_map = getBM(attributes=c("ensembl_gene_id", "external_gene_name"), filters = "ensembl_gene_id", values = rownames(sce), mart = human_ensembl)
+idx = which(gene_map$external_gene_name == "")
+gene_map$external_gene_name[idx] = gene_map$ensembl_gene_id[idx]
+
+
+rownames.sce = sapply( rownames(sce) , function(x) gene_map$external_gene_name[gene_map$ensembl_gene_id == x])
+rownames.sce = as.character(rownames.sce)
+
+tab = table(rownames.sce)
+tab = names(tab)[tab == 1 & !tab == "character(0)"]
+
+
+idx = which(rownames.sce %in% tab)
+sce = sce[idx , ]
+rownames(sce) = rownames.sce[idx]
+
+
+
 
 
 ```
@@ -52,13 +75,14 @@ sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , syst
 
 n_genes_total = 250
 
-activation_status = c("Baseline", "CD3_CD28", "IgM_IgG", "LPS")
+activation_status = c("Baseline", "CD3_CD28", "LPS")
 
 genes = bplapply(activation_status , function(id){
   current.sce = sce[, sce$HTO_Classification == id]
-  current.sce = retain_informative_genes(current.sce, var.thresh = 0)
+  current.sce = retain_informative_genes(current.sce, var.thresh = 0, discard.mt = T)
   
-  genes = gene_search(current.sce , genes_base = NULL, n_genes_total = n_genes_total, batch = "Donor_of_Origin")
+  genes = gene_search(current.sce , genes_base = NULL, n_genes_total = n_genes_total, genes.discard_prefix = c("RPL", "RPS" , "MT-") , 
+                      batch = "Donor_of_Origin")
   saveRDS(genes , paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection_", id, ".Rds"))
   return(NULL)
 }, BPPARAM = mcparam)

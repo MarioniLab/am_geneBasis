@@ -10,10 +10,10 @@ script_name=genes_pbmc
 
 #CHOOSE PARAMETERS
 #RAM in megabytes
-memory=500000
+memory=420000
 r_command="rusage[mem=${memory}]"
 #num_processors
-nproc=4
+nproc=3
 
 smg=/hps/software/users/marioni/alsu/singularity/alsu_image.simg
 script=/nfs/research/marioni/alsu/geneBasis/am_geneBasis/generateData/get_selection/pbmc_activated/run_rmd.R
