@@ -1,0 +1,395 @@
+---
+title: "Pipeline to assess how PCA inclusion affect selections (melanoma)."
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+
+Add cell,gene,celltype score
+
+# Load dependencies
+
+```{r load, message = FALSE}
+
+
+library(SingleCellExperiment)
+library(ggplot2)
+library(ggpubr)
+library(viridis)
+library(wesanderson)
+library(igraph)
+library(batchelor)
+library(stats)
+library(BiocNeighbors)
+library(tibble)
+library(reshape2)
+library(plyr)
+library(dplyr)
+library(scran)
+library(batchelor)
+library(uwot)
+library(stringr)
+library(corrplot)
+library(ggcorrplot)
+
+root.dir = "/Users/alsu/Develop/geneBasis/"
+source(paste0(root.dir, "am_geneBasis/functions/main_functions.R"))
+source(paste0(root.dir, "am_geneBasis/functions/visualization_functions.R"))
+
+system = "melanoma"
+figures.dir = paste0(root.dir , "figures/benchmark_method/diff_nPC/" , system, "/")
+
+# read sce 
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+sce = retain_only_hvgs(sce , n = 10000)
+
+
+
+# read gene selection 
+gene_selections.files = list.files(path=paste0(root.dir , "data/gene_selection__optional_PCA/" , system , "/"))
+genes = lapply(gene_selections.files , function(current.file){
+  out = readRDS(paste0(root.dir , "data/gene_selection__optional_PCA/" , system , "/" , current.file))
+  return(out)
+})
+
+genes_null = readRDS(paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection.Rds"))
+genes[[length(genes) + 1]] = genes_null
+names(genes) = c(10,100,25,50,0)
+
+
+# load stats we calced
+stat_cell_score = readRDS(paste0(root.dir , "data/benchmark_method/diff_nPC/" , system , "/cell_score.Rds"))
+stat_gene_score = readRDS(paste0(root.dir , "data/benchmark_method/diff_nPC/" , system , "/gene_score.Rds"))
+
+
+
+```
+
+
+# Set up color schemes
+
+```{r color-schemes, message = FALSE}
+
+
+type_cols = wesanderson::wes_palette("Zissou1" , type = "continuous" , 4) 
+type_ext_cols = c("gray" , type_cols)
+celltype_cols = celltype_colors[[which( names(celltype_colors) == system )]]
+
+
+```
+
+
+
+# Quantitative stat
+
+## Cell score
+
+```{r cell-score, message = FALSE}
+
+
+stat_cell_score$type = factor(stat_cell_score$type , levels = c("0" , "100" , "50" , "25" , "10"))
+p = ggplot(stat_cell_score[stat_cell_score$n_genes %in% seq(50,250,50), ], aes(x = factor(n_genes) , y = score , fill = type)) +
+  geom_boxplot() +
+  scale_fill_manual(values = type_ext_cols) + 
+  theme_classic() + 
+  ylim(c(0.25, 1)) +
+  labs(x = "# Genes" , y = "Cell score") +
+  theme(legend.position = "none")
+p
+ggsave(filename = paste0(figures.dir, "cell_score", ".png"), plot = p, width = 3, height = 3)
+
+
+
+```
+
+## Gene score
+
+```{r gene-score, message = FALSE}
+
+
+stat_gene_score$type = factor(stat_gene_score$type , levels = c("0" , "100" , "50" , "25" , "10"))
+p = ggplot(stat_gene_score[stat_gene_score$n_genes %in% seq(50,250,50) & stat_gene_score$corr_all > 0.25, ] , aes(x = factor(n_genes) , y = corr_ratio , fill = type)) +
+  geom_boxplot() +
+  scale_fill_manual(values = type_ext_cols) + 
+  theme_classic() + 
+  ylim(c(0.75, 1)) +
+  labs(x = "# Genes" , y = "Gene score") +
+  theme(legend.position = "none")
+p
+ggsave(filename = paste0(figures.dir, "gene_score", ".png"), plot = p, width = 3, height = 3)
+
+
+```
+
+
+# Minimum frac-expressed
+
+```{r min-frac-expressed, message = FALSE}
+
+
+genes = lapply(1:length(genes) , function(i){
+  current.genes = genes[[i]]
+  current.genes$nPC = names(genes)[i]
+  return(current.genes)
+})
+genes = do.call(rbind , genes)
+
+mean_stat = apply(assay(sce[as.character(unique(genes$gene)) , ] , "logcounts") , 1 , mean)
+mean_stat = data.frame(gene = names(mean_stat) , mean = mean_stat)
+
+frac.expressed_stat = apply(assay(sce[as.character(unique(genes$gene)) , ] , "logcounts") , 1 , function(x) mean(x > 0))
+frac.expressed_stat = data.frame(gene = names(frac.expressed_stat) , frac.expressed = frac.expressed_stat)
+
+sd_stat = apply(assay(sce[as.character(unique(genes$gene)),] , "logcounts") , 1 , sd)
+sd_stat = data.frame(gene = names(sd_stat) , sd = sd_stat)
+
+stat = merge(mean_stat, frac.expressed_stat)
+stat = merge(stat, sd_stat)
+stat$cv = stat$sd/stat$mean
+
+genes = merge(genes, stat, all.x = T)
+
+
+n_genes.grid = seq(75,250,25)
+stat_frac = lapply(unique(genes$nPC) , function(nPC){
+  stat_per_dist = lapply(n_genes.grid , function(n_genes){
+    current.genes = as.character( genes$gene[genes$nPC == nPC & genes$rank <= n_genes] )
+    out = data.frame(nPC = nPC , n_genes = n_genes , min_frac = min(stat$frac.expressed[stat$gene %in% current.genes]))
+    return(out)
+  })
+  stat_per_dist = do.call(rbind , stat_per_dist)
+  return(stat_per_dist)
+})
+stat_frac = do.call(rbind, stat_frac)
+stat_frac$nPC = factor(stat_frac$nPC  , levels = c("0" , "100" , "50" , "25" , "10"))
+  
+p = ggplot(stat_frac , aes(x = factor(nPC) , y = factor(n_genes) , fill = log(min_frac))) +
+  geom_tile(aes(fill = log(min_frac))) +
+  geom_text(aes(label = round(min_frac,3)) , color = "white") +
+  scale_fill_viridis(discrete = F) + 
+  theme_classic() +
+  labs(x = "nPC" , y = "Number of genes")
+p
+ggsave(filename = paste0(figures.dir, "heatmap_frac_expressed", ".png"), plot = p, width = 5, height = 4)
+
+
+
+```
+
+# BULK
+
+# Compare selections by genes - co-expression
+
+## In wo/PCA but not in w/PCA
+
+```{r compare-selections-by-gene, message = FALSE}
+
+
+genes_base = genes[[which(names(genes) == 0)]]
+
+nPC.grid = c(10,25,50,100)
+stat = lapply(nPC.grid , function(nPC){
+  current.genes = genes[[which(names(genes) == nPC)]]
+  current.stat = compare_gene_selections(sce , genes_base, current.genes , corr.thresh = 1, rank.thresh = 250)
+  current.stat$id = nPC
+  return(current.stat)
+})
+stat = do.call(rbind , stat)
+stat$id = factor(stat$id , levels = c(10,25,50,100))
+
+
+n_genes.grid = seq(50,250,50)
+plots = lapply(n_genes.grid, function(n_genes){
+  current.stat = stat[stat$rank <= n_genes , ]
+  p = ggplot(current.stat , aes(x = factor(id) , y = corr , fill = factor(id))) + 
+    geom_boxplot() +
+    scale_fill_manual(values = type_cols) + 
+    theme_classic() + 
+    ylim(c(0,1)) + 
+    labs(x = "") + 
+    ggtitle(paste(n_genes , "genes"))
+  return(p)
+})
+p = ggarrange(plotlist = plots, common.legend = T, ncol = length(n_genes.grid))
+p
+ggsave(filename = paste0(figures.dir, "in_control/corr_distr__in_control", ".png"), plot = p, width = 8, height = 2)
+
+
+
+```
+
+### What are the genes we select in control but not in tested
+
+```{r genes-in-control-unique, message = FALSE}
+
+
+corr.thresh = 0.5
+rank.thresh = 200
+stat = stat[stat$corr < corr.thresh & stat$rank < rank.thresh, ]
+
+tab = table(stat$gene)
+genes_unique = names(tab)[tab >= 2]
+
+p = get_umaps(meta , genes_unique)
+p
+ggsave(filename = paste0(figures.dir, "in_control/umaps_genes", ".png"), plot = p, width = 4, height = 4)
+
+
+
+```
+
+## In w/PCA but not in wo/PCA
+
+```{r compare-selections-by-gene, message = FALSE}
+
+
+genes_compare = genes[[which(names(genes) == 0)]]
+
+nPC.grid = c(10,25,50,100)
+stat = lapply(nPC.grid , function(nPC){
+  current.genes = genes[[which(names(genes) == nPC)]]
+  current.stat = compare_gene_selections(sce , current.genes, genes_compare , corr.thresh = 1, rank.thresh = 250)
+  current.stat$id = nPC
+  return(current.stat)
+})
+stat = do.call(rbind , stat)
+stat$id = factor(stat$id , levels = c(10,25,50,100))
+
+
+n_genes.grid = seq(50,250,50)
+plots = lapply(n_genes.grid, function(n_genes){
+  current.stat = stat[stat$rank <= n_genes , ]
+  p = ggplot(current.stat , aes(x = factor(id) , y = corr , fill = factor(id))) + 
+    geom_boxplot() +
+    scale_fill_manual(values = type_cols) + 
+    theme_classic() + 
+    ylim(c(0,1)) + 
+    labs(x = "") + 
+    ggtitle(paste(n_genes , "genes"))
+  return(p)
+})
+p = ggarrange(plotlist = plots, common.legend = T, ncol = length(n_genes.grid))
+p
+ggsave(filename = paste0(figures.dir, "in_test/corr_distr__in_test", ".png"), plot = p, width = 8, height = 2)
+
+
+
+```
+
+### What are the genes we select in control but not in tested
+
+```{r genes-in-control-unique, message = FALSE}
+
+
+corr.thresh = 0.25
+rank.thresh = 200
+stat = stat[stat$corr < corr.thresh & stat$rank < rank.thresh, ]
+
+tab = table(stat$gene)
+genes_unique = names(tab)[tab >= 2]
+
+
+plots = lapply(nPC.grid , function(nPC){
+  current.genes = as.character(stat$gene[stat$id == nPC])
+  titles = sapply(current.genes, function(gene){
+    out = stat_gene_score$corr_ratio[stat_gene_score$gene == gene & stat_gene_score$type == 0 & stat_gene_score$n_genes == rank.thresh]
+    out = round(out,2)
+    return(out)
+  })
+  if (length(current.genes) > 0){
+    p = get_umaps(meta , as.character(stat$gene[stat$id == nPC]), titles)
+    ggsave(filename = paste0(figures.dir, "in_test/umaps_genes_", nPC, ".png"), plot = p, width = 3*length(current.genes), height = 3)
+  }
+})
+
+
+
+```
+
+
+# Quantitative stat
+
+## Cell score
+
+```{r cell-score, message = FALSE}
+
+
+type_ext_cols = c("gainsboro" , type_cols)
+
+stat_cell_score$n_genes = factor(stat_cell_score$n_genes, levels = sort(unique(stat_cell_score$n_genes)))
+stat_cell_score$type = factor(stat_cell_score$type , levels = c(0,10,25,50,100))
+
+p = ggplot(stat_cell_score , aes(x = n_genes , y = score , fill = type)) +
+  geom_boxplot() +
+  scale_fill_manual(values = type_ext_cols) + 
+  theme_classic() + 
+  ylim(c(0.5, 1)) +
+  labs(x = "# Genes" , y = "Cell score")
+p
+ggsave(filename = paste0(figures.dir, "cell_score", ".png"), plot = p, width = 8, height = 3)
+
+
+```
+
+## Gene score
+
+```{r cell-score, message = FALSE}
+
+
+stat_gene_score$n_genes = factor(stat_gene_score$n_genes, levels = sort(unique(stat_gene_score$n_genes)))
+stat_gene_score$type = factor(stat_gene_score$type , levels = c(0,10,25,50,100))
+
+p = ggplot(stat_gene_score , aes(x = n_genes , y = corr_ratio , fill = type)) +
+  geom_boxplot() +
+  scale_fill_manual(values = type_ext_cols) + 
+  theme_classic() + 
+  ylim(c(0.75, 1.05)) +
+  labs(x = "# Genes" , y = "Gene score")
+p
+ggsave(filename = paste0(figures.dir, "gene_score", ".png"), plot = p, width = 8, height = 3)
+
+
+```
+
+# BULK
+
+### Celltype mapping
+
+```{r cell-score, message = FALSE}
+
+
+stat_celltypes$id = paste0(stat_celltypes$n_genes , "_" , stat_celltypes$p)
+stat_frac_mapped_correctly = lapply(unique(stat_celltypes$id) , function(id){
+  print(id)
+  current.mapping = stat_celltypes[stat_celltypes$id == id , ]
+  current.stat = get_fraction_mapped_correctly(current.mapping)
+  current.stat$id = id
+  current.stat = merge(current.stat , unique(stat_celltypes[, c("id" , "n_genes" , "p")]) , all.x = T , all.y = F)
+  return(current.stat)
+})
+stat_frac_mapped_correctly = do.call(rbind , stat_frac_mapped_correctly)
+
+
+
+n_genes.grid = seq(20,200,20)
+p = ggplot(stat_frac_mapped_correctly[stat_frac_mapped_correctly$n_genes %in% n_genes.grid & !stat_frac_mapped_correctly$celltype %in% celltypes.2exclude,] , aes(x = factor(n_genes) , y = frac_correctly_mapped, fill = p)) +
+  geom_boxplot() +
+  #geom_jitter(aes(color=celltype)) +
+  scale_fill_manual(values = p_cols) +
+  theme_classic() + 
+  labs(x = "# Genes" , y = "Fraction mapped correctly")
+p
+ggsave(filename = paste0(figures.dir, "celltype_all_cts", ".png"), plot = p, width = 6, height = 3)
+
+
+
+```
+
+
+# Session Info
+
+```{r sessinf}
+sessionInfo()
+```

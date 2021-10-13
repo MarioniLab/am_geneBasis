@@ -1,0 +1,130 @@
+---
+title: "Pipeline to assess how PCA inclusion affect selections (pancreas)."
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+
+Add cell,gene,celltype score
+
+# Load dependencies
+
+```{r load, message = FALSE}
+
+
+library(SingleCellExperiment)
+library(ggplot2)
+library(ggpubr)
+library(viridis)
+library(wesanderson)
+library(igraph)
+library(batchelor)
+library(stats)
+library(BiocNeighbors)
+library(tibble)
+library(reshape2)
+library(plyr)
+library(dplyr)
+library(scran)
+library(batchelor)
+library(uwot)
+library(stringr)
+library(corrplot)
+library(ggcorrplot)
+
+root.dir = "/Users/alsu/Develop/geneBasis/"
+source(paste0(root.dir, "am_geneBasis/functions/main_functions.R"))
+source(paste0(root.dir, "am_geneBasis/functions/visualization_functions.R"))
+
+system = "pancreas"
+figures.dir = paste0(root.dir , "figures/benchmark_method/diff_nPC/" , system, "/")
+
+# read sce 
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+sce = retain_only_hvgs(sce , n = 10000)
+
+
+# read gene selection 
+gene_selections.files = list.files(path=paste0(root.dir , "data/gene_selection__optional_PCA/" , system , "/"))
+genes = lapply(gene_selections.files , function(current.file){
+  out = readRDS(paste0(root.dir , "data/gene_selection__optional_PCA/" , system , "/" , current.file))
+  return(out)
+})
+
+genes_null = readRDS(paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection.Rds"))
+genes[[length(genes) + 1]] = genes_null
+names(genes) = c(10,100,25,50,0)
+
+
+# load stats we calced
+stat_cell_score = readRDS(paste0(root.dir , "data/benchmark_method/diff_nPC/" , system , "/cell_score.Rds"))
+stat_gene_score = readRDS(paste0(root.dir , "data/benchmark_method/diff_nPC/" , system , "/gene_score.Rds"))
+
+
+
+```
+
+
+# Set up color schemes
+
+```{r color-schemes, message = FALSE}
+
+
+type_cols = wesanderson::wes_palette("Zissou1" , type = "continuous" , 4) 
+type_ext_cols = c("gray" , type_cols)
+celltype_cols = celltype_colors[[which( names(celltype_colors) == system )]]
+
+
+```
+
+
+# Quantitative stat
+
+## Cell score
+
+```{r cell-score, message = FALSE}
+
+
+stat_cell_score$type = factor(stat_cell_score$type , levels = c("0" , "100" , "50" , "25" , "10"))
+p = ggplot(stat_cell_score[stat_cell_score$n_genes %in% seq(50,250,50), ], aes(x = factor(n_genes) , y = score , fill = type)) +
+  geom_boxplot() +
+  scale_fill_manual(values = type_ext_cols) + 
+  theme_classic() + 
+  ylim(c(0.5, 1)) +
+  labs(x = "# Genes" , y = "Cell score") +
+  theme(legend.position = "none")
+p
+ggsave(filename = paste0(figures.dir, "cell_score", ".png"), plot = p, width = 3, height = 3)
+
+
+
+```
+
+## Gene score
+
+```{r gene-score, message = FALSE}
+
+
+stat_gene_score$type = factor(stat_gene_score$type , levels = c("0" , "100" , "50" , "25" , "10"))
+p = ggplot(stat_gene_score[stat_gene_score$n_genes %in% seq(50,250,50) & stat_gene_score$corr_all > 0.25, ] , aes(x = factor(n_genes) , y = corr_ratio , fill = type)) +
+  geom_boxplot() +
+  scale_fill_manual(values = type_ext_cols) + 
+  theme_classic() + 
+  ylim(c(0.75, 1)) +
+  labs(x = "# Genes" , y = "Gene score") +
+  theme(legend.position = "none")
+p
+ggsave(filename = paste0(figures.dir, "gene_score", ".png"), plot = p, width = 3, height = 3)
+
+
+```
+
+
+
+# Session Info
+
+```{r sessinf}
+sessionInfo()
+```
