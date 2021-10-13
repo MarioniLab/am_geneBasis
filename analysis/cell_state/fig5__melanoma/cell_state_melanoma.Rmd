@@ -1,0 +1,313 @@
+---
+title: "Pipeline to analyse selection for melanoma dataset."
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+# Load dependencies
+
+```{r load, message = FALSE}
+
+
+library(SingleCellExperiment)
+library(ggplot2)
+library(ggpubr)
+library(viridis)
+library(wesanderson)
+library(igraph)
+library(batchelor)
+library(stats)
+library(BiocNeighbors)
+library(tibble)
+library(reshape2)
+library(plyr)
+library(dplyr)
+library(scran)
+library(batchelor)
+library(uwot)
+library(stringr)
+library(BiocSingular)
+library(scater)
+
+root.dir = "/Users/alsu/Develop/geneBasis/"
+#root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
+source(paste0(root.dir, "am_geneBasis/functions/main_functions.R"))
+source(paste0(root.dir, "am_geneBasis/functions/visualization_functions.R"))
+
+system = "melanoma"
+figures.dir = paste0(root.dir , "figures/cell_state/" , system, "/")
+
+# read sce 
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+sce = retain_only_hvgs(sce ,n = 10000)
+sce$celltype[is.na(sce$malignancy)] = "Not resolved"
+sce$malignancy[is.na(sce$malignancy)] = 0.5
+sce$celltype[sce$malignancy == 1] = "Malignant"
+sce$celltype[sce$celltype == "other"] = "Not resolved"
+
+# read gene selection
+gene_selection.unbatched = readRDS(paste0(root.dir , "data/gene_selection/" , system , "/gene_selection_unbatched.Rds"))
+gene_selection.unbatched = gene_selection.unbatched[gene_selection.unbatched$rank <= 100, ]
+
+# get meta w/umaps
+meta = as.data.frame(colData(sce))
+if (!( "cell" %in% colnames(meta) )){
+  meta = rownames_to_column(meta , var = "cell")
+}
+umaps = as.data.frame( reducedDim(sce , "UMAP_unbatched"))
+if (!( "cell" %in% colnames(umaps) )){
+  umaps = rownames_to_column(umaps , var = "cell")
+}
+meta = merge(meta, umaps)
+meta$sample = factor(meta$sample)
+meta$celltype = factor(meta$celltype)
+
+
+
+```
+
+
+# Put together stat on genes (from original publication)
+
+```{r get-stat-genes, message = FALSE}
+
+
+# programs from original publication
+melanoma_stat = read.table(file = "/Users/alsu/Develop/External/Tyrosh_melanoma/Melanoma_signatures.tab" , header = T, sep = "\t")
+melanoma_stat$gene = str_replace_all(melanoma_stat$gene , " " , "")
+melanoma_stat$program = str_replace_all(melanoma_stat$program , " " , "")
+melanoma_stat = melanoma_stat[!melanoma_stat$program %in% c("CAF" , "Tregs") , ]
+
+melanoma_stat_tab = as.data.frame(table(melanoma_stat$gene))
+colnames(melanoma_stat_tab) = c("gene" , "n")
+melanoma_stat_tab$program = 1
+melanoma_stat_tab = melanoma_stat_tab[, c("gene" , "program")]
+gene_selection.unbatched = merge(gene_selection.unbatched , melanoma_stat_tab , all.x = T , all.y = F)
+
+
+# DE genes
+get_de_genes = function(sce , cluster = "celltype" , test = "binom", type = "some", FDR.thresh = 0.01){
+  require(scran)
+  if (cluster == "celltype"){
+    markers <- scran::findMarkers(sce , groups=sce$celltype, direction = "up", pval.type=type, test = test, assay.type = "logcounts")
+  } 
+  else if (cluster == "malignancy"){
+    markers <- scran::findMarkers(sce , groups=sce$malignancy, direction = "up", pval.type=type, test = test, assay.type = "logcounts")
+  }
+  
+  # put together
+  clusters = names(markers)
+  markers = lapply(1:length(clusters), function(i){
+    current.markers = as.data.frame(markers[[i]])
+    current.markers = current.markers[!is.na(current.markers$FDR) & current.markers$FDR < FDR.thresh , ]
+    if (nrow(current.markers) > 0){
+      out = data.frame( cluster = clusters[i], gene = rownames(current.markers) )
+      return(out)
+    }
+  })
+  markers = do.call(rbind,markers)
+  return(markers)
+}
+
+# CT marker
+idx = which(!sce$celltype %in% c("Not resolved", "Malignant"))
+markers_celltypes = get_de_genes(sce[, idx] , cluster = "celltype" , test = "binom" , type = "some")
+colnames(markers_celltypes) = c("celltype" , "gene")
+markers_celltypes_tab = as.data.frame(table(markers_celltypes$gene))
+colnames(markers_celltypes_tab) = c("gene" , "n")
+markers_celltypes_tab$marker_celltype = 1
+markers_celltypes_tab = markers_celltypes_tab[, c("gene" , "marker_celltype")]
+
+gene_selection.unbatched = merge(gene_selection.unbatched , markers_celltypes_tab , all.x = T , all.y = F)
+
+# malignancy marker
+markers_malignancy = get_de_genes(sce[ , !sce$malignancy == 0.5] , cluster = "malignancy" , test = "binom" , type = "some")
+colnames(markers_malignancy) = c("malignancy" , "gene")
+
+gene_selection.unbatched = merge(gene_selection.unbatched , markers_malignancy , all.x = T , all.y = F)
+
+gene_selection.unbatched$program[is.na(gene_selection.unbatched$program)] = 0
+gene_selection.unbatched$marker_celltype[is.na(gene_selection.unbatched$marker_celltype)] = 0
+gene_selection.unbatched$malignancy[gene_selection.unbatched$malignancy == 0] = "down"
+gene_selection.unbatched$malignancy[gene_selection.unbatched$malignancy == 1] = "up"
+gene_selection.unbatched$malignancy[is.na(gene_selection.unbatched$malignancy)] = 0
+
+# give category
+category = sapply(1:nrow(gene_selection.unbatched) , function(i){
+  if (gene_selection.unbatched$marker_celltype[i] == 1){
+    return("marker_celltype")
+  } else if (gene_selection.unbatched$malignancy[i] == "up"){
+    return("malignancy_marker_up")
+  } else if (gene_selection.unbatched$malignancy[i] == "down"){
+    return("malignancy_marker_down")
+  } else {
+    return("not_marker")
+  }
+})
+gene_selection.unbatched$category = category
+
+# order
+gene_selection.unbatched = gene_selection.unbatched[order(gene_selection.unbatched$rank) , ]
+
+
+
+```
+
+
+# Set up color schemes
+
+```{r color-schemes, message = FALSE}
+
+
+type_cols = c("L1" = "aquamarine4" , "L2" = "chocolate" , "L3" = "violetred1" , "L4" = "royalblue4")
+
+assay_cols = c("logcounts" = "cadetblue3",
+                "logcounts.denoised" = "cadetblue4")
+  
+celltype_cols = celltype_colors[[which( names(celltype_colors) == system )]]
+
+
+```
+
+# UMAP - colored by celltype
+
+```{r umaps-overall, message = FALSE}
+
+
+p = ggplot(meta, aes(x = V1 , y = V2 , col = celltype)) + 
+  geom_point(size=.75) +
+  scale_color_manual(values = celltype_cols) +
+  theme_classic() +
+  #theme(legend.position = "top") + 
+  labs(x = "UMAP-1" , y = "UMAP-2")
+p
+ggsave(filename = paste0(figures.dir, "umap_CTs" ,".png"), plot = p, width = 4, height = 3)
+
+
+```
+
+# CT composition 
+
+```{r CT-composition, message = FALSE}
+
+
+tab = as.data.frame(table(sce$celltype))
+colnames(tab) = c("celltype" , "n")
+tab$frac = tab$n/sum(tab$n)
+tab = tab[order(tab$frac) , ]
+tab$celltype = factor(tab$celltype , levels = tab$celltype)
+
+p = ggplot(tab , aes(x = celltype , y = frac , fill = celltype)) + 
+  geom_bar(stat = "identity" , position = "dodge") + 
+  scale_fill_manual(values = celltype_cols) + 
+  theme_classic() + 
+  theme(axis.text.x = element_blank()) + 
+  labs(y = "Fraction of cells") + 
+  theme(legend.position = "right")
+p
+ggsave(filename = paste0(figures.dir, "CT_composition" ,".png"), plot = p, width = 5, height = 3)
+
+
+
+```
+
+# Mapping
+
+```{r get-mapping-selected-descr, message = FALSE}
+
+
+
+get_celltype_mapping = function(sce , genes , batch = NULL, n.neigh = 5 , nPC = 50){
+  neighs = suppressWarnings( get_mapping(sce , genes = genes, batch = batch, n.neigh = n.neigh, nPC = nPC , get.dist = F ))
+  if (!is.null(neighs)){
+    meta = as.data.frame(colData(sce))
+    current.mapping = data.frame(cell = rownames(neighs) ,
+                               celltype = sapply(1:nrow(neighs) , function(i) meta$celltype[meta$cell == rownames(neighs)[i]]) ,
+                               mapped_celltype = sapply(1:nrow(neighs), function(i) getmode(meta$celltype[match(neighs[i,] , meta$cell)] , 1:n.neigh) ))
+    return(current.mapping)
+  }
+  else {
+    return(NULL)
+  }
+}
+
+mapping = get_celltype_mapping(sce[, !sce$celltype %in% c("Not resolved" , "Malignant") ] , as.character( gene_selection.unbatched$gene[gene_selection.unbatched$marker_celltype == 1]))
+
+plot_mapping_heatmap = function(mapping , title = NULL){
+ # mapping = mapping[mapping$celltype %in% tab$celltype , ]
+      mapping$celltype = as.character(mapping$celltype)
+      mapping$mapped_celltype = as.character(mapping$mapped_celltype)
+      tab = table(mapping$celltype , mapping$mapped_celltype)
+      tab = sweep(tab, 1, rowSums(tab), "/")
+      tab = as.data.frame( tab )
+      colnames(tab) = c("celltype", "celltype_mapped", "n")
+      tab$celltype = factor(tab$celltype , levels = unique(mapping$celltype))
+      tab$celltype_mapped = factor(tab$celltype_mapped , levels = c(unique(mapping$celltype)))
+      tab = tab[!is.na(tab$celltype) , ]
+      p <- ggplot(tab, aes(x = celltype , y = celltype_mapped, fill = n)) +
+        geom_tile() + viridis::scale_fill_viridis(discrete = F, name = "Fraction\nof cells") +
+        theme_classic() +
+        theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+        ggtitle(title)
+      return(p)
+}
+
+p = plot_mapping_heatmap(mapping) + 
+  labs(x = "Celltype" , y = "Mapped celltype")
+p
+ggsave(filename = paste0(figures.dir, "mapping" ,".png"), plot = p, width = 4, height = 3)
+
+
+```
+
+# Co-expression patterns 
+
+```{r coexpression-hits, message = FALSE}
+
+
+# manually select relvant genes (overlapping with original pub)
+
+genes_interesting_stat = data.frame(gene = c("CHI3L1" , "CRIP1" , "CD52" , "PMEL" , "GPNMB" , "QPCT" , "JUN" , "TYMS" , "CDC20" , "DTL" , "KIFC1" , "CXCL13" , "RGS2" , "HSPA1A" , "TPI1" , "NR4A2" , "STAT1" , "FCRL3" , "IRF8" , "B2M" , "CD8A" , "HLA-DRB1" , "LDHA" ,  "JUNB" , "RMRP" , "CD55" , "ZNF331" , "DNAJB1" , "SERPINA3" , "FOS"), 
+                      program = c( rep("AXL",3) , rep("MITF",4)  , rep("CC",4) , rep("Exhaustion_consistentAcrossTumours",2) , 
+            rep("Exhaustion_variableAcrossTumours",6) , rep("Exhaustion_tumourSpecific",4) , rep("variable_malignant_and_t",1) , rep("variable_t",3), rep("variable_malignant",3)) )
+
+
+get_coexpression_plot = function(sce , genes , colors , title){
+  current.sce = sce[genes , ]
+  current.counts = as.matrix(logcounts(current.sce))
+  corr.stat = as.data.frame( cor(t(current.counts), method = "pearson") )
+  p <- ggcorrplot(corr.stat, hc.order = F, outline.col = "white", ggtheme = ggplot2::theme_gray, colors = c("#6D9EC1", "white", "#E46726")) +
+    theme(axis.text.x = element_text(size=4 , colour = colors), axis.text.y = element_text(size=4 , colour = colors)) +
+    ggtitle(title) + 
+    theme(legend.position = "none")
+  p
+  return(p)
+}
+
+color_scheme = data.frame(program = c("AXL"  , "MITF" , "CC" , "Exhaustion_consistentAcrossTumours", "Exhaustion_variableAcrossTumours"  , "Exhaustion_tumourSpecific"  , "variable_malignant_and_t" , "variable_t"  , "variable_malignant" ) , 
+                          color = c("#532C8A" , "#5cb450" , "gray40" , "#f79083" , "red" , "orange" , "dodgerblue2" , "orange3" , "plum2") )
+
+
+colors = sapply(1:nrow(genes_interesting_stat) , function(i) return(color_scheme$color[color_scheme$program == genes_interesting_stat$program[i]]))
+
+
+p1 = get_coexpression_plot(sce , genes_interesting_stat$gene ,colors, "All cells")
+
+p2 = get_coexpression_plot(sce[, sce$malignancy == 1] , genes_interesting_stat$gene , colors,  "Malignant cells")
+
+p = ggarrange(p1,p2,common.legend = F)
+p
+ggsave(filename = paste0(figures.dir, "coexpression_targetGenes" ,".png"), plot = p, width = 6, height = 3)
+
+
+
+```
+
+
+# Session Info
+
+```{r sessinf}
+sessionInfo()
+```

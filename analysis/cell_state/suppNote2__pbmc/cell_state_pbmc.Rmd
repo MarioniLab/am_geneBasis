@@ -1,0 +1,196 @@
+---
+title: "Pipeline to analyze selections for activated PBMCs."
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+# Load dependencies
+
+```{r load, message = FALSE}
+
+
+library(SingleCellExperiment)
+library(ggplot2)
+library(ggpubr)
+library(viridis)
+library(wesanderson)
+library(igraph)
+library(batchelor)
+library(stats)
+library(BiocNeighbors)
+library(tibble)
+library(reshape2)
+library(plyr)
+library(dplyr)
+library(scran)
+library(batchelor)
+library(stringr)
+library(BiocSingular)
+library(scater)
+library(ggplot2)
+library(biomaRt)
+library(tibble)
+library(ggpubr)
+library(scales)
+library(geneBasisR)
+
+root.dir = "/Users/alsu/Develop/geneBasis/"
+#root.dir = "/nfs/research/marioni/alsu/geneBasis/"
+source(paste0(root.dir, "am_geneBasis/functions/main_functions.R"))
+source(paste0(root.dir, "am_geneBasis/functions/visualization_functions.R"))
+
+system = "pbmc_activated"
+figures.dir = paste0(root.dir , "figures/cell_state/" , system, "/")
+
+# read sce
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+rowdata = as.data.frame(rownames(sce))
+sce = sce[, !is.na(sce$Celltype_Annotation)]
+
+# change gene-ensembl to external
+human_ensembl = useMart("ensembl")
+human_ensembl = useDataset("hsapiens_gene_ensembl", mart = human_ensembl)
+gene_map = getBM(attributes=c("ensembl_gene_id", "external_gene_name"), filters = "ensembl_gene_id", values = rownames(sce), mart = human_ensembl)
+idx = which(gene_map$external_gene_name == "")
+gene_map$external_gene_name[idx] = gene_map$ensembl_gene_id[idx]
+rownames.sce = sapply( rownames(sce) , function(x) gene_map$external_gene_name[gene_map$ensembl_gene_id == x])
+rownames.sce = as.character(rownames.sce)
+tab = table(rownames.sce)
+tab = names(tab)[tab == 1 & !tab == "character(0)"]
+idx = which(rownames.sce %in% tab)
+sce = sce[idx , ]
+rownames(sce) = rownames.sce[idx]
+
+
+```
+
+# Get selections
+
+```{r get-selections, message = FALSE}
+
+
+n_genes_total = 25
+
+activation_status = c("CD3_CD28", "LPS")
+celltypes = unique(sce$Celltype_Annotation)
+celltypes_cd = setdiff( celltypes[!is.na(celltypes)] , "CD14_Mono")
+celltypes_lps = c("CD14_Mono")
+
+stat_cd = lapply(celltypes_cd, function(celltype){
+  current.sce = sce[, sce$HTO_Classification %in% c("Baseline", "CD3_CD28") & sce$Celltype_Annotation == celltype]
+  current.sce = geneBasisR::retain_informative_genes(current.sce)
+  genes = geneBasisR::gene_search(current.sce , genes_base = NULL, nPC.all = 25, n_genes_total = n_genes_total, genes.discard_prefix = c("RPL", "RPS" , "MT-") , n.neigh = 5, batch = "HTO_Classification", verbose = F)
+  genes$celltype = celltype
+  return(genes)
+})
+stat_cd = do.call(rbind , stat_cd)
+saveRDS(stat_cd , paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection_cd_", "per_celltype", ".Rds"))
+
+
+
+stat_lps = lapply(celltypes_lps, function(celltype){
+  current.sce = sce[, sce$HTO_Classification %in% c("Baseline", "LPS") & sce$Celltype_Annotation == celltype]
+  current.sce = geneBasisR::retain_informative_genes(current.sce)
+  genes = geneBasisR::gene_search(current.sce , genes_base = NULL, nPC.all = 25, n_genes_total = n_genes_total, genes.discard_prefix = c("RPL", "RPS" , "MT-") , n.neigh = 5, batch = "HTO_Classification", verbose = F)
+  genes$celltype = celltype
+  return(genes)
+})
+stat_lps = do.call(rbind , stat_lps)
+saveRDS(stat_lps , paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection_lps_", "per_celltype", ".Rds"))
+
+
+
+```
+
+# Get heatmaps - CD3
+
+```{r heatmap-cd, message = FALSE}
+
+
+lfc_stat_cd = lapply(unique(stat_cd$celltype) , function(celltype){
+  current.sce = sce[, sce$Celltype_Annotation == celltype & sce$HTO_Classification %in% c("Baseline" , "CD3_CD28")]
+  current.de = scran::findMarkers(current.sce , groups = current.sce$HTO_Classification, direction = "any")
+  current.de = current.de$CD3_CD28
+  current.de = as.data.frame( current.de[rownames(current.de) %in% unique(stat_cd$gene[stat_cd$celltype == celltype]) , ] )
+  current.de = rownames_to_column(current.de , var = "gene")
+  current.de = merge(current.de , stat_cd[stat_cd$celltype == celltype , ])
+  return(current.de)
+})
+lfc_stat_cd = do.call(rbind , lfc_stat_cd)
+#lfc_stat_cd$summary.logFC[lfc_stat_cd$FDR >= 0.01] = NaN
+lfc_stat_cd$celltype = factor(lfc_stat_cd$celltype , c("CD4T_Naive", "CD4T_Mem", "CD8T_Naive", "CD8T_Mem", "NK" , "B"))
+
+
+get_heatmap = function(sign){
+  if (sign == "Up"){
+    genes = unique(lfc_stat_cd$gene[lfc_stat_cd$summary.logFC > 0.25 & lfc_stat_cd$FDR < 0.01] )
+    current.stat = lfc_stat_cd[lfc_stat_cd$gene %in% genes , ]
+    current.stat$summary.logFC[current.stat$FDR > 0.01] = NaN
+    current.stat$summary.logFC[current.stat$summary.logFC < 0] = NaN
+    limits = c(0,1)
+  }
+  else if (sign == "Down"){
+    genes = unique(lfc_stat_cd$gene[lfc_stat_cd$summary.logFC < -0.25 & lfc_stat_cd$FDR < 0.01] )
+    current.stat = lfc_stat_cd[lfc_stat_cd$gene %in% genes , ]
+    current.stat$summary.logFC[current.stat$FDR > 0.01] = NaN
+    current.stat$summary.logFC[current.stat$summary.logFC > 0] = NaN
+    limits = c(-1,0)
+  }
+  stat_by_gene = as.data.frame(current.stat %>% group_by(gene) %>% dplyr::summarise(mean = mean(summary.logFC, na.rm  = T)))
+  stat_by_gene = stat_by_gene[order(stat_by_gene$mean) , ]
+  current.stat$gene = factor(current.stat$gene , levels = stat_by_gene$gene)
+  
+  p = ggplot(current.stat , aes(x = celltype , y = gene , fill = summary.logFC)) + 
+    geom_tile() +
+    scale_fill_viridis(name = "logFC", limits = limits, oob=squish) +
+    theme_classic() +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    labs(x = "Cell type", y = "Gene") +
+    ggtitle(paste0("Anti-CD3/CD28 over Baseline, " , sign))
+  return(p)
+}
+
+p = get_heatmap("Up")
+ggsave(filename = paste0(figures.dir, "heatmap__cd3_cd28__pos" ,".png"), plot = p, width = 5, height = 8)
+
+p = get_heatmap("Down")
+ggsave(filename = paste0(figures.dir, "heatmap__cd3_cd28__neg" ,".png"), plot = p, width = 5, height = 8)
+
+
+```
+
+# Get co-expression - LPS
+
+```{r coexpr-lps, message = FALSE}
+
+
+current.sce = sce[, sce$Celltype_Annotation == "CD14_Mono" & sce$HTO_Classification %in% c("Baseline" , "LPS")]
+current.de = scran::findMarkers(current.sce , groups = current.sce$HTO_Classification, direction = "any")
+current.de = current.de$LPS
+current.de = as.data.frame( current.de[rownames(current.de) %in% stat_lps$gene , ])
+current.de = rownames_to_column(current.de , var = "gene")
+
+
+genes_pos = current.de$gene[current.de$summary.logFC > 0]
+p = geneBasisR::plot_coexpression(sce[, sce$Celltype_Annotation == "CD14_Mono" & sce$HTO_Classification %in% c("LPS")] , genes_pos)
+p
+ggsave(filename = paste0(figures.dir, "coexpr__lps_pos" ,".png"), plot = p, width = 5, height = 5)
+
+genes_neg = current.de$gene[current.de$summary.logFC < 0]
+p = geneBasisR::plot_coexpression(sce[, sce$Celltype_Annotation == "CD14_Mono" & sce$HTO_Classification %in% c("Baseline")] , genes_neg)
+p
+ggsave(filename = paste0(figures.dir, "coexpr__lps_neg" ,".png"), plot = p, width = 3, height = 3)
+
+
+
+
+```
+
+
+# Session Info
+
+```{r sessinf}
+sessionInfo()
+```
