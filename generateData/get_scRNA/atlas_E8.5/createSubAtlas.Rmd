@@ -1,0 +1,79 @@
+---
+title: "Mapping to the atlas"
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+#Introduction & method
+
+In this script we map cells from the FAS-affected embryos (+ 4 samples from the atlas experiment) onto our atlas.
+
+```{r load, message = FALSE}
+# load libraries we are going to use
+
+
+library(Matrix)
+library(scran)
+library(scater)
+library(batchelor)
+library(knitr)
+library(pheatmap)
+library(reshape2)
+library(edgeR)
+library(MouseGastrulationData)
+library(BiocSingular)
+library(BiocParallel)
+library(BiocNeighbors)
+library(SingleCellExperiment)
+
+set.seed(32)
+
+
+root.dir = "/Users/alsu/Develop/geneBasis/"
+source(paste0(root.dir, "amScripts_geneBasis/core_functions.R"))
+
+samples = AtlasSampleMetadata$sample[AtlasSampleMetadata$stage == "E8.5"]
+sce.atlas = lapply(samples, function(x){
+  print(x)
+  out = EmbryoAtlasData(samples = x)
+  rownames(out) = rowData(out, "SYMBOL")[,2]
+  clusters <- quickCluster(out, method="igraph", use.ranks=TRUE, d=50, min.mean=0.01)
+  out <- computeSumFactors(out, clusters=clusters)
+  return(out)
+})
+sce.atlas <- do.call(multiBatchNorm , sce.atlas )
+sce.atlas = do.call(cbind, sce.atlas)
+
+# get rid of stripped and doublets
+sce.atlas = sce.atlas[, !sce.atlas$stripped & !sce.atlas$doublet]
+
+# save 
+saveRDS(sce.atlas, file =  paste0( root.dir, "data/sce_atlas_8.5.Rds"))
+
+
+```
+
+# Generate h5ad file (to run for SCMER)
+
+```{r gen-h5ad, message = FALSE}
+
+
+sce = readRDS(paste0( root.dir, "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+
+#sce = SingleCellExperiment(assays = list("counts" = counts(sce) , "logcounts" = logcounts(sce)), colData = colData(sce))  
+
+
+writeH5AD(sce, paste0(root.dir, "data/scRNA_datasets/" , system , "/sce_" , system , ".h5ad"), X_name = NULL, skip_assays = FALSE)
+
+
+```
+
+
+
+#Session Info
+
+```{r sessinf}
+sessionInfo()
+```
