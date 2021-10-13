@@ -1,0 +1,185 @@
+---
+title: "Pipeline to assess whether geneBasis/SCMER select markers for celltypes present in a single batch."
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+# Load dependencies
+
+```{r load, message = FALSE}
+
+
+library(SingleCellExperiment)
+library(batchelor)
+library(stats)
+library(BiocNeighbors)
+library(tibble)
+library(reshape2)
+library(plyr)
+library(dplyr)
+library(scran)
+library(batchelor)
+library(stringr)
+library(SingleCellExperiment)
+
+set.seed(32)
+
+root.dir = "/Users/alsu/Develop/geneBasis/"
+source(paste0(root.dir, "am_geneBasis/functions/main_functions.R"))
+source(paste0(root.dir, "am_geneBasis/functions/visualization_functions.R"))
+figures.dir = paste0(root.dir, "figures/benchmark_method/batch_effect/atlas_E8.5/")
+system = "atlas_E8.5"
+
+# read sce 
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+rowdata = as.data.frame( rowData(sce) )
+colnames(rowdata) = c("gene" , "gene_symbol")
+#sce = retain_only_hvgs(sce , n = 10000)
+
+
+# get markers
+celltypes.2check = c("Erythroid1" , "Erythroid2" , "Erythroid3")
+markers = get_markers(sce , test = "t" , type = "some")
+markers = markers[markers$celltype %in% celltypes.2check, ]
+
+
+```
+
+
+# get UMAP plot w/ colored blood lineage
+
+```{r umap-strong-blood, message = FALSE}
+
+
+# get meta w/umaps
+meta = as.data.frame(colData(sce))
+if (!( "cell" %in% colnames(meta) )){
+  meta = rownames_to_column(meta , var = "cell")
+}
+umaps = as.data.frame( reducedDim(sce , "umap"))
+colnames(umaps)[which(colnames(umaps) == "x")] = "V1"
+colnames(umaps)[which(colnames(umaps) == "y")] = "V2"
+if (!( "cell" %in% colnames(umaps) )){
+  umaps = rownames_to_column(umaps , var = "cell")
+}
+meta = merge(meta, umaps)
+meta$sample = factor(meta$sample)
+meta$celltype = factor(meta$celltype)
+
+celltypes.2retract = c("Erythroid1" , "Erythroid2" , "Erythroid3" , "Blood progenitors 1" , "Blood progenitors 2")
+celltype_blood = lapply(1:nrow(meta), function(i){
+  if (meta$celltype[i] %in% celltypes.2retract){
+    return(as.character(meta$celltype[i]))
+  }
+  else {
+    return("Rest")
+  }
+})
+meta$celltype_blood = unlist(celltype_blood)
+
+celltype_blood_cols = c(celltype_atlas_E8.5_colors, "Rest" = "gainsboro")
+  
+  
+plots = lapply(unique(meta$sample) , function(sample){
+  current.meta = meta[meta$sample == sample, ]
+  p1 = ggplot(current.meta, aes(x = V1 , y = V2 , col = celltype_blood)) + 
+    geom_point() +
+    theme_classic() +
+    scale_color_manual(values = celltype_blood_cols) +
+    xlim(c(-10,11)) + 
+    theme(legend.position = "none") + 
+    labs(x = "UMAP-1" , y = "UMAP-2") + 
+    ggtitle(paste0("Sample ", sample))
+  ggsave(filename = paste0(figures.dir, "umaps_ct/", sample , "_all.png"), plot = p1, width = 3, height = 4)
+  
+  p2 = ggplot(current.meta[current.meta$celltype_blood == "Rest", ], aes(x = V1 , y = V2 , col = celltype_blood)) + 
+    geom_point() +
+    theme_classic() +
+    scale_color_manual(values = celltype_blood_cols) +
+    xlim(c(-10,11)) + 
+    theme(legend.position = "none") + 
+    labs(x = "UMAP-1" , y = "UMAP-2") + 
+    ggtitle(paste0("Sample ", sample))
+  ggsave(filename = paste0(figures.dir, "umaps_ct/", sample , "_rest.png"), plot = p2, width = 3, height = 4)
+})
+
+
+```
+
+# Get UMAPs with markers
+
+```{r get-umap-w-markers, message = FALSE}
+
+
+sce_w_gene_symbols = sce
+rownames(sce_w_gene_symbols) = rowData(sce)[,2]
+p = get_umaps(sce_w_gene_symbols , meta, c("Hba-x" , "Hba-a1", "Hba-a2"))
+p
+ggsave(filename = paste0(figures.dir, "umaps_markers.png"), plot = p, width = 10, height = 4)
+
+
+```
+
+
+# Do we select blood markers
+
+## geneBasis
+
+```{r read-selection-gene-basis, message = FALSE}
+
+
+stat_geneBasis = lapply(0:4 , function(i){
+  out = readRDS(paste0(root.dir , "data/gene_selection__batch_effect/" , system , "/" , "gene_selection_" , i , ".Rds"))
+  current.stat = data.frame(gene = out$gene , rank = out$rank , id = i)
+  current.stat = merge(current.stat , rowdata, all.x = T)
+  return(current.stat)
+})
+stat_geneBasis = do.call(rbind , stat_geneBasis)
+
+genes.2check = unique(intersect( stat_geneBasis$gene , markers$gene))
+p = plot_expression_heatmap(sce , genes.2check , "mean")
+p
+genes.2keep = c("ENSMUSG00000069919" , "ENSMUSG00000052187" , "ENSMUSG00000027562" , "ENSMUSG00000055609")
+stat_geneBasis_selected = stat_geneBasis[stat_geneBasis$gene %in% genes.2keep , ]
+stat_geneBasis_first = stat_geneBasis[stat_geneBasis$rank <= 5 , ]
+
+
+
+```
+
+
+## SCMER
+
+```{r read-selection-scmer, message = FALSE}
+
+
+scmer.files = list.files(path = paste0( root.dir , "data/gene_selection__batch_effect/" , system , "/scmer/" ))
+
+stat_scmer = lapply(scmer.files , function(current.file){
+  out = read.table(paste0( root.dir , "data/gene_selection__batch_effect/" , system , "/scmer/" , current.file) , header = F)
+  anno = str_split(current.file, "_")[[1]]
+  stat = data.frame(gene = out$V1, n_genes = as.numeric(anno[2]) , id = as.numeric(str_replace(anno[4] , ".txt" , "")))
+  stat = merge(stat , rowdata , all.x = T)                  
+  return(stat)
+})
+stat_scmer = do.call(rbind , stat_scmer)
+
+genes.2check = stat_scmer$gene[stat_scmer$n_genes == 44]
+p = plot_expression_heatmap(sce , genes.2check , "mean")
+p
+
+
+write.table(stat_scmer[stat_scmer$n_genes == 44 , ] , file = paste0(root.dir , "sups/scmer_batch.txt"), col.names = T, quote = F, row.names = F , sep = "\t")
+
+
+```
+
+
+
+# Session Info
+
+```{r sessinf}
+sessionInfo()
+```

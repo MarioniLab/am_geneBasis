@@ -1,0 +1,257 @@
+---
+title: "Pipeline to assess the redundancy in the selections (i.e. co-expression) for geneBasis and SCMER selections."
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+# Load dependencies
+
+```{r load, message = FALSE}
+
+
+library(SingleCellExperiment)
+library(batchelor)
+library(stats)
+library(BiocNeighbors)
+library(tibble)
+library(reshape2)
+library(plyr)
+library(dplyr)
+library(scran)
+library(batchelor)
+library(stringr)
+library(corrplot)
+library(ggcorrplot)
+
+root.dir = "/Users/alsu/Develop/geneBasis/"
+source(paste0(root.dir, "am_geneBasis/functions/main_functions.R"))
+source(paste0(root.dir, "am_geneBasis/functions/visualization_functions.R"))
+
+system = "atlas_E8.5"
+figures.dir = paste0(root.dir , "figures/benchmark/", "firstGenes_coexpr" , "/")
+
+
+```
+
+# Get co-expr plots
+
+## Mouse embryo
+
+```{r mouse-embryo, message = FALSE}
+
+
+system = "atlas_E8.5"
+
+genes_alsu = readRDS(paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection.Rds"))
+genes_alsu = as.character( genes_alsu$gene )
+
+# scmer, unbatched
+scmer_unbatched.files = list.files(path = paste0( root.dir , "data/scmer_res_selected/" , system , "/unbatched/" ))
+n_genes = sapply(scmer_unbatched.files , function(str) str_replace_all(str,  ".txt" , ""))
+n_genes = sapply(n_genes , function(str) str_replace_all(str,  "nGenes_" , ""))
+n_genes = sort(as.numeric(n_genes))
+genes_scmer_unbatched = lapply(n_genes , function(str){
+  out = read.table(paste0( root.dir , "data/scmer_res_selected/" , system , "/unbatched/nGenes_" , str , ".txt") , header = F)
+  genes = out$V1
+  return(genes)
+})
+
+mouseEmbryo_genes = list(SCMER = genes_scmer_unbatched[[1]] , geneBasis = genes_alsu[1:length(genes_scmer_unbatched[[1]])])
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+mouseEmbryo_sce = sce[rownames(sce) %in% unlist(mouseEmbryo_genes) , ]
+
+
+```
+
+
+## Spleen
+
+```{r spleen, message = FALSE}
+
+
+system = "spleen"
+
+# read gene selection 
+genes_alsu = readRDS(paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection.Rds"))
+genes_alsu = as.character( genes_alsu$gene )
+
+# unbatched
+scmer_unbatched.files = list.files(path = paste0( root.dir , "data/scmer_res_selected/" , system , "_higher_mean/unbatched/" ))
+n_genes = sapply(scmer_unbatched.files , function(str) str_replace_all(str,  ".txt" , ""))
+n_genes = sapply(n_genes , function(str) str_replace_all(str,  "nGenes_" , ""))
+n_genes = sort(as.numeric(n_genes))
+
+genes_scmer_unbatched = lapply(n_genes , function(str){
+  out = read.table(paste0( root.dir , "data/scmer_res_selected/" , system , "_higher_mean/unbatched/nGenes_" , str , ".txt") , header = F)
+  genes = out$V1
+  return(genes)
+})
+
+spleen_genes = list(SCMER = genes_scmer_unbatched[[1]] , geneBasis = genes_alsu[1:length(genes_scmer_unbatched[[1]])])
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+spleen_sce = sce[rownames(sce) %in% unlist(spleen_genes) , ]
+
+
+```
+
+
+## Pancreas
+
+```{r pancreas, message = FALSE}
+
+system = "pancreas"
+
+# read gene selection 
+genes_alsu = readRDS(paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection.Rds"))
+genes_alsu = as.character( genes_alsu$gene )
+
+# unbatched
+scmer_unbatched.files = list.files(path = paste0( root.dir , "data/scmer_res_selected/" , system , "/unbatched/" ))
+n_genes = sapply(scmer_unbatched.files , function(str) str_replace_all(str,  ".txt" , ""))
+n_genes = sapply(n_genes , function(str) str_replace_all(str,  "nGenes_" , ""))
+n_genes = sort(as.numeric(n_genes))
+
+genes_scmer_unbatched = lapply(n_genes , function(str){
+  out = read.table(paste0( root.dir , "data/scmer_res_selected/" , system , "/unbatched/nGenes_" , str , ".txt") , header = F)
+  genes = out$V1
+  return(genes)
+})
+
+pancreas_genes = list(SCMER = genes_scmer_unbatched[[1]] , geneBasis = genes_alsu[1:length(genes_scmer_unbatched[[1]])])
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+pancreas_sce = sce[rownames(sce) %in% unlist(pancreas_genes) , ]
+
+
+```
+
+## Melanoma
+
+```{r melanoma, message = FALSE}
+
+system = "melanoma"
+
+# read gene selection 
+genes_alsu = readRDS(paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection_unbatched.Rds"))
+genes_alsu = as.character( genes_alsu$gene )
+
+# batched
+# batched
+scmer_batched.files = list.files(path = paste0( root.dir , "data/scmer_res_selected/" , system , "/batched/" ))
+n_genes = sapply(scmer_batched.files , function(str) str_replace_all(str,  ".txt" , ""))
+n_genes = sapply(n_genes , function(str) str_replace_all(str,  "nGenes_" , ""))
+n_genes = sort(as.numeric(n_genes))
+
+genes_scmer_batched = lapply(n_genes , function(str){
+  out = read.table(paste0( root.dir , "data/scmer_res_selected/" , system , "/batched/nGenes_" , str , ".txt") , header = F)
+  genes = out$V1
+  return(genes)
+})
+
+melanoma_genes = list(SCMER = genes_scmer_batched[[2]] , geneBasis = genes_alsu[1:length(genes_scmer_batched[[2]])])
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+melanoma_sce = sce[rownames(sce) %in% unlist(melanoma_genes) , ]
+
+
+```
+
+
+# Get co-expression plots
+
+
+```{r co-expr-plot, message = FALSE}
+
+
+get_coexpression_plot = function(sce , genes , system , title){
+  current.sce = sce[genes , ]
+  if (system == "mouseEmbryo"){
+    rownames(current.sce) = rowData(current.sce)[,2]
+  }
+  current.counts = as.matrix(logcounts(current.sce))
+  corr.stat = as.data.frame( cor(t(current.counts), method = "pearson") )
+  p <- ggcorrplot(corr.stat, hc.order = TRUE, outline.col = "white", ggtheme = ggplot2::theme_gray, colors = c("#6D9EC1", "white", "#E46726")) +
+    theme(axis.text.x = element_text(size=7), axis.text.y = element_text(size=7)) + 
+    ggtitle(title) + 
+    theme(legend.position = "bottom") + 
+    theme(text=element_text(family="Arial"))
+  p
+  return(p)
+}
+
+p1 = get_coexpression_plot(mouseEmbryo_sce , mouseEmbryo_genes$geneBasis , "mouseEmbryo" , "geneBasis")
+p2 = get_coexpression_plot(spleen_sce , spleen_genes$geneBasis , "spleen" , "geneBasis")
+p3 = get_coexpression_plot(pancreas_sce , pancreas_genes$geneBasis , "pancreas" , "geneBasis")
+p4 = get_coexpression_plot(melanoma_sce , melanoma_genes$geneBasis , "melanoma" , "geneBasis")
+p5 = get_coexpression_plot(mouseEmbryo_sce , mouseEmbryo_genes$SCMER , "mouseEmbryo" , "SCMER")
+p6 = get_coexpression_plot(spleen_sce , spleen_genes$SCMER , "spleen" , "SCMER")
+p7 = get_coexpression_plot(pancreas_sce , pancreas_genes$SCMER , "pancreas" , "SCMER")
+p8 = get_coexpression_plot(melanoma_sce , melanoma_genes$SCMER , "melanoma" , "SCMER")
+
+p = ggarrange(p1,p2,p3,p4,p5,p6,p7,p8,common.legend = T, nrow = 2 , ncol = 4) + 
+  theme(legend.position = "bottom")
+p
+ggsave(filename = paste0(figures.dir , "coexpr" , ".png"), plot = p, width = 9, height = 5)
+
+
+
+```
+
+
+# Get boxplots
+
+```{r get-boxplots, message = FALSE}
+
+
+type_cols = c("geneBasis" = pals3[2] , "scgenefit" = pals1[3] , "SCMER" = pals1[5] , "hvgs" = pals1[3] )
+
+get_coexpression_boxplot = function(sce , genes , system ){
+  stat = lapply(1:2 , function(i){
+    current.sce = sce[genes[[i]] , ]
+    if (system == "mouseEmbryo"){
+      rownames(current.sce) = rowData(current.sce)[,2]
+    }
+    current.counts = as.matrix(logcounts(current.sce))
+    corr.stat = as.matrix( cor(t(current.counts), method = "pearson") )
+    corr.stat = corr.stat[upper.tri(corr.stat, diag = F)]
+    current.stat = data.frame(Method = names(genes)[i] , corr = corr.stat)
+    return(current.stat)
+  })
+  stat = do.call(rbind, stat)
+  p = ggplot(stat , aes(x = Method , y = corr )) + 
+    scale_color_manual(values = type_cols) +
+    geom_boxplot(alpha = .5, width = .3, outlier.shape = NA) + 
+    geom_jitter(aes(color=Method), size=2, alpha=0.9, width = .2) + 
+    theme_classic() +  
+    labs(x = "Method" , y = "Co-expression") +
+    ylim(c(-.85 , .85)) +
+    theme(text=element_text(family="Arial")) + 
+    theme( axis.text.y = element_blank()) + 
+    coord_flip() 
+  return(p)
+}
+
+
+
+p1 = get_coexpression_boxplot(mouseEmbryo_sce , mouseEmbryo_genes , "mouseEmbryo" )
+p2 = get_coexpression_boxplot(spleen_sce , spleen_genes , "spleen" )
+p3 = get_coexpression_boxplot(pancreas_sce , pancreas_genes , "pancreas" )
+p4 = get_coexpression_boxplot(melanoma_sce , melanoma_genes , "melanoma" )
+
+p = ggarrange(p1,p2,p3,p4,common.legend = T, ncol = 4)
+p
+
+
+ggsave(filename = paste0(figures.dir , "coexpr_boxplot" , ".png"), plot = p, width = 9, height = 3)
+
+
+
+```
+
+
+
+# Session Info
+
+```{r sessinf}
+sessionInfo()
+```

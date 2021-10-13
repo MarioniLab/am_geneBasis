@@ -1,0 +1,146 @@
+---
+title: "Pipeline to assess how addtionally selected genes improve cell type mapping (pancreas)."
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+
+#Introduction & method
+
+
+```{r load, message = FALSE}
+# load libraries we are going to use
+
+library(Matrix)
+library(scran)
+library(scater)
+library(batchelor)
+library(knitr)
+library(reshape2)
+library(edgeR)
+library(ggplot2)
+library(BiocSingular)
+library(BiocParallel)
+library(BiocNeighbors)
+library(SingleCellExperiment)
+library(dplyr)
+library(BiocStyle)
+library(stats)
+ncores = 5
+mcparam = MulticoreParam(workers = ncores)
+register(mcparam)
+set.seed(32)
+
+root.dir = "/Users/alsu/Develop/geneBasis/"
+source(paste0(root.dir , "am_geneBasis/functions/main_functions.R"))
+
+system = "pancreas"
+figures.dir = paste0(root.dir , "figures/additional_selections/" , system, "/")
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+sce$cell = colnames(sce)
+# reduce search - discard obviously uninteresting genes
+sce = retain_only_hvgs(sce, n = 10000, var.thresh = 0)
+sce$celltype[which(sce$celltype == "macrophage")]   = "immune"
+sce$celltype[which(sce$celltype == "mast")]   = "immune"
+
+# discard mitochondrial
+rownames.sce = rownames(sce)
+idx = which(!grepl("mt-" , rownames.sce) & !grepl("MT-" , rownames.sce) & !grepl("Mt-" , rownames.sce))
+sce = sce[idx,]
+
+
+# define rare CTs
+tab = as.data.frame( table(sce$celltype) )
+colnames(tab) = c("celltype" , "n")
+tab$frac = tab$n/sum(tab$n)
+rare_CTs = as.character( tab$celltype[tab$n > 10 & tab$frac < 0.01] )
+celltypes.2exclude = as.character(tab$celltype[tab$n < 10])
+
+
+initial_selections = readRDS(paste0(root.dir , "data/additional_selections/" , system , "/initial_selections.Rds"))
+additional_selections = readRDS(paste0(root.dir , "data/additional_selections/" , system , "/additional_selections.Rds"))
+mappings = readRDS(paste0(root.dir , "data/additional_selections/" , system , "/mappings.Rds"))
+  
+k = 20
+
+# update labels
+mappings$celltype = as.character(mappings$celltype)
+mappings$mapped_celltype = as.character(mappings$mapped_celltype)
+mappings$celltype[which(mappings$celltype %in% c("macrophage" , "mast"))] = "immune"
+mappings$mapped_celltype[which(mappings$mapped_celltype %in% c("macrophage" , "mast"))] = "immune"
+
+
+```
+
+# Get CT order
+
+```{r get-ct-order, message = FALSE}
+
+
+
+get_ct_hierarchy = function(sce , batch = NULL, nPC = 50){
+  hvgs_5000 = get_hvgs(sce , n = 5000)
+  current.sce = sce[hvgs_5000, ]
+  counts = as.matrix( logcounts(current.sce) )
+  meta = as.data.frame(colData(sce))  
+  if (is.null(batch)){
+    pcs = irlba::prcomp_irlba(t(counts) , n = min(nPC, (nrow(counts)-1) , (ncol(counts) - 1)))
+    counts = pcs$x
+    rownames(counts) = colnames(current.sce)
+  }
+  else {
+    batchFactor = factor(meta[, colnames(meta) == batch])
+    counts = batchelor::multiBatchPCA(counts , batch = batchFactor , d = nPC)
+    counts = do.call(batchelor::reducedMNN , counts)
+    counts = counts$corrected
+  }
+  celltypes = unique(sce$celltype)      
+  avg_pc_per_ct.stat = lapply(celltypes , function(celltype){
+    cells = rownames(counts) %in% meta$cell[meta$celltype == celltype]
+    return( apply( counts[cells,] , 2 , median))
+  })
+  avg_pc_per_ct.stat = do.call(cbind , avg_pc_per_ct.stat)
+  colnames(avg_pc_per_ct.stat) = celltypes
+
+  # build hierarchy
+  dist = dist(t(avg_pc_per_ct.stat) , diag=TRUE)
+  ct_hierarchy = hclust(dist ,  method = "ward.D2")
+  out = celltypes[ ct_hierarchy$order ]
+  return(out)
+}
+
+celltypes_ordered = get_ct_hierarchy(sce , batch = "sample", nPC = 20)
+# manually rearrange for more consistent view
+#celltypes_ordered = replace(celltypes_ordered, c(4, 5), celltypes_ordered[c(5, 4)])
+
+
+```
+
+# See mappings
+
+```{r get-initial-selections, message = FALSE}
+
+
+plots = lapply(c(1:20) , function(i){
+  current.mapping = mappings[mappings$id == i , ]
+  n_genes.begin = initial_selections[[i]]$n_genes
+  n_genes.grid = c(n_genes.begin , n_genes.begin + 6 , n_genes.begin + 12)
+  plots_per_id = lapply(n_genes.grid , function(n_genes){
+    p = plot_mapping_heatmap(current.mapping[current.mapping$n_genes == n_genes & !current.mapping$celltype %in% celltypes.2exclude,] , title = paste0(n_genes , " genes") , levels = celltypes_ordered ) + labs(x = "Cell type" , y = "Mapped cell type")
+    return(p)
+  })
+  p = ggarrange(plotlist = plots_per_id, common.legend = T, ncol = 3)
+  ggsave(filename = paste0(figures.dir, "mappings_",i ,".png"), plot = p, width = 18, height = 6)
+  return(p)
+})
+
+
+```
+
+#Session Info
+
+```{r sessinf}
+sessionInfo()
+```
