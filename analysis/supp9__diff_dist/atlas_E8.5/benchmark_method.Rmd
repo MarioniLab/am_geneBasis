@@ -1,0 +1,209 @@
+---
+title: "Pipeline to assess how different Lp-norms affect selections (mouse embryo)."
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+# Load dependencies
+
+```{r load, message = FALSE}
+
+
+library(SingleCellExperiment)
+library(ggplot2)
+library(ggpubr)
+library(viridis)
+library(wesanderson)
+library(igraph)
+library(batchelor)
+library(stats)
+library(BiocNeighbors)
+library(tibble)
+library(reshape2)
+library(plyr)
+library(dplyr)
+library(scran)
+library(batchelor)
+library(uwot)
+library(stringr)
+library(corrplot)
+library(ggcorrplot)
+
+root.dir = "/Users/alsu/Develop/geneBasis/"
+source(paste0(root.dir, "am_geneBasis/functions/main_functions.R"))
+source(paste0(root.dir, "am_geneBasis/functions/visualization_functions.R"))
+
+system = "atlas_E8.5"
+figures.dir = paste0(root.dir , "figures/benchmark_method/diff_dist/" , system, "/")
+
+# read sce 
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+sce = retain_only_hvgs(sce , n = 10000)
+
+p = c(1:5)
+# read gene selection
+gene_selections.files = list.files(path=paste0(root.dir , "data/gene_selection__diff_p/" , system , "/"))
+genes = lapply(1:length(gene_selections.files) , function(i){
+  current.file = gene_selections.files[i]
+  out = readRDS(paste0(root.dir , "data/gene_selection__diff_p/" , system , "/" , current.file))
+  out$p = p[i]
+  return(out)
+})
+names(genes) = p
+genes = do.call(rbind , genes)
+
+n_genes.grid = seq(25,250,25)
+# load stats we calced
+stat_cell_score = readRDS(paste0(root.dir , "data/benchmark_method/diff_dist/" , system , "/cell_score.Rds"))
+colnames(stat_cell_score)[colnames(stat_cell_score) == "type"] = "p"
+stat_cell_score$n_genes = factor(stat_cell_score$n_genes , levels = n_genes.grid)
+
+stat_gene_score = readRDS(paste0(root.dir , "data/benchmark_method/diff_dist/" , system , "/gene_score.Rds"))
+stat_gene_score$n_genes = factor(stat_gene_score$n_genes , levels = n_genes.grid)
+  
+  
+
+```
+
+# Set up color schemes
+
+```{r color-schemes, message = FALSE}
+
+
+p_cols = wesanderson::wes_palette("Zissou1" , type = "continuous" , length(p) ) 
+names(p_cols) = p[1:5]
+  
+celltype_cols = celltype_colors[[which( names(celltype_colors) == system )]]
+
+
+```
+
+# Set up functions
+
+```{r funcs, message = FALSE}
+
+
+
+get_umaps = function(meta, genes, titles, wide = T){
+  plots = lapply(1:length(genes) , function(i){
+    gene = genes[i]
+    if (!is.null(titles)){
+      title = paste(rowdata$gene_symbol[rowdata$gene == gene], ", gene-score = ", titles[i])
+    } else {
+      title = rowdata$gene_symbol[rowdata$gene == gene]
+    }
+    counts = data.frame(cell = colnames(sce) , counts = as.numeric(assay(sce , "logcounts")[gene , ]))
+    current.meta = merge(meta , counts)
+    current.meta = current.meta[order(current.meta$counts) , ]
+    p <- ggplot(current.meta , aes(x = V1 , y = V2 , col = counts)) +
+      geom_point(size=.5) +
+      scale_color_gradient(low = "azure3" , high = "darkgreen") + 
+      theme_classic() +
+      theme(legend.position="none") +
+      ggtitle(title)
+    return(p)
+  })
+  if (wide){
+    p <- ggarrange(plotlist = plots , ncol = length(genes))
+  }
+  else {
+    p <- ggarrange(plotlist = plots )
+  }
+  return(p)
+}
+
+
+```
+
+# Quantitative stat
+
+## Cell score
+
+```{r cell-score, message = FALSE}
+
+
+p = ggplot(stat_cell_score[stat_cell_score$p < Inf & stat_cell_score$n_genes %in% seq(50,250,50), ], aes(x = n_genes , y = score , fill = p)) +
+  geom_boxplot() +
+  scale_fill_manual(values = p_cols) + 
+  theme_classic() + 
+  ylim(c(0.5, 1)) +
+  labs(x = "# Genes" , y = "Cell score") + 
+  theme(legend.position = "none")
+p
+ggsave(filename = paste0(figures.dir, "cell_score", ".png"), plot = p, width = 3, height = 3)
+
+
+```
+
+## Gene score
+
+```{r gene-score, message = FALSE}
+
+
+p = ggplot(stat_gene_score[stat_gene_score$type < Inf & stat_gene_score$n_genes %in% seq(50,250,50) & stat_gene_score$corr_all > 0.25, ] , aes(x = n_genes , y = corr_ratio , fill = type)) +
+  geom_boxplot() +
+  scale_fill_manual(values = p_cols) + 
+  theme_classic() + 
+  ylim(c(0.75, 1)) +
+  labs(x = "# Genes" , y = "Gene score") + 
+  theme(legend.position = "none")
+p
+ggsave(filename = paste0(figures.dir, "gene_score", ".png"), plot = p, width = 3, height = 3)
+
+
+```
+
+
+# Minimum frac-expressed
+
+```{r min-frac-expressed, message = FALSE}
+
+
+mean_stat = apply(assay(sce[as.character(unique(genes$gene)) , ] , "logcounts") , 1 , mean)
+mean_stat = data.frame(gene = names(mean_stat) , mean = mean_stat)
+
+frac.expressed_stat = apply(assay(sce[as.character(unique(genes$gene)) , ] , "logcounts") , 1 , function(x) mean(x > 0))
+frac.expressed_stat = data.frame(gene = names(frac.expressed_stat) , frac.expressed = frac.expressed_stat)
+
+sd_stat = apply(assay(sce[as.character(unique(genes$gene)),] , "logcounts") , 1 , sd)
+sd_stat = data.frame(gene = names(sd_stat) , sd = sd_stat)
+
+stat = merge(mean_stat, frac.expressed_stat)
+stat = merge(stat, sd_stat)
+stat$cv = stat$sd/stat$mean
+
+genes = merge(genes, stat, all.x = T)
+
+n_genes.grid = seq(75,250,25)
+stat_frac = lapply(unique(genes$p) , function(p){
+  stat_per_dist = lapply(n_genes.grid , function(n_genes){
+    current.genes = as.character( genes$gene[genes$p == p & genes$rank <= n_genes] )
+    out = data.frame(p = p , n_genes = n_genes , min_frac = min(stat$frac.expressed[stat$gene %in% current.genes]))
+    return(out)
+  })
+  stat_per_dist = do.call(rbind , stat_per_dist)
+  return(stat_per_dist)
+})
+stat_frac = do.call(rbind, stat_frac)
+
+p = ggplot(stat_frac[stat_frac$p < Inf ,] , aes(x = factor(p) , y = factor(n_genes) , fill = log(min_frac))) +
+  geom_tile(aes(fill = log(min_frac))) +
+  geom_text(aes(label = round(min_frac,3)) , color = "red") +
+  scale_fill_viridis(discrete = F, name = "ln (min \n fraction)") + 
+  theme_classic() +
+  labs(x = "P" , y = "Number of genes")
+p
+ggsave(filename = paste0(figures.dir, "heatmap_frac_expressed", ".png"), plot = p, width = 5, height = 4)
+
+
+
+```
+
+
+# Session Info
+
+```{r sessinf}
+sessionInfo()
+```
