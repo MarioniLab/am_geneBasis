@@ -1,0 +1,198 @@
+---
+title: "Compare robustness of the selections for different combination of spleen samples."
+author: "Alsu Missarova"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Gene-selection-and-validation}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+# Load libraries
+
+```{r setup}
+
+
+library(knitr)
+library(SingleCellExperiment)
+library(dplyr)
+library(ggplot2)
+library(scran)
+library(batchelor)
+library(ggpubr)
+library(ape)
+library(plyr)
+library(readr)
+library(caret)
+library(repr)
+library(glmnet)
+library(stringr)
+library(wesanderson)
+library(BiocNeighbors)
+library(MouseGastrulationData)
+library(irlba)
+library(tibble)
+
+root.dir = "/Users/alsu/Develop/geneBasis/"
+#root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
+source(paste0(root.dir, "am_geneBasis/functions/main_functions.R"))
+source(paste0(root.dir, "am_geneBasis/functions/visualization_functions.R"))
+
+system = "spleen"
+figures.dir = paste0(root.dir , "figures/spleen_by_samples/" )
+
+# read sce 
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+sce$cell = colnames(sce)
+
+
+# read gene selection 
+gene_selections.files = list.files(path=paste0(root.dir , "data/gene_selection/" , system , "/by_sample"))
+genes = lapply(gene_selections.files , function(current.file){
+  out = readRDS(paste0(root.dir , "data/gene_selection/" , system , "/by_sample/" , current.file))
+  return(out)
+})
+genes_all = readRDS(paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection.Rds"))
+genes[[length(genes) + 1]] = genes_all
+names(genes) = c(1,2,3,4,5,6,"all")
+
+
+n_genes.grid = seq(25,150,25)
+
+celltype_cols = celltype_colors[[which( names(celltype_colors) == system )]]
+
+
+# read stats
+stat_cell_score = readRDS(paste0(root.dir , "data/spleen_by_sample_stat/" , "cell_score.Rds"))
+stat_gene_score = readRDS(paste0(root.dir , "data/spleen_by_sample_stat/" , "gene_score.Rds"))
+mappings = readRDS(paste0(root.dir , "data/spleen_by_sample_stat/" , "celltype_classic.Rds"))
+  
+  
+```
+
+
+# Composition between samples
+
+## Heatmaps
+
+```{r heatmap-ct-comp, message = FALSE}
+
+
+stat = as.data.frame(table(sce$sample , sce$celltype))
+colnames(stat) = c("sample" , "celltype" , "n")
+stat_samples = as.data.frame(table(sce$sample))
+colnames(stat_samples) = c("sample", "n_sample")
+stat = merge(stat , stat_samples )
+stat$frac = stat$n/stat$n_sample
+
+p = ggplot(stat , aes(x = sample , y = celltype , fill = log(frac))) + 
+  geom_tile() + 
+  scale_fill_viridis(discrete = F, name = "ln\n(Fraction\nof cells)") +
+  theme_classic() +
+  #theme(legend.position = "none") +
+  labs(x = "Sample" , y = "Celltype") + 
+  ggtitle("Celltype composition\nacross samples") +
+  theme(text=element_text(family="Arial", size = 14))
+p
+ggsave(filename = paste0(figures.dir, "celltype_composition" ,".png"), plot = p, width = 4, height = 4)
+
+
+```
+
+
+# Compare selections - w all samples
+
+## Celltype mappings
+
+```{r celltype, message = FALSE}
+
+
+# get mapping stat
+get_fraction_mapped_correctly_stat = function(mappings){
+  mappings$id = paste0(mappings$type , "_" , mappings$n_genes )
+  stat_frac_mapped_correctly = lapply(unique(mappings$id) , function(id){
+    current.mapping = mappings[mappings$id == id, ]
+    current.stat = get_fraction_mapped_correctly(current.mapping)
+    current.stat$id = id
+    current.stat = merge(current.stat , unique(mappings[, c("id" , "n_genes" , "type")]) , all.x = T , all.y = F)
+    return(current.stat)
+  })
+  stat_frac_mapped_correctly = do.call(rbind , stat_frac_mapped_correctly)
+  return(stat_frac_mapped_correctly)
+}
+stat_celltypes = get_fraction_mapped_correctly_stat(mappings)
+stat_celltypes$type = factor(stat_celltypes$type , levels = c(1:6, "all"))
+
+type_cols = c(wes_palette("FantasticFox1", type = "continuous", n = 6) , "gray")
+
+p = ggplot(stat_celltypes , aes(x = n_genes , y = frac_correctly_mapped , col = type)) +
+  geom_line() +
+  scale_color_manual(values = type_cols) +
+  facet_wrap(~celltype, ncol = 6) + 
+  theme_classic() + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) + 
+  labs(x = "# Genes" , y = "Fraction of cells mapped\nto the correctcell type") +
+  theme(text=element_text(family="Arial", size = 13))
+p
+ggsave(filename = paste0(figures.dir, "celltype_mapping" ,".png"), plot = p, width = 8, height = 4)
+
+
+```
+
+## Cell score
+
+```{r cell-score}
+
+
+p = ggplot(stat_cell_score , aes(x = factor(n_genes)  , y = score, fill = type)) + 
+  geom_boxplot() + 
+  scale_fill_manual(values = type_cols) + 
+  ylim(c(0.5,1)) +
+  theme_classic() + 
+  labs(y = "Cell neighbourhood\npreservation score" , x = "# Genes") + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) + 
+  theme(legend.position = "none") +
+  theme(text=element_text(family="Arial", size = 15))
+p
+ggsave(filename = paste0(figures.dir, "cell_score" ,".png"), plot = p, width = 6, height = 4)
+
+
+```
+
+## Cell score - tail
+
+```{r cell-score-tail}
+
+score.thresh = 0.5
+current_stat = as.data.frame(stat_cell_score %>% group_by(type , n_genes) %>% dplyr::summarise(frac_predicted_poorly = log(mean(score < score.thresh) + 1 )))
+
+p = ggplot(current_stat, aes(x = factor(n_genes)  , y = frac_predicted_poorly, fill = type)) + 
+  geom_bar(stat = "identity" , position = "dodge") + 
+  scale_fill_manual(values = type_cols) + 
+  theme_classic() + 
+  labs(y = "ln( fraction of the tail + 1)" , x = "# Genes") + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) + 
+  ggtitle(paste0("Cell score < ", score.thresh))+ 
+  theme(legend.position = "none") +
+  theme(text=element_text(family="Arial", size = 15))
+p
+ggsave(filename = paste0(figures.dir, "cell_score_tail" ,".png"), plot = p, width = 6, height = 4)
+
+
+```
+
+
+# Session Info
+
+```{r sessinf}
+sessionInfo()
+```
+
+

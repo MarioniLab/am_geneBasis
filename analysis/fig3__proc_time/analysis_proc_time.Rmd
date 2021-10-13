@@ -1,0 +1,220 @@
+---
+title: "Pipeline to compare processing time for geneBasis and SCMER."
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+# Load dependencies
+
+```{r load, message = FALSE}
+
+library(SingleCellExperiment)
+library(batchelor)
+library(stats)
+library(BiocNeighbors)
+library(tibble)
+library(reshape2)
+library(plyr)
+library(dplyr)
+library(scran)
+library(batchelor)
+library(stringr)
+library(corrplot)
+library(ggcorrplot)
+library(gdata)
+
+root.dir = "/Users/alsu/Develop/geneBasis/"
+source(paste0(root.dir, "am_geneBasis/functions/main_functions.R"))
+source(paste0(root.dir, "am_geneBasis/functions/visualization_functions.R"))
+
+figures.dir = paste0(root.dir , "figures/benchmark/proc_time/")
+data.dir = paste0(root.dir, "data/processed_time/")
+
+systems = c("spleen")
+
+```
+
+# Set up color schemes
+
+```{r color-schemes, message = FALSE}
+
+
+pals1 = wes_palette("Darjeeling1", n = 5)
+pals2 = wes_palette("Darjeeling2", n = 5)
+pals3 = wes_palette("Royal1", n = 4)
+pals4 = wes_palette("Royal2", n = 5)
+
+type_cols = c("geneBasis" = pals3[2] , "SCMER" = pals1[5])
+
+n_genes_cols = wes_palette("Zissou1" , type = "continuous", n = 5)
+
+```
+
+
+# Get processed time
+
+!! In the scripts to generate relevant data - batched and unbatched were conceptually swapped - re-name them here now post-hoc !!
+
+## geneBasis
+
+```{r read-selection-gene-basis, message = FALSE}
+
+
+# read gene selection 
+stat_geneBasis = lapply(systems , function(system){
+  stat_batched = readRDS(paste0(data.dir , "geneBasis/" , system , "/stat_unparalleled_batched.Rds"))
+  stat_batched$system = system
+  stat_batched$batch = "none"
+  
+  stat_unbatched = readRDS(paste0(data.dir , "geneBasis/" , system , "/stat_unparalleled_unbatched.Rds"))
+  stat_unbatched$system = system
+  stat_unbatched$batch = "sample"
+  
+  stat_per_system = rbind(stat_batched, stat_unbatched)
+  return(stat_per_system)
+})
+stat_geneBasis = do.call(rbind , stat_geneBasis)
+stat_geneBasis$id = "geneBasis"
+
+# round
+stat_geneBasis$n_genes_init = plyr::round_any(stat_geneBasis$n_genes_init , 1000)
+
+
+```
+
+## SCMER
+
+```{r read-selection-scmer, message = FALSE}
+
+
+stat_scmer = lapply(systems , function(system){
+  current.files = list.files(path = paste0( data.dir , "scmer/" , system , "/" ))
+  
+  current.files_batched = current.files[sapply(current.files , function(x) ifelse(startsWith(x , "stat_batched") , T , F))]
+  stat_batched = lapply(current.files_batched , function(current.file){
+    current.stat = read.csv(file =  paste0( data.dir , "scmer/" , system , "/" , current.file ))
+    return(current.stat)
+  })
+  stat_batched = do.call(rbind , stat_batched)
+  stat_batched$system = system
+  stat_batched$batch = "none"
+  
+  current.files_unbatched = current.files[sapply(current.files , function(x) ifelse(startsWith(x , "stat_unbatched") , T , F))]
+  stat_unbatched = lapply(current.files_unbatched , function(current.file){
+    current.stat = read.csv(file =  paste0( data.dir , "scmer/" , system , "/" , current.file ))
+    return(current.stat)
+  })
+  stat_unbatched = do.call(rbind , stat_unbatched)
+  stat_unbatched$system = system
+  stat_unbatched$batch = "sample"
+  
+  stat_per_system = rbind(stat_batched, stat_unbatched )
+  return(stat_per_system)
+})
+stat_scmer = do.call(rbind , stat_scmer)
+stat_scmer$id = "SCMER"
+
+# round
+stat_scmer$n_genes_init = plyr::round_any(stat_scmer$n_genes_init , 1000)
+#stat_scmer$n_genes_selected = plyr::round_any(stat_scmer$n_genes_selected, 10)
+stat_scmer = stat_scmer[stat_scmer$n_genes_selected > 10 & stat_scmer$n_genes_selected <= 250, ]
+
+
+```
+
+## Align colnames and put together
+
+```{r combine-together, message = FALSE}
+
+
+stat_geneBasis$n_threads = 1
+colnames(stat_scmer)[colnames(stat_scmer) == "n_genes_selected"] = "n_genes"
+colnames(stat_scmer)[colnames(stat_scmer) == "n_processed_samples"] = "n_samples"
+
+# re-arrange columns and combine
+stat_geneBasis = stat_geneBasis[, c("id", "system", "batch", "n_threads",  "n_samples" , "n_cells" , "n_genes_init" , "n_genes" , "time")]
+stat_scmer = stat_scmer[stat_scmer$n_threads == 9, c("id", "system", "batch", "n_samples" , "n_threads", "n_cells" , "n_genes_init" , "n_genes" , "time")]
+stat = rbind(stat_geneBasis, stat_scmer)
+
+# select only <= 150 genes
+stat = stat[stat$n_genes <= 150 , ]
+
+# split into batched and unbatched
+stat_unbatched = stat[stat$batch == "none" , ]
+stat_unbatched$n_cells = factor(stat_unbatched$n_cells)
+stat_unbatched$n_genes_init = factor(stat_unbatched$n_genes_init , levels = seq(1000,10000,1000))
+stat_batched = stat[stat$batch == "sample" , ]
+
+
+```
+
+# Analysis
+
+## geneBasis -- scaling w number of cells/number of genes
+
+```{r gene-basis-stat, message = FALSE}
+
+
+n_genes.grid = seq(50,150,50)
+p = ggplot(stat_unbatched[stat_unbatched$id == "geneBasis" & stat_unbatched$n_genes_init %in% seq(2000,10000,2000) & stat_unbatched$n_genes %in% n_genes.grid, ] , aes(x = factor(n_genes) , y = time/60 , fill = factor(n_cells))) + 
+  geom_boxplot() + 
+  theme_classic() + 
+  scale_fill_manual(values = wes_palette("Zissou1" , type = "continuous", n = 6), name = "Number of cells") +
+  labs(y = "Elapsed time, minutes" , x = "Number of genes selected") + 
+  theme(legend.position = "top") +
+  theme(text=element_text(family="Arial", size = 14))
+p
+ggsave(filename = paste0(figures.dir, "main_time_geneBasis_dep_nCells_updated" ,".png"), plot = p, width = 5, height = 5)
+
+
+p = ggplot(stat_unbatched[stat_unbatched$id == "geneBasis" & stat_unbatched$n_genes_init %in% seq(2000,10000,2000) & stat_unbatched$n_genes %in% n_genes.grid, ] , aes(x = factor(n_genes) , y = time/60 , fill = n_genes_init)) + 
+  geom_boxplot() + 
+  theme_classic() + 
+  scale_fill_manual(values = wes_palette("Cavalcanti1" , type = "continuous", n = 5), name = "Initial\nnumber\nof genes") +
+  labs(y = "Elapsed time, minutes" , x = "Number of genes selected") + 
+  theme(legend.position = "top") +
+  theme(text=element_text(family="Arial", size = 15))
+p
+ggsave(filename = paste0(figures.dir, "main_time_geneBasis_dep_nGenesInit_updated" ,".png"), plot = p, width = 6, height = 5)
+
+
+```
+
+
+## Compare geneBasis with SCMER
+
+```{r comp-w-scmer, message = FALSE}
+
+
+stat_unbatched$n_genes_bin = plyr::round_any(stat_unbatched$n_genes , 50 , ceiling)
+
+n_genes_bin.labs <- c("0-50 genes", "50-100 genes" , "100-150 genes")
+names(n_genes_bin.labs) <- c("50" , "100" , "150" )
+
+p = ggplot(stat_unbatched[stat_unbatched$n_genes > 1 & stat_unbatched$n_genes_bin <= 150 & stat_unbatched$n_genes_init %in% seq(3000,10000,1000) ,] , aes(x = factor(n_cells) , y = time/60 , fill = id)) + 
+  geom_boxplot() + 
+  scale_fill_manual(values = type_cols, name = "Method") + 
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) + 
+  labs(y = "Elapsed time, minutes" , x = "Number of cells") +
+  facet_wrap(~n_genes_bin, labeller = labeller(n_genes_bin = n_genes_bin.labs), nrow = 3) +
+  ylim(c(0, 1500)) + 
+  theme(legend.position = "top") +
+  theme(text=element_text(family="Arial"))
+p 
+ggsave(filename = paste0(figures.dir, "main_time_comp_w_scmer_updated" ,".png"), plot = p, width = 4, height = 4)
+
+
+```
+
+
+
+
+
+# Session Info
+
+```{r sessinf}
+sessionInfo()
+```

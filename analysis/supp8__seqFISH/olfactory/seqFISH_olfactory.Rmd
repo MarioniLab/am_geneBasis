@@ -1,0 +1,326 @@
+---
+title: "Pipeline to benchmark selection for seqFISH+."
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+# Load dependencies
+
+```{r load, message = FALSE}
+
+
+library(SingleCellExperiment)
+library(batchelor)
+library(stats)
+library(BiocNeighbors)
+library(tibble)
+library(reshape2)
+library(plyr)
+library(dplyr)
+library(scran)
+library(batchelor)
+library(stringr)
+library(corrplot)
+library(ggcorrplot)
+library(geneBasisR)
+
+root.dir = "/Users/alsu/Develop/"
+
+system = "mouse_olfactory"
+figures.dir = paste0(root.dir , "geneBasis/figures/seqFISH_plus/" , system , "/")
+
+sce = readRDS(paste0(root.dir , "geneBasis/data/scRNA_datasets/Zeisel_mouseBrain/" , "olfactory" , ".Rds"))
+sce = sce[, !sce$Class %in% c("Blood" , "Excluded", "Ependymal")]
+sce = sce[, !sce$Subclass %in% c("Neurons,Cycling" , "Oligos,Cycling")]
+colnames(sce) = paste0("sce_" , colnames(sce))
+sce$cell = paste0("sce_" , sce$cell)
+meta_sce = as.data.frame(colData(sce))
+
+seqfish = readRDS(file = paste0(root.dir, "geneBasis/data/FISH_datasets/seqfish_olfactory" , ".Rds"))
+colnames(seqfish) = paste0("seq_" , colnames(seqfish))
+seqfish$cell = paste0("seq_" , seqfish$cell)
+meta_seqfish = as.data.frame(colData(seqfish))
+
+```
+
+# Get seqFISH selections - based on seqFISH
+
+```{r seqfish-selection, message = FALSE}
+
+
+n_genes_total = 200
+
+genes_seqfish = geneBasisR::gene_search(seqfish , genes_base = NULL, n_genes_total = n_genes_total, batch = NULL, n.neigh = 3, nPC.all = 25, nPC.selection = 50, verbose = F)
+saveRDS(genes_seqfish , paste0(root.dir , "geneBasis/data/gene_selection/mouse_olfactory/gene_selection_seqfish.Rds"))
+#genes_seqfish = readRDS(paste0(root.dir , "geneBasis/data/gene_selection/mouse_olfactory/gene_selection_seqfish.Rds"))
+
+# read sce genes, they are precomputed
+genes_sce = readRDS(paste0(root.dir , "geneBasis/data/gene_selection/mouse_olfactory/gene_selection.Rds"))
+
+
+```
+
+
+
+# Get joint UMAP
+
+```{r joint-umap, message = FALSE}
+
+
+
+get_joined_umap = function(genes){
+  seqfish = seqfish[genes, ]
+  seqfish = seqfish[order(rownames(seqfish)) , ]
+  seqfish$batch = "seq"
+  
+  sce = sce[genes, ]
+  sce = sce[order(rownames(sce)) , ]
+  sce$batch = "sce"
+  
+  assay(seqfish , "cosineNorm") = cosineNorm(logcounts(seqfish))
+  assay(sce , "cosineNorm") = cosineNorm(logcounts(sce))
+  counts.joint = cbind(assay(seqfish , "cosineNorm") , assay(sce , "cosineNorm") )
+  
+  batch.factor = factor(c(seqfish$batch , sce$DonorID ))
+  mbpca = multiBatchPCA(counts.joint, batch = batch.factor, d = 25)
+  out = do.call(reducedMNN, mbpca)
+  joint.pca = out$corrected
+  
+  umaps_corrected = as.data.frame( uwot::umap(joint.pca , min_dist = 0.7) )
+  rownames(umaps_corrected) = rownames(joint.pca)
+  colnames(umaps_corrected) = c("x" , "y")
+  umaps_corrected = rownames_to_column(umaps_corrected, var = "cell")
+  return(umaps_corrected)
+}
+
+
+umaps = get_joined_umap(intersect(rownames(seqfish) , rownames(sce)))
+
+umaps_sce = merge( umaps , meta_sce , all.x = F , all.y = T )
+umaps_sce$Subclass = factor(umaps_sce$Subclass)
+umaps_seq = merge(umaps , meta_seqfish , all.x = F , all.y = T)
+umaps_seq$louvain_anno[which(umaps_seq$louvain_anno == "Olfactory ensheathing cells")] = "OEC"
+umaps_seq$louvain_anno = factor(umaps_seq$louvain_anno)
+
+
+celltype_colours = c("Astrocytes" = "#f79083" , "Astrocyte" = "#f79083", "Endothelial" = "#ff891c", 
+                     "Interneuron" = "#3F84AA" , "Neurons" = "#3F84AA", "Ependymal" = "#EF4E22", 
+                     "Bergmann-glia" = "#FACB12" , "OEC" = "#65A83E" , "Olfactory ensheathing cells" = "#65A83E",
+                     "Oligos" = "#635547", "Oligodendrocytes" = "#635547", "Immune" = "#532C8A", "Microglia" = "#532C8A" , "Mitral/Tufted cells" = "#EF5A9D", 
+                     "Neuroblast" = "#C9EBFB" , "Pia" = "#8870ad" , "Vascular" = "#C594BF")
+                    
+
+current.celltype_colours = celltype_colours[names(celltype_colours) %in% unique(umaps_sce$Subclass)]
+current.celltype_colours = current.celltype_colours[match( levels(umaps_sce$Subclass) , names(current.celltype_colours))]
+p1 = ggplot(umaps_sce, aes(x=x, y=y, col=Subclass)) +
+  geom_point(alpha = .85, size=1.25) + 
+  theme_classic() +
+  scale_color_manual(values = current.celltype_colours, name = "Classes, scRNA-seq") +
+  ylim(c(-15,18)) + xlim(c(-16,18)) +
+  ggtitle("scRNA-seq")
+
+current.celltype_colours = celltype_colours[names(celltype_colours) %in% unique(umaps_seq$louvain_anno)]
+current.celltype_colours = current.celltype_colours[match( levels(umaps_seq$louvain_anno) , names(current.celltype_colours))]
+p2 = ggplot(umaps_seq, aes(x=x, y=y, col=louvain_anno)) +
+  geom_point(alpha=.85, size=1.25) + 
+  theme_classic() +
+  scale_color_manual(values = current.celltype_colours, name = "Clusters, seqFISH+") +
+  ylim(c(-15,18)) + xlim(c(-16,18)) + 
+  ggtitle("seqFISH")
+p = ggarrange(p1,p2, ncol=2)
+p
+
+ggsave(filename = paste0(figures.dir, "umap_joint.png"), plot = p, width = 8, height = 3)
+
+
+```
+
+# Mapping between celltypes: scRNA - seqFISH
+
+```{r umap-per-selection, message = FALSE}
+
+
+get_mapping = function(seqfish , sce, genes, nPC = 25){
+  seqfish = seqfish[genes, ]
+  seqfish = seqfish[order(rownames(seqfish)) , ]
+  seqfish$celltype = seqfish$louvain_anno
+  seqfish$batch = "seq"
+  meta.seqfish = as.data.frame(colData(seqfish))
+  meta.seqfish = meta.seqfish[, c("cell", "celltype")]
+  
+  sce = sce[genes, ]
+  sce = sce[order(rownames(sce)) , ]
+  sce$celltype = sce$Subclass
+  sce$batch = "sce"
+  meta.sce = as.data.frame(colData(sce))
+  meta.sce = meta.sce[, c("cell", "celltype")]
+  
+  assay(seqfish , "cosineNorm") = cosineNorm(logcounts(seqfish))
+  assay(sce , "cosineNorm") = cosineNorm(logcounts(sce))
+  
+  counts.joint = cbind(assay(seqfish , "cosineNorm") , assay(sce , "cosineNorm") )
+  batch.factor = factor(c(seqfish$batch , sce$DonorID ))
+  
+  mbpca = multiBatchPCA(counts.joint, batch = batch.factor, d = nPC)
+  out = do.call(reducedMNN, mbpca)
+  joint.pca = out$corrected
+  
+  current.knns = suppressWarnings( queryKNN( joint.pca[colnames(sce),], joint.pca[colnames(seqfish),], k = 5, 
+                           get.index = TRUE, get.distance = FALSE) )
+  cells.mapped = t(apply(current.knns$index, 1, function(x) colnames(sce)[x]))
+  celltype.df = t(apply(cells.mapped, 1, function(x) meta.sce$celltype[match(x, meta.sce$cell)]))
+  celltype.df = as.data.frame(celltype.df)
+  rownames(celltype.df) = colnames(seqfish)
+  celltype = apply(celltype.df, 1, function(x) getmode(x, 1:length(x)))
+  out = data.frame(cell = names(celltype) , mapped_celltype = celltype )
+  out = merge(out , meta.seqfish) 
+  return(out)
+}
+
+
+getmode <- function(v, dist) {
+  tab = table(v)
+  #if tie, break to shortest distance
+  if(sum(tab == max(tab)) > 1){
+    tied = names(tab)[tab == max(tab)]
+    sub = dist[v %in% tied]
+    names(sub) = v[v %in% tied]
+    return(names(sub)[which.min(sub)])
+  } else {
+    return(names(tab)[which.max(tab)])
+  }
+}
+
+
+mapping = get_mapping(seqfish, sce , intersect(rownames(seqfish) , rownames(sce)))
+mapping$celltype[mapping$celltype == "Olfactory ensheathing cells"] = "OEC"
+
+mapping$celltype = as.character(mapping$celltype)
+mapping$celltype_mapped = as.character(mapping$mapped_celltype)
+tab = table(mapping$celltype , mapping$celltype_mapped)
+tab = sweep(tab, 1, rowSums(tab), "/")
+tab = as.data.frame( tab )
+colnames(tab) = c("celltype", "celltype_mapped", "n")
+tab$celltype = factor(tab$celltype , levels = c("Astrocytes" , "Interneuron" ,"Neuroblast" , "Mitral/Tufted cells", "Microglia" , "OEC" , "Oligodendrocytes" , "Pia" , "Endothelial"))
+tab$celltype_mapped = factor(tab$celltype_mapped , levels = c("Astrocyte" , "Neurons" , "Immune" , "OEC" , "Oligos" , "Vascular"))
+tab = tab[!is.na(tab$celltype) , ]
+p <- ggplot(tab, aes(x = celltype , y = celltype_mapped, fill = n)) +
+  geom_tile() + viridis::scale_fill_viridis(discrete = F, name = "Fraction \n of cells") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+  labs(x = "Cluster, seqFISH+" , y = "Class, scRNA-seq")
+p
+ggsave(filename = paste0(figures.dir, "mapping_celltypes.png"), plot = p, width = 4, height = 4)
+
+
+
+```
+
+# Compare selections
+
+## Louvain anno - general
+
+### Heatmaps
+
+```{r umap-per-selection, message = FALSE}
+
+
+updated_heatmap = function(p, lab = "Cluster"){
+  p = p + 
+    scale_fill_viridis(name = "Fraction \n of cells") + 
+    labs(x = lab , y = paste("Mapped" , lab)) 
+  return(p)
+}
+
+
+
+ordered_cts = c("Astrocytes" , "Interneuron" , "Neuroblast" , "Mitral/Tufted cells", "Microglia" , "Endothelial" , "Pia" , "Olfactory ensheathing cells" , "Oligodendrocytes")
+
+mapping_all = get_celltype_mapping(seqfish , intersect(rownames(seqfish),rownames(sce)), 
+                                   celltype.id = "louvain_anno" , cosine=T, n.neigh = 5 , 
+                                   nPC.selection = 50 , which_genes_to_use = "all")
+
+p_all = plot_mapping_heatmap(mapping_all$mapping, levels = ordered_cts , title = "Using all seqFISH+")
+p_all = updated_heatmap(p_all)
+
+n_genes.grid = seq(10,200,10)
+
+stat = lapply(n_genes.grid, function(n_genes){
+  print(n_genes)
+  mapping_seq = get_celltype_mapping(seqfish , genes_seqfish$gene[1:n_genes], 
+                                   celltype.id = "louvain_anno" , cosine=T, n.neigh = 5 , 
+                                   nPC.selection = 50 , which_genes_to_use = "all")
+  p_seq = plot_mapping_heatmap(mapping_seq$mapping, levels = ordered_cts , title = "Selection from seqFISH+")
+  p_seq = updated_heatmap(p_seq)
+  
+  mapping_sce = get_celltype_mapping(seqfish , genes_sce$gene[1:n_genes], 
+                                   celltype.id = "louvain_anno" , cosine=T, n.neigh = 5 , 
+                                   nPC.selection = 50 , which_genes_to_use = "all")
+  p_sce = plot_mapping_heatmap(mapping_sce$mapping, levels = ordered_cts , title = "Selection from scRNA-seq")
+  p_sce = updated_heatmap(p_sce)
+  
+  p = ggarrange(p_sce , p_seq , p_all, common.legend = T , ncol = 3)
+  ggsave(filename = paste0(figures.dir, "heatmaps_mapping_selections/louvain_anno/" , n_genes,".png"), plot = p, width = 13, height = 5)
+  return(NULL)
+})
+
+
+
+```
+
+### Mapping trend
+
+```{r umap-per-selection, message = FALSE}
+
+
+n_genes.grid = seq(20,150,10)
+stat = lapply(n_genes.grid, function(n_genes){
+  print(n_genes)
+  stat.all = get_celltype_mapping(seqfish , genes.selection = intersect(rownames(seqfish), rownames(sce)), celltype.id = "louvain_anno", n.neigh = 5 , nPC.selection = 50, cosine = T, return.stat = T, which_genes_to_use = "DE" , test.type = "t")
+  stat.all = stat.all$stat
+  stat.all$n_genes = n_genes
+  stat.all$type = "all"
+  
+  stat.seqfish_counts_seqfish_cells = get_celltype_mapping(seqfish , genes.selection = genes_seqfish$gene[1:n_genes], celltype.id = "louvain_anno", n.neigh = 5 , nPC.selection = 50, cosine = T, return.stat = T, which_genes_to_use = "DE" , test.type = "t")
+  stat.seqfish_counts_seqfish_cells = stat.seqfish_counts_seqfish_cells$stat
+  stat.seqfish_counts_seqfish_cells$n_genes = n_genes
+  stat.seqfish_counts_seqfish_cells$type = "seqfish"
+  
+  stat.sce_counts_sce_cells = get_celltype_mapping(seqfish , genes.selection = genes_sce$gene[1:n_genes], celltype.id = "louvain_anno", n.neigh = 5 , nPC.selection = 50, cosine = T, return.stat = T, which_genes_to_use = "DE" , test.type = "t")
+  stat.sce_counts_sce_cells = stat.sce_counts_sce_cells$stat
+  stat.sce_counts_sce_cells$n_genes = n_genes
+  stat.sce_counts_sce_cells$type = "sce"
+  
+  current.stat = rbind(stat.all, stat.seqfish_counts_seqfish_cells, stat.sce_counts_sce_cells)
+  return(current.stat)
+})
+stat = do.call(rbind, stat)
+
+
+ordered_cts = c("Astrocytes" , "Interneuron" , "Neuroblast" , "Mitral/Tufted cells" , "Olfactory ensheathing cells" , "Oligodendrocytes" , "Microglia" , "Endothelial" , "Pia" )
+stat$celltype = factor(stat$celltype , levels = ordered_cts)
+
+pals = wesanderson::wes_palette("Darjeeling1" , 2)
+selections_colors = c("all" = "gray" , "seqfish" = pals[2] , "sce" = pals[1])
+p = ggplot(stat , aes(x = n_genes , y = frac_correctly_mapped, col = type)) + 
+  geom_line() + 
+  scale_color_manual(values = selections_colors) + 
+  facet_wrap(~celltype, ncol = 5) + 
+  theme_classic() + 
+  labs(y = "Fraction of cells mapped correctly" , x = "# Genes")
+p
+ggsave(filename = paste0(figures.dir , "mapping_trend__louvain_anno" ,".png"), plot = p, width = 10, height = 5)
+  
+
+
+
+```
+
+
+# Session Info
+
+```{r sessinf}
+sessionInfo()
+```
