@@ -1,0 +1,207 @@
+---
+title: "Generating useable dataset for kidney."
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+
+
+
+```{r load, message = FALSE}
+# load libraries we are going to use
+
+
+library(Matrix)
+library(scran)
+library(scater)
+library(batchelor)
+library(knitr)
+library(pheatmap)
+library(reshape2)
+library(edgeR)
+library(BiocSingular)
+library(BiocParallel)
+library(BiocNeighbors)
+library(SingleCellExperiment)
+library(dplyr)
+library(tibble)
+library(plyr)
+library(zellkonverter)
+set.seed(32)
+
+root.dir = "/Users/alsu/Develop/geneBasis/"
+#root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
+
+
+```
+
+# Read .txt file
+
+```{r read-file, message = FALSE}
+
+
+system = "melanoma"
+sce = read.table(paste0(root.dir , "data/scRNA_datasets/melanoma/GSE72056_melanoma_single_cell_revised_v2.txt"), header = T)
+
+# get meta-file
+meta = as.data.frame(t(sce[1:3,2:ncol(sce)]))
+colnames(meta) = c("sample" , "malignancy" , "celltype")
+meta = rownames_to_column(meta , var = "cell")
+malignancy_legend = data.frame(id = c(0:2) , malignancy = c(NA , 0 , 1))
+celltype_legend = data.frame(id = c(0:6) , celltype = c("other" , "T" , "B" , "Macro." , "Endo." , "CAF" , "NK"))
+meta$celltype = sapply(1:nrow(meta) , function(i) return(celltype_legend$celltype[celltype_legend$id == meta$celltype[i]]))
+meta$malignancy = sapply(1:nrow(meta) , function(i) return(malignancy_legend$malignancy[malignancy_legend$id == meta$malignancy[i]]))
+
+# get counts
+counts = as.matrix(sce[4:nrow(sce) , 2:ncol(sce)])
+rownames(counts) = sce[4:nrow(sce) , 1]
+
+# get rid of spike-ins
+counts.spikes = counts[grepl("ERCC", rownames(counts)) , ]
+counts = counts[!grepl("ERCC", rownames(counts)) , ]
+
+# see if features are duplicated
+tab = table(rownames(counts))
+tab = tab[tab > 1]
+rownames.counts = rownames(counts)
+for (x in tab){
+  gene_dupped = names(x)
+  idx = which(rownames.counts == gene_dupped)
+  rownames.counts[idx] = paste0(gene_dupped , "_" , c(1:length(idx)))
+}
+rownames(counts) = rownames.counts
+
+# ensure that cells match in counts and meta
+mean(meta$cell == colnames(counts))
+
+# combine together
+sce <- SingleCellExperiment(list(counts=counts) ,
+                            colData = meta)
+
+
+
+```
+
+# Add logcounts
+
+```{r add-logcounts, message = FALSE}
+
+
+batchFactor = factor(sce$sample)
+sce = lapply(unique(batchFactor) , function(current.batch){
+  idx = which(batchFactor == current.batch)
+  current.sce = SingleCellExperiment(assays = list("counts" = counts[,idx]), colData = meta[idx,])
+  clusters <- quickCluster(current.sce, method="igraph", use.ranks=TRUE, d=50, min.mean=0.1, min.size = 50)
+  current.sce <- computeSumFactors(current.sce, clusters=clusters)
+  return(current.sce)
+})
+sce = do.call(multiBatchNorm , sce )
+sce = do.call(cbind, sce)
+#saveRDS(sce, file = paste0(root.dir, "data/scRNA_datasets/" , system , "/sce_" , system, ".Rds"))
+
+
+
+```
+
+# Add UMAP coordinates
+
+## Run UMAP
+
+```{r add-umap, message = FALSE}
+
+
+library(scater)
+# get hvgs
+hvgs = get_hvgs(sce, var.thresh = 0)
+
+# get corrected pcs
+pcs = multiBatchPCA(logcounts(sce[hvgs , ]), batch = factor(sce$sample), d = 50)
+pcs = do.call(reducedMNN, pcs)
+pcs = pcs$corrected
+
+umaps = as.data.frame( scater::calculateUMAP(pcs, transposed = T) )
+rownames(umaps) = rownames(pcs)
+
+
+
+```
+
+## Check how it looks before saving
+
+```{r plot-umap, message = FALSE}
+
+
+umaps = rownames_to_column(umaps , var = "cell")
+meta = merge(meta , umaps)
+
+p1 = ggplot(meta , aes(x = V1 , y = V2 , col = factor(sample))) + 
+  geom_point(size = .5) +
+  theme_classic()
+p2 = ggplot(meta , aes(x = V1 , y = V2 , col = factor(malignancy))) + 
+  geom_point(size = .5) +
+  theme_classic()
+p3 = ggplot(meta , aes(x = V1 , y = V2 , col = factor(celltype))) + 
+  geom_point(size = .5) +
+  theme_classic()
+p = ggarrange(p1,p2,p3)
+p
+
+
+
+```
+
+# Combine
+
+```{r combine-together, message = FALSE}
+
+sce = sce[, order(colnames(sce))]
+umaps = umaps[order(umaps$cell) , ]
+# check
+mean(colnames(sce) == umaps$cell)
+
+reducedDim(sce , "UMAP") = umaps[, c("V1" , "V2")]
+saveRDS(sce, file = paste0(root.dir, "data/scRNA_datasets/" , system , "/sce_" , system, ".Rds"))
+
+```
+
+# Generate h5ad file (to run for SCMER)
+
+```{r gen-h5ad, message = FALSE}
+
+
+sce = readRDS(paste0( root.dir, "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+
+
+writeH5AD(sce, paste0(root.dir, "data/scRNA_datasets/" , system , "/sce_" , system , ".h5ad"), X_name = NULL, skip_assays = FALSE)
+
+
+```
+
+# Add umaps wo batch correction
+
+```{r add-umaps-no-batch-corr, message = FALSE}
+
+
+sce = readRDS(paste0( root.dir, "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+hvgs = get_hvgs(sce)
+set.seed(32)
+# get corrected pcs
+pcs = prcomp_irlba(t(as.matrix(logcounts(sce[hvgs , ]))), n = 50)
+pcs = pcs$x
+umaps = as.data.frame( uwot::umap(pcs , min_dist = 0.7) )
+rownames(umaps) = colnames(sce)
+colnames(umaps) = c("V1" , "V2")
+
+reducedDim(sce , "UMAP_unbatched") = umaps
+saveRDS(sce, file = paste0(root.dir, "data/scRNA_datasets/" , system , "/sce_" , system, ".Rds"))
+
+
+```
+
+#Session Info
+
+```{r sessinf}
+sessionInfo()
+```

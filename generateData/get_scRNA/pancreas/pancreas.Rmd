@@ -1,0 +1,108 @@
+---
+title: "Mapping to the atlas"
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+#Introduction & method
+
+In this script we map cells from the FAS-affected embryos (+ 4 samples from the atlas experiment) onto our atlas.
+
+```{r load, message = FALSE}
+# load libraries we are going to use
+
+
+library(Matrix)
+library(scran)
+library(scater)
+library(batchelor)
+library(reshape2)
+library(BiocSingular)
+library(BiocParallel)
+library(BiocNeighbors)
+library(SingleCellExperiment)
+library(SingleCellExperiment)
+library(Seurat)
+library(SeuratObject)
+library(SingleCellExperiment)
+library(scran)
+library(scuttle)
+library(zellkonverter)
+set.seed(32)
+
+#root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
+root.dir = "/Users/alsu/Develop/geneBasis/"
+
+system = "pancreas"
+
+
+```
+
+
+# Read seurat file
+
+```{r read-seurat, message = FALSE}
+
+
+df = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/" , system , "_original.rds"))
+sce = as.SingleCellExperiment(df)
+
+# add sample field
+sce$sample = sce$dataset
+
+# ensure there are no spike-ins and delete originally pulled logcounts
+sce = sce[!grepl("ERCC-" , rownames(sce)) , ]
+umaps = reducedDim(sce , "UMAP")
+sce = SingleCellExperiment(assays = list("counts" = counts(sce)), colData = colData(sce))  
+reducedDims(sce) = list(UMAP = umaps)  
+
+
+
+```
+
+
+# Add logcounts
+
+```{r add-logcounts, message = FALSE}
+
+
+sce = lapply(unique(sce$sample) , function(current.batch){
+  print(current.batch)
+  current.sce = sce[, sce$sample == current.batch]
+  clusters = quickCluster(current.sce, method="igraph", use.ranks=TRUE, d=50, min.mean=0.1)
+  current.sce = computeSumFactors(current.sce, clusters=clusters)
+  return(current.sce)
+}) 
+sce = do.call(multiBatchNorm , sce )
+sce = do.call(cbind, sce)
+saveRDS(sce, file = paste0(root.dir, "data/scRNA_datasets/" , system , "/sce_" , system, ".Rds"))
+
+
+
+```
+
+# Generate h5ad file (to run for SCMER)
+
+```{r gen-h5ad, message = FALSE}
+
+
+sce = readRDS(paste0( root.dir, "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+
+idx = which(is.na(sce$celltype))
+sce$celltype[idx] = as.character(sce$annotation.l1[idx])
+saveRDS(sce, file = paste0(root.dir, "data/scRNA_datasets/" , system , "/sce_" , system, ".Rds"))
+
+
+writeH5AD(sce, paste0(root.dir, "data/scRNA_datasets/" , system , "/sce_" , system , ".h5ad"), X_name = NULL, skip_assays = FALSE)
+
+
+```
+
+
+#Session Info
+
+```{r sessinf}
+sessionInfo()
+```
