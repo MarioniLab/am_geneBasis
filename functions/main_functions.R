@@ -648,188 +648,29 @@ getmode <- function(v, dist) {
   }
 }
 
-generateSimilarity = function(SCE, k = 50, batchFactor = NULL, HVGs = NULL) {
-  # SCE is a single cell experiment object containing the gene expression
-  # in "logcounts" slot, otherwise a genes x cells matrix of logcounts
-  # k is the number of nearest neighbours in the estimated KNN network
-  # batchFactor is a factor matching columns of SCE specifying batches for MNN correction
-  # after PCA
-  # HVGs is optional set of genes to calculate similarity
 
-  require(scran)
+load_spatial_embryo_8.5 = function(dir = "local"){
   require(SingleCellExperiment)
-  require(bluster)
-  require(igraph)
   require(scater)
-  require(batchelor)
-  #
-  # if (!"logcounts" %in% names(assays(SCE))) {
-  #   require(scuttle)
-  #   SCE <- logNormCounts(SCE)
-  # }
-
-  if (is.null(HVGs)) {
-    fit = modelGeneVar(logcounts(SCE))
-    HVGs = getTopHVGs(fit)
-  }
-
-  SCE <- runPCA(SCE, subset_row = HVGs)
-
-  if (!is.null(batchFactor)) {
-    SCE_corrected <- fastMNN(SCE, batch = batchFactor)
-    PCs = reducedDim(SCE_corrected, "corrected")
+  
+  # load sce for seqFISH
+  if (dir == "cluster") {
+    data.dir = "/nfs/research/marioni/alsu/External/Lohoff_spatEmbryo/"
   } else {
-    PCs = reducedDim(SCE, "PCA")
+    data.dir = "/Users/alsu/Develop/spatial/mouse_embryo/data/8_5/source/"
   }
-
-  graph = bluster::makeKNNGraph(PCs, k = k)
-  V(graph)$name <- colnames(SCE)
-
-  graph_sim = igraph::similarity(graph, method = "jaccard")
-  rownames(graph_sim) <- V(graph)$name
-  colnames(graph_sim) <- V(graph)$name
-
-  return(graph_sim)
+  
+  sce = readRDS( paste0( data.dir , "E8.5_sce_filt.Rds"))
+  # add normalization by libsize 
+  assay(sce, "cpm") <- logcounts(scater::logNormCounts(sce, size_factors = sce$total))
+  assay(sce, "cpm_wo_xist") <- logcounts(scater::logNormCounts(sce, size_factors = as.numeric( sce$total - counts( sce["Xist"] )) ))
+  
+  meta = colData(sce)
+  meta = data.frame(meta)
+  # rename Cavin3 --> Prkcdbp
+  rownames.sce = rownames(sce)
+  rownames.sce[rownames.sce == "Cavin3"] = "Prkcdbp"
+  rownames(sce) = rownames.sce
+  
+  return(sce)
 }
-
-getSubsetUncertainty = function(SCE, batchFactor.sim = NULL,
-                                querySCE = NULL,
-                                subsetGenes = NULL,
-                                k = 50,
-                                full_sim = NULL,
-                                plot = FALSE,
-                                plotAdditional = NULL,
-                                verbose = FALSE,
-                                jointBatchFactor = NULL,
-                                returnAdditional = NULL,
-                                ...) {
-
-  # output is a named numeric vector of uncertainty values for each cell
-  # if querySCE is provided, uncertainty values will include these
-  # cells too
-
-  # SCE is a SingleCellExperiment object of the reference dataset
-  # querySCE is a SingleCellExperiment object of the query dataset,
-  # if subsetGenes is NULL then the rownames of these are given as the
-  # subset
-  # subsetGenes is a character vector of genes to subset with, this can
-  # be NULL if querySCE is provided
-  # k integer is the number of nearest neighbours
-  # full_sim is a square matrix assumed to be the similarity of the
-  # reference data given as SCE, which can be generated a priori
-  # using generateSimilarity(SCE)
-  # jointBatchFactor is a named factor that should have values for SCE and
-  # querySCE if provided, which will be included as a batch via interaction
-  # with the Reference and Query batch
-  # returnAdditional is a character vector of any additional objects to be
-  # returned along with the uncertainty score, e.g. to also extract the
-  # joint PCs set returnAdditional = "jointPCs", or "g" for the plot
-
-  require(igraph)
-  require(BiocNeighbors)
-
-  if (is.null(full_sim)) {
-    full_sim = generateSimilarity(SCE, ...)
-  }
-
-  # combining SCE objects is nontrivial in general
-  if (is.null(querySCE)) {
-    if (is.null(subsetGenes)) stop("Either querySCE or subsetGenes needs to be provided")
-    jointSCE = SCE[subsetGenes,]
-    batchFactor = rep(c("Reference"), times = c(ncol(SCE)))
-  } else {
-    if (is.null(subsetGenes)) {
-      jointSCE = cbind(SCE, querySCE)[rownames(querySCE),]
-      batchFactor = rep(c("Reference", "Query"), times = c(ncol(SCE), ncol(querySCE)))
-    } else {
-      jointSCE = cbind(SCE, querySCE)[subsetGenes,]
-      batchFactor = rep(c("Reference"), times = c(ncol(SCE)))
-    }
-  }
-
-  # add the additional batch factor if given
-  if (!is.null(jointBatchFactor)) {
-    batchFactor <- interaction(batchFactor, jointBatchFactor[colnames(jointSCE)])
-  }
-
-  # extract similarity of the subsetted genes
-  subset_sim = generateSimilarity(SCE, batchFactor = batchFactor.sim, HVGs = rownames(jointSCE))
-
-  # concatenate and batch correct the reference and query datasets (if applicable)
-  jointSCE <- logNormCounts(jointSCE)
-  jointSCE <- runPCA(jointSCE)
-  if (length(unique(batchFactor)) != 1) {
-    jointSCE_corrected <- fastMNN(jointSCE, batch = batchFactor)
-    jointPCs = reducedDim(jointSCE_corrected, "corrected")
-  } else {
-    jointPCs = reducedDim(jointSCE, "PCA")
-  }
-
-  # identify nearest neighbours
-  tmp_r = jointPCs[colnames(SCE),]
-
-  ref_knn = queryKNN(tmp_r,
-                     query = jointPCs,
-                     k = k)$index
-  ref_knn_name = apply(ref_knn, 2, function(x) rownames(tmp_r)[x])
-  rownames(ref_knn_name) <- rownames(jointPCs)
-
-  # extract cell-specific uncertainty score
-  uncertainty_scores = sapply(rownames(ref_knn_name), function(i) {
-    if (verbose) print(i)
-    ref_sim_nn = full_sim[ref_knn_name[i,], ref_knn_name[i,]]
-    ref_sim_sub_nn = subset_sim[ref_knn_name[i,], ref_knn_name[i,]]
-
-    stat = suppressWarnings({ks.test(c(ref_sim_nn[lower.tri(ref_sim_nn)]),
-                                     c(ref_sim_sub_nn[lower.tri(ref_sim_sub_nn)]))$stat})
-    names(stat) <- NULL
-    return(stat)
-  })
-
-  # generate UMAP for plotting
-  if (plot) {
-    jointSCE$uncertainty = uncertainty_scores
-    reducedDim(jointSCE, "UMAP") <- calculateUMAP(t(jointPCs))
-    g = plotUMAP(jointSCE, colour_by = "uncertainty")
-    if (!is.null(plotAdditional)) {
-      # e.g. plotAdditional = list("celltype", scale_colour_manual(values = celltype_colours))
-      require(patchwork)
-      gAdditional = plotUMAP(jointSCE, colour_by = plotAdditional[[1]])
-      gAll = gAdditional + plotAdditional[[2]] + labs(colour = plotAdditional[[1]]) + g
-      print(gAll)
-    } else {
-      print(g)
-    }
-  }
-
-  if (!is.null(returnAdditional)) {
-    out = mget(c("uncertainty_scores", intersect(ls(), returnAdditional)))
-    return(out)
-  } else {
-    return(uncertainty_scores)
-  }
-}
-
-
-compare_gene_selections = function(sce , genes , genes_to_compare , corr.thresh = 1, rank.thresh = 1000){
-  genes = genes[genes$rank <= rank.thresh , ]
-  genes_to_compare = genes_to_compare[genes_to_compare$rank <= rank.thresh,]
-  sce = sce[rownames(sce) %in% unique( c(as.character(genes$gene) , as.character(genes_to_compare$gene)) ) ,]
-  counts = as.matrix(logcounts(sce))
-  corr_stat = as.data.frame( cor(t(counts), method = "pearson") )
-
-  stat_genes = lapply(1:nrow(genes) , function(i){
-    current.corr_stat = corr_stat[, colnames(corr_stat) %in% genes_to_compare$gene]
-    current.corr = current.corr_stat[rownames(current.corr_stat) == genes$gene[i], ]
-    out = data.frame(corr = max(current.corr) , gene.which = colnames(current.corr_stat)[which.max(current.corr)])
-    return(out)
-  })
-  stat_genes = do.call(rbind , stat_genes)
-  genes = cbind(genes , stat_genes)
-  genes = genes[genes$corr <= corr.thresh , ]
-
-  return(genes)
-}
-
-
-
