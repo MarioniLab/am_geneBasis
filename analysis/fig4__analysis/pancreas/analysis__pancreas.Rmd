@@ -1,0 +1,222 @@
+---
+title: "Deatiled analysis of gene panels for pancreas."
+author: "Alsu Missarova"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Gene-selection-and-validation}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+# Load libraries
+
+```{r setup}
+
+
+library(devtools)
+library(usethis)
+library(roxygen2)
+library(testthat)
+library(knitr)
+library(SingleCellExperiment)
+library(dplyr)
+library(ggplot2)
+library(scran)
+library(batchelor)
+library(ggpubr)
+library(ape)
+library(plyr)
+library(readr)
+library(caret)
+library(repr)
+library(glmnet)
+library(stringr)
+library(wesanderson)
+library(BiocNeighbors)
+library(MouseGastrulationData)
+library(irlba)
+library(ggcorrplot)
+library(viridis)
+library(viridisLite)
+
+
+root.dir = "/Users/alsu/Develop/geneBasis/"
+#root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
+source(paste0(root.dir, "am_geneBasis/functions/main_functions.R"))
+source(paste0(root.dir, "am_geneBasis/functions/visualization_functions.R"))
+
+system = "pancreas"
+figures.dir = paste0(root.dir , "figures/rare_and_sub_CTs/" , system, "/")
+
+# read sce 
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+sce$cell = colnames(sce)
+sce$celltype[which(sce$celltype %in% c("macrophage" , "mast"))] = "immune"
+#sce$celltype[idx] = as.character(sce$annotation.l1[idx])
+
+# read gene selection
+genes = readRDS(paste0(root.dir , "data/gene_selection/" , system , "/gene_selection.Rds"))
+
+# get meta w/umaps
+meta = as.data.frame(colData(sce))
+if (!( "cell" %in% colnames(meta) )){
+  meta = rownames_to_column(meta , var = "cell")
+}
+umaps = as.data.frame( reducedDim(sce , "UMAP"))
+colnames(umaps)[which(colnames(umaps) == "UMAP_1")] = "V1"
+colnames(umaps)[which(colnames(umaps) == "UMAP_2")] = "V2"
+if (!( "cell" %in% colnames(umaps) )){
+  umaps = rownames_to_column(umaps , var = "cell")
+}
+meta = merge(meta, umaps)
+meta$sample = factor(meta$sample)
+meta$celltype = factor(meta$celltype)
+
+n_genes.grid = seq(25,150,25)
+
+celltype_cols = celltype_colors[[which( names(celltype_colors) == system )]]
+
+
+```
+
+# UMAPs overall
+
+```{r umaps-cts, message = FALSE}
+
+
+p = ggplot(meta , aes(x = V1 , y = V2 , col = celltype)) + 
+  geom_point(size=1,alpha = .75) + 
+  scale_color_manual(values = celltype_cols) +
+  theme_classic() +
+  #theme(legend.position = "none") +
+  labs(x = "UMAP-1" , y = "UMAP-2") 
+p
+ggsave(filename = paste0(figures.dir, "umap_CTs" ,".png"), plot = p, width = 5, height = 5)
+
+
+```
+
+# CT composition - pick rare ones
+
+```{r CT-composition, message = FALSE}
+
+
+tab = as.data.frame(table(sce$celltype))
+colnames(tab) = c("celltype" , "n")
+tab = tab[tab$n > 10, ]
+tab$frac = tab$n/sum(tab$n)
+tab = tab[order(tab$frac) , ]
+tab$celltype = factor(tab$celltype , levels = tab$celltype)
+
+p = ggplot(tab , aes(x = celltype , y = frac , fill = celltype)) + 
+  geom_bar(stat = "identity" , position = "dodge") + 
+  scale_fill_manual(values = celltype_cols) + 
+  theme_classic() + 
+  theme(axis.text.x = element_blank()) + 
+  labs(y = "Fraction of cells", x = "Cell type") + 
+  guides(fill=guide_legend(ncol=2)) +
+  theme(legend.position = "right")
+p
+ggsave(filename = paste0(figures.dir, "CT_composition" ,".png"), plot = p, width = 6, height = 3)
+
+
+
+```
+
+# Mappings
+
+```{r get-mappings, message = FALSE}
+
+
+get_celltype_mapping = function(sce , genes , batch = "sample", n.neigh = 5 , nPC = NULL, type = "together"){
+  neighs = suppressWarnings( get_mapping(sce , genes = genes, batch = batch, n.neigh = n.neigh, nPC = nPC , get.dist = F , type = type))
+  if (!is.null(neighs)){
+    meta = as.data.frame(colData(sce))
+    current.mapping = data.frame(cell = rownames(neighs) ,
+                               celltype = sapply(1:nrow(neighs) , function(i) meta$celltype[meta$cell == rownames(neighs)[i]]) ,
+                               mapped_celltype = sapply(1:nrow(neighs), function(i) getmode(meta$celltype[match(neighs[i,] , meta$cell)] , 1:n.neigh) ))
+    return(current.mapping)
+  }
+  else {
+    return(NULL)
+  }
+}
+
+mappings = lapply(n_genes.grid , function(n_genes){
+  current.genes = as.character( genes$gene[1:n_genes] )
+  current.mapping = get_celltype_mapping(sce , current.genes)
+  current.mapping$n_genes = n_genes
+  return(current.mapping)
+})
+mappings = do.call(rbind, mappings)
+
+
+
+```
+
+# Get order of celltypes representing their transcriptional relationship
+
+```{r plot-mappings}
+
+
+get_ct_hierarchy = function(sce , batch = NULL, nPC = 50){
+  hvgs_5000 = get_hvgs(sce , n = 5000)
+  current.sce = sce[hvgs_5000, ]
+  counts = as.matrix( logcounts(current.sce) )
+  meta = as.data.frame(colData(sce))  
+  if (is.null(batch)){
+    pcs = irlba::prcomp_irlba(t(counts) , n = min(nPC, (nrow(counts)-1) , (ncol(counts) - 1)))
+    counts = pcs$x
+    rownames(counts) = colnames(current.sce)
+  }
+  else {
+    batchFactor = factor(meta[, colnames(meta) == batch])
+    counts = batchelor::multiBatchPCA(counts , batch = batchFactor , d = nPC)
+    counts = do.call(batchelor::reducedMNN , counts)
+    counts = counts$corrected
+  }
+  celltypes = unique(sce$celltype)      
+  avg_pc_per_ct.stat = lapply(celltypes , function(celltype){
+    cells = rownames(counts) %in% meta$cell[meta$celltype == celltype]
+    return( apply( counts[cells,] , 2 , median))
+  })
+  avg_pc_per_ct.stat = do.call(cbind , avg_pc_per_ct.stat)
+  colnames(avg_pc_per_ct.stat) = celltypes
+
+  # build hierarchy
+  dist = dist(t(avg_pc_per_ct.stat) , diag=TRUE)
+  ct_hierarchy = hclust(dist ,  method = "ward.D2")
+  out = celltypes[ ct_hierarchy$order ]
+  return(out)
+}
+
+celltypes_ordered = get_ct_hierarchy(sce , batch = "sample", nPC = 50)
+
+# manually rearrange for more consistent view
+#celltypes_ordered = replace(celltypes_ordered, c(4, 5), celltypes_ordered[c(5, 4)])
+
+plots = lapply(n_genes.grid , function(n_genes){
+  p = plot_mapping_heatmap(mappings[mappings$n_genes == n_genes , ], levels = celltypes_ordered , title = paste(n_genes , "genes")) + 
+    labs(x = "Cell type" , y = "Mapped cell type")
+  print(p)
+  #ggsave(filename = paste0(figures.dir, "mapping_heatmaps/",n_genes ,".png"), plot = p, width = 4, height = 4)
+})
+
+
+```
+
+
+# Session Info
+
+```{r sessinf}
+sessionInfo()
+```
+
+

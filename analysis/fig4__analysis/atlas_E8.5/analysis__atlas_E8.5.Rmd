@@ -1,0 +1,807 @@
+---
+title: "Deatiled analysis of gene panels for mouse embryo."
+author: "Alsu Missarova"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Gene-selection-and-validation}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+# Load libraries
+
+```{r load}
+
+
+library(devtools)
+library(knitr)
+library(SingleCellExperiment)
+library(dplyr)
+library(ggplot2)
+library(scran)
+library(batchelor)
+library(ggpubr)
+library(ape)
+library(plyr)
+library(readr)
+library(repr)
+library(glmnet)
+library(stringr)
+library(wesanderson)
+library(BiocNeighbors)
+library(MouseGastrulationData)
+library(irlba)
+library(tibble)
+library(ggcorrplot)
+library(viridis)
+library(viridisLite)
+
+root.dir = "/Users/alsu/Develop/geneBasis/"
+#root.dir = "/nfs/research1/marioni/alsu/geneBasis/"
+source(paste0(root.dir, "am_geneBasis/functions/main_functions.R"))
+source(paste0(root.dir, "am_geneBasis/functions/visualization_functions.R"))
+
+system = "atlas_E8.5"
+figures.dir = paste0(root.dir , "figures/rare_and_sub_CTs/" , system, "/")
+
+# read sce 
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+
+# update celltypes
+celltype_legend_altered = c("Blood progenitors 1" = "Blood prog. 1" , "Blood progenitors 2" = "Blood prog. 2" , 
+                            "Caudal Mesoderm" = "Caudal Mes." , "Forebrain/Midbrain/Hindbrain" = "Brain" , 
+                            "Haematoendothelial progenitors" = "Haematoendo. prog." , 
+                            "Intermediate mesoderm" = "Intermediate Mes." , "Pharyngeal mesoderm" = "Pharyngeal Mes." , 
+                            "Somitic mesoderm" = "Somitic Mes.")
+updated_celltypes = sapply(1:ncol(sce) , function(i){
+  if (sce$celltype[i] %in% names(celltype_legend_altered)){
+    return(as.character( celltype_legend_altered[which(names(celltype_legend_altered) == sce$celltype[i])] ) )
+  }
+  else {
+    return(as.character( sce$celltype[i]) )
+  }
+})
+sce$celltype = updated_celltypes
+
+# read gene selection
+genes = readRDS( paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection.Rds") )
+
+# get meta w/umaps
+meta = as.data.frame(colData(sce))
+if (!( "cell" %in% colnames(meta) )){
+  meta = rownames_to_column(meta , var = "cell")
+}
+umaps = as.data.frame( reducedDim(sce , "umap"))
+colnames(umaps)[which(colnames(umaps) == "x")] = "V1"
+colnames(umaps)[which(colnames(umaps) == "y")] = "V2"
+if (!( "cell" %in% colnames(umaps) )){
+  umaps = rownames_to_column(umaps , var = "cell")
+}
+meta = merge(meta, umaps)
+meta$sample = factor(meta$sample)
+meta$celltype = factor(meta$celltype)
+
+
+# exclude left-over celltypes from earlier stages (< 10 cells: notochord, pariental endoderm)
+tab = as.data.frame(table(sce$celltype))
+colnames(tab) = c("celltype" , "n")
+tab = tab[tab$n > 10, ]
+sce = sce[, sce$celltype %in% as.character(tab$celltype)]
+
+celltype_cols = celltype_colors[[which( names(celltype_colors) == system )]]
+
+rowdata = as.data.frame( rowData(sce) )
+
+```
+
+# Set up functions scpecific to this pipeline
+
+
+```{r util-funcs, message = FALSE}
+
+# co-expression plot (add symbol names)
+get_coexpression_plot = function(sce , genes , title = NULL){
+  current.sce = sce[genes , ]
+  rownames(current.sce) = rowData(current.sce)[,2]
+  current.counts = as.matrix(logcounts(current.sce))
+  corr.stat = as.data.frame( cor(t(current.counts), method = "pearson") )
+  p <- ggcorrplot(corr.stat, hc.order = T, outline.col = "white", ggtheme = ggplot2::theme_gray, colors = c("#6D9EC1", "white", "#E46726")) +
+    theme(axis.text.x = element_text(size=6), axis.text.y = element_text(size=6)) +
+    ggtitle(title)
+  p
+  return(p)
+}
+
+
+#
+plot_mapping_heatmap_clusters = function(mapping , title = NULL , levels = sort(unique(mapping$cluster))){
+  mapping$cluster = as.character(mapping$cluster)
+  mapping$mapped_cluster = as.character(mapping$mapped_cluster)
+  tab = table(mapping$cluster , mapping$mapped_cluster)
+  tab = sweep(tab, 1, rowSums(tab), "/")
+  tab = as.data.frame( tab )
+  colnames(tab) = c("cluster", "cluster_mapped", "n")
+  tab$cluster = factor(tab$cluster , levels = levels)
+  tab$cluster_mapped = factor(tab$cluster_mapped , levels = levels)
+  tab = tab[!is.na(tab$cluster_mapped) , ]
+  p <- ggplot(tab, aes(x = cluster , y = cluster_mapped, fill = n)) +
+    geom_tile() + viridis::scale_fill_viridis(discrete = F, option = "inferno", name = "Fraction\nof cells") +
+    theme_classic() +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+    ggtitle(title) + 
+    theme(text=element_text(family="Arial")) 
+  return(p)
+}
+
+
+# 
+plot_expr_distribution_cluster = function(sce , gene , mapping , colors , title = gene){
+  counts = data.frame(cell = sce$cell ,
+                      counts = as.numeric( logcounts(sce[gene, ])) )
+  counts = merge(counts, mapping , all.y = T , all.x = F)
+  p <- ggplot(data=counts , aes(x = mapped_cluster , y = counts , fill = mapped_cluster)) +
+    geom_boxplot() +
+    theme_classic() +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+    scale_fill_manual(values = colors) +
+    theme(legend.position = "none") +
+    labs(y = "Log-counts")
+    ggtitle(title)
+  return(p)
+}
+
+# 
+plot_expression_heatmap_cluster = function(sce , genes , value.type){
+  require(viridis)
+  sce = sce[rownames(sce) %in% genes , ]
+  rownames(sce) = rowData(sce)[,2]
+  stat = lapply(unique(sce$mapped_cluster) , function(cluster){
+    current.sce = sce[, sce$mapped_cluster == cluster]
+    current.counts = as.matrix( assay(current.sce, "logcounts" ))
+    if (value.type == "mean"){
+      current.stat = data.frame(gene = rownames(sce) , value = apply(current.counts , 1 , mean))
+    } 
+    else if (value.type == "frac"){
+      current.stat = data.frame(gene = rownames(sce) , value = apply(current.counts , 1 , function(x) mean(x > 0)))
+    }
+    current.stat$mapped_cluster = cluster
+    return(current.stat)
+  })
+  stat = do.call(rbind , stat)
+  stat$gene = factor(stat$gene )
+  
+  p <- ggplot(data=stat , aes(x = mapped_cluster , y = gene , fill = value)) +
+    geom_tile() +
+    scale_fill_viridis(discrete = F, name = value.type) +
+    theme_classic() +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+    #theme(legend.position = "none") +
+    coord_flip() 
+  return(p)
+}
+
+
+
+```
+
+# UMAP colored by celltypes
+
+```{r umaps-cts, message = FALSE}
+
+
+p = ggplot(meta , aes(x = V1 , y = V2 , col = celltype)) + 
+  geom_point(size=1,alpha = .9) + 
+  scale_color_manual(values = celltype_cols) +
+  theme_classic() +
+  #theme(legend.position = "none") +
+  labs(x = "UMAP-1" , y = "UMAP-2")
+p
+ggsave(filename = paste0(figures.dir, "umap_CTs" ,".png"), plot = p, width = 7, height = 5)
+
+
+```
+
+# CT composition - align by frequency
+
+```{r CT-composition, message = FALSE}
+
+tab = as.data.frame(table(sce$celltype))
+colnames(tab) = c("celltype" , "n")
+tab = tab[tab$n > 10, ]
+tab$frac = tab$n/sum(tab$n)
+tab = tab[order(tab$frac) , ]
+tab$celltype = factor(tab$celltype , levels = tab$celltype)
+
+p = ggplot(tab , aes(x = celltype , y = frac , fill = celltype)) + 
+  geom_bar(stat = "identity" , position = "dodge") + 
+  scale_fill_manual(values = celltype_cols) + 
+  theme_classic() + 
+  theme(axis.text.x = element_blank()) + 
+  labs(y = "Fraction of cells" , x = "Cell type") + 
+  theme(legend.position = "right")
+p
+ggsave(filename = paste0(figures.dir, "CT_composition" ,".png"), plot = p, width = 8, height = 4)
+
+
+```
+
+# Get ct mappings as a function of n-genes
+
+```{r get-mappings, message = FALSE}
+
+
+get_celltype_mapping = function(sce , genes , batch = "sample", n.neigh = 5 , nPC = 50, type = "together"){
+  neighs = suppressWarnings( get_mapping(sce , genes = genes, batch = batch, n.neigh = n.neigh, nPC = nPC , get.dist = F , type = type))
+  if (!is.null(neighs)){
+    meta = as.data.frame(colData(sce))
+    current.mapping = data.frame(cell = rownames(neighs) ,
+                               celltype = sapply(1:nrow(neighs) , function(i) meta$celltype[meta$cell == rownames(neighs)[i]]) ,
+                               mapped_celltype = sapply(1:nrow(neighs), function(i) getmode(meta$celltype[match(neighs[i,] , meta$cell)] , 1:n.neigh) ))
+    return(current.mapping)
+  }
+  else {
+    return(NULL)
+  }
+}
+
+n_genes.grid = c(10, 20, 50, 75, 100, 150)
+mappings = lapply(n_genes.grid , function(n_genes){
+  current.genes = as.character( genes$gene[1:n_genes] )
+  current.mapping = get_celltype_mapping(sce , current.genes)
+  current.mapping$n_genes = n_genes
+  return(current.mapping)
+})
+mappings = do.call(rbind, mappings)
+
+
+```
+
+# Get order of celltypes reflective of their transcriptional relationship
+
+```{r plot-mappings}
+
+
+get_ct_hierarchy = function(sce , batch = NULL, nPC = 50){
+  hvgs_5000 = get_hvgs(sce , n = 5000)
+  current.sce = sce[hvgs_5000, ]
+  counts = as.matrix( logcounts(current.sce) )
+  meta = as.data.frame(colData(sce))  
+  if (is.null(batch)){
+    pcs = irlba::prcomp_irlba(t(counts) , n = min(nPC, (nrow(counts)-1) , (ncol(counts) - 1)))
+    counts = pcs$x
+    rownames(counts) = colnames(current.sce)
+  }
+  else {
+    batchFactor = factor(meta[, colnames(meta) == batch])
+    counts = batchelor::multiBatchPCA(counts , batch = batchFactor , d = nPC)
+    counts = do.call(batchelor::reducedMNN , counts)
+    counts = counts$corrected
+  }
+  celltypes = unique(sce$celltype)      
+  avg_pc_per_ct.stat = lapply(celltypes , function(celltype){
+    cells = rownames(counts) %in% meta$cell[meta$celltype == celltype]
+    return( apply( counts[cells,] , 2 , median))
+  })
+  avg_pc_per_ct.stat = do.call(cbind , avg_pc_per_ct.stat)
+  colnames(avg_pc_per_ct.stat) = celltypes
+
+  # build hierarchy
+  dist = dist(t(avg_pc_per_ct.stat) , diag=TRUE)
+  ct_hierarchy = hclust(dist ,  method = "ward.D2")
+  out = celltypes[ ct_hierarchy$order ]
+  return(out)
+}
+
+celltypes_ordered = get_ct_hierarchy(sce , batch = "sample", nPC = 20)
+# manually rearrange for more consistent view
+celltypes_ordered = replace(celltypes_ordered, c(2, 3), celltypes_ordered[c(3, 2)])
+celltypes_ordered = replace(celltypes_ordered, c(5, 6), celltypes_ordered[c(6, 5)])
+
+plots = lapply(n_genes.grid , function(n_genes){
+  p = plot_mapping_heatmap(mappings[mappings$n_genes == n_genes , ], levels = celltypes_ordered , title = paste(n_genes , "genes")) + 
+    labs(x = "Cell type" , y = "Mapped cell type") + 
+    theme(text=element_text(family="Arial")) 
+  print(p)
+  #ggsave(filename = paste0(figures.dir, "mapping_heatmaps/",n_genes ,".png"), plot = p, width = 5, height = 5)
+})
+
+
+```
+
+
+# Expression disitributions for markers between mismapped cell types
+
+## Visceral endoderm VS Gut
+
+
+```{r rare-markers-visceral-endoderm}
+
+
+get_markers_w_lfc = function(sce , test = "binom", type = "all", FDR.thresh = 0.01){
+  require(scran)
+  markers <- scran::findMarkers(sce , groups=sce$celltype, direction = "up", pval.type=type, test = test, assay.type = "logcounts")
+  celltypes = names(markers)
+  markers = lapply(1:length(celltypes), function(i){
+    current.markers = as.data.frame(markers[[i]])
+    current.markers = current.markers[!is.na(current.markers$FDR) & current.markers$FDR < FDR.thresh , ]
+    if (nrow(current.markers) > 0){
+      out = data.frame( celltype = celltypes[i], gene = rownames(current.markers) , lfc = current.markers$summary.logFC)
+      return(out)
+    }
+  })
+  markers = do.call(rbind,markers)
+  return(markers)
+}
+
+marker_genes = c("Krt18" , "Cldn6" , "Nepn" , "Sparc" , "Car4" , "Gpx3" )
+plots = lapply(marker_genes , function(gene){
+  p = plot_expr_distribution(sce[, sce$celltype %in% c("Visceral endoderm" , "Gut")] , rowdata$ENSEMBL[rowdata$SYMBOL == gene] , title = paste0( gene, ", # ", genes$rank[genes$gene == rowdata$ENSEMBL[rowdata$SYMBOL == gene]] ) , levels = levels(tab$celltype)) + 
+    scale_fill_manual(values = celltype_cols) + 
+    theme(legend.position = "none") + 
+    labs(x = "")
+  return(p)
+})
+p = ggarrange(plotlist = plots, common.legend = F , ncol = 6)
+p
+ggsave(filename = paste0(figures.dir, "markers_rareCTs/", "Visceral_endoderm__selection" ,".png"), plot = p, width = 10, height = 3)
+
+
+```
+
+## Caudal mesoderm VS NMP
+
+```{r rare-markers-caudal-mesoderm}
+
+
+marker_genes = c("Cldn6" , "T" , "Cyp26a1" , "Cdkn1a" )
+plots = lapply(marker_genes , function(gene){
+  p = plot_expr_distribution(sce[, sce$celltype %in% c("Caudal Mes." , "NMP")] , rowdata$ENSEMBL[rowdata$SYMBOL == gene] , title = paste0( gene, ", # ", genes$rank[genes$gene == rowdata$ENSEMBL[rowdata$SYMBOL == gene]] ) , levels = levels(tab$celltype)) + 
+    scale_fill_manual(values = celltype_cols) + 
+    theme(legend.position = "none") + 
+    labs(x = "")
+  return(p)
+})
+p = ggarrange(plotlist = plots, common.legend = F , ncol = 4)
+p
+ggsave(filename = paste0(figures.dir, "markers_rareCTs/", "Caudal_mesoderm__selection" ,".png"), plot = p, width = 8, height = 3)
+
+
+```
+
+
+# See if we see strucuture within celltypes
+
+## Cardiomyocytes (based on Ximena's ds)
+
+### Map to Ximena's ds - using all genes
+
+```{r heart-analysis-mapping-all}
+
+
+celltypes = c( "Cardiomyocytes" )
+rownames(sce) = rowData(sce)[,2]
+# load external ds
+sce_reference = readRDS("~/Develop/External/Tyser_heart/sce_goodQual.NORM.clusters.Rds")
+sce_reference = sce_reference[, sce_reference$clusterAnn %in% paste0("Me" , c(1:8))]
+rownames(sce_reference) = rowData(sce_reference)[,1]
+sce_reference$sample = sce_reference$batch
+
+# get colors
+heart_colors_stat = unique(as.data.frame( colData(sce_reference)[, c("clusterAnn" , "clusterCol")]) )
+heart_colors = as.list( heart_colors_stat$clusterCol )
+names(heart_colors) = heart_colors_stat$clusterAnn
+
+
+mapping_heart.all = get_mapping_2_external_dataset(sce_reference , sce[ , sce$celltype %in% celltypes] , cluster_id = "clusterAnn",
+                                                    genes = rownames(sce), nPC = 20, n.neigh = 5, cosine = T)
+
+mapping_heart.all = merge(mapping_heart.all , meta[, c("cell" , "V1" , "V2")] , all.x = T, all.y = F)
+
+
+p <- ggplot(mapping_heart.all, aes(x=V1, y=V2, col = mapped_cluster)) +
+  geom_point(size=1, alpha = .75) +
+  scale_color_manual(values = heart_colors) + 
+  theme_classic() + 
+  ylim(c(10,13)) + 
+  labs(x = "UMAP-1" , y = "UMAP-2") + 
+  theme(legend.position = "none") + 
+  ggtitle("All genes") + 
+  theme(text=element_text(family="Arial")) 
+p
+ggsave(filename = paste0(figures.dir, "cardiomyocytes/mapping_all_umap" ,".png"), plot = p, width = 3, height = 2)
+
+
+```
+
+### Mapping to Ximena's ds - using selections
+
+Plot UMAPs
+
+```{r heart-analysis-mapping-selecions}
+
+
+mapping_heart.selections = lapply(n_genes.grid , function(n_genes){
+  current.genes = as.character( genes$gene[1:n_genes] )
+  current.genes = as.character(rowdata$SYMBOL[rowdata$ENSEMBL %in% current.genes])
+  current.mapping = get_mapping_2_external_dataset(sce_reference , sce[ , sce$celltype %in% celltypes] , cluster_id = "clusterAnn",
+                                                    genes = current.genes, nPC = 20, n.neigh = 5, cosine = T)
+  current.mapping$n_genes = n_genes
+  return(current.mapping)
+})
+mapping_heart.selections = do.call(rbind , mapping_heart.selections)
+mapping_heart.selections = merge(mapping_heart.selections , meta[, c("cell" , "V1" , "V2")] , all.x = T, all.y = F)
+
+
+plots = lapply(n_genes.grid, function(n_genes){
+  p <- ggplot(mapping_heart.selections[mapping_heart.selections$n_genes == n_genes,], aes(x=V1, y=V2, col = mapped_cluster)) +
+    geom_point(size=1, alpha = .75) +
+    scale_color_manual(values = heart_colors) + 
+    theme_classic() + 
+    ylim(c(10,13)) + 
+    labs(x = "UMAP-1" , y = "UMAP-2") + 
+    theme(legend.position = "none") + 
+    ggtitle("Selection") + 
+    theme(text=element_text(family="Arial")) 
+  print(p)
+  #ggsave(filename = paste0(figures.dir, "cardiomyocytes/mapping_selections_umap/", n_genes ,".png"), plot = p, width = 3, height = 2)
+})
+
+
+
+```
+
+### Mapping selections - heatmaps
+
+```{r heart-analysis-heatmaps}
+
+
+plots = lapply(n_genes.grid , function(n_genes){
+  stat = mapping_heart.all[, c("cell" , "mapped_cluster")]
+  colnames(stat) = c("cell" , "cluster")
+  stat = merge(stat , mapping_heart.selections[mapping_heart.selections$n_genes == n_genes, c("cell" , "mapped_cluster")])
+  p = plot_mapping_heatmap_clusters(stat) + labs(x = "Cluster" , y = "Mapped cluster")
+  print(p)
+  #ggsave(filename = paste0(figures.dir, "cardiomyocytes/mapping_selections_heatmaps/", n_genes ,".png"), plot = p, width = 3, height = 3)
+})
+
+
+```
+
+### Which genes contribute to this
+
+#### Co-expression
+
+```{r heart-analysis-coexpression}
+
+
+celltypes = c( "Cardiomyocytes" )
+rownames(sce) = rowData(sce)[,1]
+markers = get_markers(sce , test = "binom" , type = "some")
+markers = markers[markers$celltype %in% celltypes , ]
+
+fixed_n_genes = 100
+
+markers_selection = intersect(markers$gene , as.character(genes$gene[genes$rank <= fixed_n_genes]))
+
+get_coexpression_plot = function(sce , genes , title = NULL){
+  current.sce = sce[genes , ]
+  rownames(current.sce) = rowData(current.sce)[,2]
+  current.counts = as.matrix(logcounts(current.sce))
+  corr.stat = as.data.frame( cor(t(current.counts), method = "pearson") )
+  p <- ggcorrplot(corr.stat, hc.order = T, outline.col = "white", ggtheme = ggplot2::theme_gray, colors = c("#6D9EC1", "white", "#E46726")) +
+    theme(axis.text.x = element_text(size=6), axis.text.y = element_text(size=6)) +
+    ggtitle(title)
+  p
+  return(p)
+}
+
+p1 = get_coexpression_plot(sce , markers_selection, title = "All cells")
+p2 = get_coexpression_plot(sce[, sce$celltype %in% celltypes] , markers_selection, title = "Cardiomyocytes")
+p = ggarrange(p1,p2,common.legend = T)
+p
+ggsave(filename = paste0(figures.dir, "cardiomyocytes/coexpression_markers" ,".png"), plot = p2, width = 3.5, height = 3.5)
+
+
+```
+
+#### Expression distribution across clusters and UMAPs
+
+```{r heart-analysis-expr-distr}
+
+
+plots = lapply(markers_selection , function(gene){
+  p = plot_expr_distribution_cluster(sce , gene , mapping_heart.all , heart_colors , title = rowdata$SYMBOL[rowdata$ENSEMBL == gene]) +
+    labs(x = "Mapped cluster")
+  ggsave(filename = paste0(figures.dir, "cardiomyocytes/genes_distr/", rowdata$SYMBOL[rowdata$ENSEMBL == gene],".png"), plot = p, width = 2, height = 2)
+})
+
+
+plots = lapply(markers_selection , function(gene){
+  current.meta = meta[meta$celltype %in% celltypes , ]
+  current.sce = sce[, sce$celltype %in% celltypes]
+  p = get_umaps(current.sce , current.meta , gene , title = rowdata$SYMBOL[rowdata$ENSEMBL == gene] , ylim = c(10,13))
+  print(p)
+  #ggsave(filename = paste0(figures.dir, "cardiomyocytes/genes_umaps/", rowdata$SYMBOL[rowdata$ENSEMBL == gene],".png"), plot = p, width = 3, height = 2)
+})
+
+  
+```
+
+### Do I select this genes from independent search 
+
+```{r heart-analysis-de-novo-genes}
+
+
+n_genes_total = 20
+rownames(sce) = rowData(sce)[,1]
+hvgs_10000 = get_hvgs(sce , n = 10000)
+genes_cardiomycytes = gene_search(sce[hvgs_10000, sce$celltype %in% celltypes] , genes_base = NULL, n_genes_total = n_genes_total, batch = "sample", n.neigh = 5, p = 3, K = 5, nPC = NULL)
+
+rownames(sce) = rowData(sce)[,2]
+mapping_heart.within_selections = lapply(seq(5,20,5) , function(n_genes){
+  current.genes = as.character( genes_cardiomycytes$gene[1:n_genes] )
+  current.genes = as.character(rowdata$SYMBOL[rowdata$ENSEMBL %in% current.genes])
+  current.mapping = get_mapping_2_external_dataset(sce_reference , sce[ , sce$celltype %in% celltypes] , cluster_id = "clusterAnn",
+                                                    genes = current.genes, nPC = 20, n.neigh = 5, cosine = T)
+  current.mapping$n_genes = n_genes
+  return(current.mapping)
+})
+mapping_heart.within_selections = do.call(rbind , mapping_heart.within_selections)
+mapping_heart.within_selections = merge(mapping_heart.within_selections , meta[, c("cell" , "V1" , "V2")] , all.x = T, all.y = F)
+
+
+# mappings - umaps
+plots = lapply(seq(5,20,5), function(n_genes){
+  p <- ggplot(mapping_heart.within_selections[mapping_heart.within_selections$n_genes == n_genes,], aes(x=V1, y=V2, col = mapped_cluster)) +
+    geom_point(size=1, alpha = .75) +
+    scale_color_manual(values = heart_colors) + 
+    theme_classic() + 
+    ylim(c(10,13)) + 
+    labs(x = "UMAP-1" , y = "UMAP-2") + 
+    theme(legend.position = "none")
+  print(p)
+  #ggsave(filename = paste0(figures.dir, "cardiomyocytes/mapping_selections_within_umap/", n_genes ,".png"), plot = p, width = 3, height = 2)
+})
+
+
+# get heatmap
+current.sce = sce[, sce$celltype %in% celltypes]
+current.meta = as.data.frame(colData(current.sce))
+current.meta = merge(current.meta , mapping_heart.all[, c("cell" , "mapped_cluster")] , all.x = T)
+current.sce = current.sce[, order(colnames(current.sce))]
+current.meta = current.meta[order(current.meta$cell) , ]
+current.sce = SingleCellExperiment(list(counts = counts(current.sce) , logcounts = logcounts(current.sce)) , 
+                                   colData = current.meta, rowData = rowData(current.sce))
+rownames(current.sce) = rowData(current.sce)[,1]
+p = plot_expression_heatmap_cluster(current.sce , as.character( genes_cardiomycytes$gene[1:15] ), value.type = "mean") + 
+  labs(y = "Gene" , x = "Me cluster")
+p
+ggsave(filename = paste0(figures.dir, "cardiomyocytes/" , "heatmap_selected_within",".png"), plot = p, width = 5, height = 2)
+
+
+```
+
+## Gut (based on Nowotschin's ds)
+
+### Map to Nowotschin's ds - using all genes
+
+```{r gut-analysis-mapping-all}
+
+
+celltypes = c("Gut")
+rownames(sce) = rowData(sce)[,2]
+# load external ds
+sce_reference = readRDS("~/Develop/External/Nowotschin_gut/sce.Rds")
+sce_reference = sce_reference[, !is.na(sce_reference$AP_pseudo)]
+sce_reference$sample = sce_reference$Sample
+
+# get colors
+gut_colors = c("Thymus" = "violetred3", "Thyroid" = "#a7b347", "Lung 1" = "slategray4", "Lung 2" = "slategray1", "Liver" = "red3" , 
+               "Pancreas 1" = "springgreen4" , "Pancreas 2" = "seagreen3" , "Small intestine" = "orange2" , "Large intestine/Colon" = "#d0993c" )
+               
+
+mapping_gut.all = get_mapping_2_external_dataset(sce_reference , sce[ , sce$celltype %in% celltypes] , cluster_id = "AP_pseudo",
+                                                    genes = rownames(sce), nPC = 20, n.neigh = 5, cosine = T)
+mapping_gut.all = merge(mapping_gut.all , meta[, c("cell" , "V1" , "V2")] , all.x = T, all.y = F)
+mapping_gut.all$mapped_cluster = factor(mapping_gut.all$mapped_cluster , levels = names(gut_colors))
+
+p <- ggplot(mapping_gut.all, aes(x=V1, y=V2, col = mapped_cluster)) +
+  geom_point(size=1, alpha = .75) +
+  scale_color_manual(values = gut_colors) + 
+  theme_classic() + 
+  labs(x = "UMAP-1" , y = "UMAP-2") +
+  theme(legend.position = "none") + 
+  ggtitle("All genes") + 
+  theme(text=element_text(family="Arial")) 
+p
+ggsave(filename = paste0(figures.dir, "gut/mapping_all_umap" ,".png"), plot = p, width = 3, height = 2)
+
+
+```
+
+### Mapping to Nowotschin's ds - using selections
+
+```{r gut-analysis-mapping-selecions}
+
+
+
+mapping_gut.selections = lapply(n_genes.grid , function(n_genes){
+  current.genes = genes$gene[1:n_genes]
+  current.genes = as.character(rowdata$SYMBOL[rowdata$ENSEMBL %in% current.genes])
+  current.mapping = get_mapping_2_external_dataset(sce_reference , sce[ , sce$celltype %in% celltypes] , cluster_id = "AP_pseudo",
+                                                    genes = current.genes, nPC = 20, n.neigh = 5, cosine = T)
+  current.mapping$n_genes = n_genes
+  return(current.mapping)
+})
+mapping_gut.selections = do.call(rbind , mapping_gut.selections)
+mapping_gut.selections = merge(mapping_gut.selections , meta[, c("cell" , "V1" , "V2")] , all.x = T, all.y = F)
+mapping_gut.selections$mapped_cluster = factor(mapping_gut.selections$mapped_cluster , levels = names(gut_colors))
+
+
+plots = lapply(n_genes.grid, function(n_genes){
+  p <- ggplot(mapping_gut.selections[mapping_gut.selections$n_genes == n_genes,], aes(x=V1, y=V2, col = mapped_cluster)) +
+    geom_point(size=1, alpha = .75) +
+    scale_color_manual(values = gut_colors) + 
+    theme_classic() + 
+    labs(x = "UMAP-1" , y = "UMAP-2") + 
+    theme(legend.position = "none") + 
+   ggtitle("Selection") + 
+   theme(text=element_text(family="Arial")) 
+  print(p)
+  #ggsave(filename = paste0(figures.dir, "gut/mapping_selections_umap/", n_genes ,".png"), plot = p, width = 3, height = 2)
+})
+
+
+```
+
+### Mapping selections - heatmaps
+
+```{r gut-analysis-heatmaps}
+
+
+plots = lapply(n_genes.grid , function(n_genes){
+  stat = mapping_gut.all[, c("cell" , "mapped_cluster")]
+  colnames(stat) = c("cell" , "cluster")
+  stat = merge(stat , mapping_gut.selections[mapping_gut.selections$n_genes == n_genes, c("cell" , "mapped_cluster")])
+  p = plot_mapping_heatmap_clusters(stat, levels = names(gut_colors)) + 
+    labs(x = "Cluster" , y = "Mapped cluster")
+  print(p)
+  #ggsave(filename = paste0(figures.dir, "gut/mapping_selections_heatmaps/", n_genes ,".png"), plot = p, width = 4, height = 4)
+})
+
+
+```
+
+### Which genes contribute to this
+
+#### Co-expression
+
+```{r gut-analysis-coexpr}
+
+
+rownames(sce) = rowData(sce)[,1]
+markers = get_markers(sce , test = "binom" , type = "some")
+markers = markers[markers$celltype %in% celltypes , ]
+
+fixed_n_genes = 100
+
+markers_selection = intersect(markers$gene , as.character(genes$gene[genes$rank <= fixed_n_genes]))
+
+get_coexpression_plot = function(sce , genes , title = NULL){
+  current.sce = sce[genes , ]
+  rownames(current.sce) = rowData(current.sce)[,2]
+  current.counts = as.matrix(logcounts(current.sce))
+  corr.stat = as.data.frame( cor(t(current.counts), method = "pearson") )
+  p <- ggcorrplot(corr.stat, hc.order = T, outline.col = "white", ggtheme = ggplot2::theme_gray, colors = c("#6D9EC1", "white", "#E46726")) +
+    theme(axis.text.x = element_text(size=6), axis.text.y = element_text(size=6)) +
+    ggtitle(title)
+  p
+  return(p)
+}
+
+p1 = get_coexpression_plot(sce , markers_selection, title = "All cells")
+p2 = get_coexpression_plot(sce[, sce$celltype %in% celltypes] , markers_selection, title = "Gut")
+p = ggarrange(p1,p2,common.legend = T)
+p
+ggsave(filename = paste0(figures.dir, "gut/coexpression_markers" ,".png"), plot = p2, width = 3.5, height = 3.5)
+
+
+```
+
+#### Expression distribution across clusters and UMAPs
+
+```{r gut-analysis-expr-distr}
+
+
+plots = lapply(markers_selection , function(gene){
+  p = plot_expr_distribution_cluster(sce , gene , mapping_gut.all , gut_colors , title = rowdata$SYMBOL[rowdata$ENSEMBL == gene]) +
+    labs(x = "Mapped organ")
+  print(p)
+  #ggsave(filename = paste0(figures.dir, "gut/genes_distr/", rowdata$SYMBOL[rowdata$ENSEMBL == gene],".png"), plot = p, width = 3, height = 3)
+})
+
+
+plots = lapply(markers_selection , function(gene){
+  current.meta = meta[meta$celltype %in% celltypes , ]
+  current.sce = sce[, sce$celltype %in% celltypes]
+  p = get_umaps(current.sce , current.meta , gene , title = rowdata$SYMBOL[rowdata$ENSEMBL == gene] )
+  print(p)
+  #ggsave(filename = paste0(figures.dir, "gut/genes_umaps/", rowdata$SYMBOL[rowdata$ENSEMBL == gene],".png"), plot = p, width = 3, height = 2)
+})
+
+  
+```
+
+
+### Do I select this genes from independent search 
+
+```{r gut-analysis-genes-de-novo}
+
+
+celltypes = c("Gut")
+n_genes_total = 20
+rownames(sce) = rowData(sce)[,1]
+hvgs_10000 = get_hvgs(sce , n = 10000)
+genes_gut = gene_search(sce[hvgs_10000, sce$celltype %in% celltypes] , genes_base = NULL, n_genes_total = n_genes_total, batch = "sample", n.neigh = 5, p = 3, K = 5, nPC = NULL)
+
+rownames(sce) = rowData(sce)[,2]
+mapping_gut.within_selections = lapply(seq(5,20,5) , function(n_genes){
+  print(n_genes)
+  current.genes = as.character( genes_gut$gene[1:n_genes] )
+  current.genes = as.character(rowdata$SYMBOL[rowdata$ENSEMBL %in% current.genes])
+  current.mapping = get_mapping_2_external_dataset(sce_reference , sce[ , sce$celltype %in% celltypes] , cluster_id = "AP_pseudo",
+                                                    genes = current.genes, nPC = 20, n.neigh = 5, cosine = T)
+  current.mapping$n_genes = n_genes
+  return(current.mapping)
+})
+mapping_gut.within_selections = do.call(rbind , mapping_gut.within_selections)
+mapping_gut.within_selections = merge(mapping_gut.within_selections , meta[, c("cell" , "V1" , "V2")] , all.x = T, all.y = F)
+
+
+# mappings - umaps
+plots = lapply(seq(5,20,5), function(n_genes){
+  p <- ggplot(mapping_gut.within_selections[mapping_gut.within_selections$n_genes == n_genes,], aes(x=V1, y=V2, col = mapped_cluster)) +
+    geom_point(size=1, alpha = .75) +
+    scale_color_manual(values = gut_colors) + 
+    theme_classic() + 
+    labs(x = "UMAP-1" , y = "UMAP-2") + 
+    theme(legend.position = "none")
+  p
+  ggsave(filename = paste0(figures.dir, "gut/mapping_selections_within_umap/", n_genes ,".png"), plot = p, width = 3, height = 2)
+})
+
+
+
+# get heatmap
+current.sce = sce[, sce$celltype %in% celltypes]
+current.meta = as.data.frame(colData(current.sce))
+current.meta = merge(current.meta , mapping_gut.all[, c("cell" , "mapped_cluster")] , all.x = T)
+current.sce = current.sce[, order(colnames(current.sce))]
+current.meta = current.meta[order(current.meta$cell) , ]
+current.sce = SingleCellExperiment(list(counts = counts(current.sce) , logcounts = logcounts(current.sce)) , 
+                                   colData = current.meta, rowData = rowData(current.sce))
+rownames(current.sce) = rowData(current.sce)[,1]
+p = plot_expression_heatmap_cluster(current.sce , as.character( genes_gut$gene[1:15] ), value.type = "mean") + 
+  labs(y = "Gene" , x = "Mapped organ")
+p
+ggsave(filename = paste0(figures.dir, "gut/" , "heatmap_selected_within",".png"), plot = p, width = 7, height = 3)
+
+
+```
+
+
+# Session Info
+
+```{r sessinf}
+sessionInfo()
+```
+
+
+
