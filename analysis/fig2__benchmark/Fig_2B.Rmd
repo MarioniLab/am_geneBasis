@@ -1,0 +1,141 @@
+---
+title: "Figure 2B -- distributon of cell score for geneBasis and SCMER."
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+# Load dependencies
+
+```{r load, message = FALSE}
+
+
+library(SingleCellExperiment)
+library(batchelor)
+library(stats)
+library(BiocNeighbors)
+library(tibble)
+library(reshape2)
+library(plyr)
+library(dplyr)
+library(scran)
+library(batchelor)
+library(stringr)
+library(corrplot)
+library(ggcorrplot)
+library(wesanderson)
+
+root.dir = "/Users/alsu/Develop/geneBasis/"
+source(paste0(root.dir, "am_geneBasis/functions/main_functions.R"))
+source(paste0(root.dir, "am_geneBasis/functions/visualization_functions.R"))
+
+figures.dir = paste0(root.dir , "figures/benchmark/")
+
+
+```
+
+# Load stats
+
+!! Note that the naming of SCMER files is confusing -- `unbatched` corresponds to genes selected with using batch id (and vice versa) !! 
+
+```{r load-stats, message = FALSE}
+
+
+system = "atlas_E8.5"
+mouseEmbryo_stat = readRDS(paste0(root.dir , "data/benchmark/cell_score/" , system , "/cell_score__scmer_unbatched.Rds"))
+mouseEmbryo_stat$system = system
+
+system = "spleen"
+spleen_stat = readRDS(paste0(root.dir , "data/benchmark/cell_score/" , system , "/cell_score__scmer_unbatched_updated.Rds"))
+spleen_stat$system = system
+
+system = "pancreas"
+pancreas_stat = readRDS(paste0(root.dir , "data/benchmark/cell_score/" , system , "/cell_score__scmer_unbatched.Rds"))
+pancreas_stat$system = system
+
+system = "melanoma"
+melanoma_stat = readRDS(paste0(root.dir , "data/benchmark/cell_score/" , system , "_unbatched/cell_score__scmer_batched.Rds"))
+melanoma_stat$system = system
+
+stat = rbind(mouseEmbryo_stat, spleen_stat, pancreas_stat, melanoma_stat)
+stat$system = factor(stat$system , levels = c("atlas_E8.5", "spleen" , "pancreas" , "melanoma"))
+stat$n_genes = as.numeric(as.character(stat$n_genes))
+stat$score[stat$score < 0] = 0
+
+stat_tail = lapply(unique(stat$system) , function(system){
+  current.stat = stat[stat$system == system & stat$type %in% c("geneBasis" , "SCMER") & stat$nPC == "all" , ]
+  current_stat = as.data.frame(current.stat %>% group_by(type , n_genes) %>% dplyr::summarise(frac_predicted_poorly = log(mean(score < 0.5) + 1 )))
+  current_stat$system = system
+  return(current_stat)
+})
+stat_tail = do.call(rbind, stat_tail)
+stat_tail$system = factor(stat_tail$system , levels = c("atlas_E8.5", "spleen" , "pancreas" , "melanoma"))
+
+
+
+```
+
+## Cell score plots
+
+```{r plot, message = FALSE}
+
+
+pals1 = wes_palette("Darjeeling1", n = 5)
+pals2 = wes_palette("Darjeeling2", n = 5)
+pals3 = wes_palette("Royal1", n = 4)
+pals4 = wes_palette("Royal2", n = 5)
+
+type_cols = c("geneBasis" = pals3[2] , "scgenefit" = pals1[3] , "SCMER" = pals1[5] , "hvgs" = pals1[3] )
+  
+get_cell_score_plot = function(stat , nPC){
+  p = ggplot(stat[stat$nPC == nPC, ] , aes(x = factor(n_genes)  , y = score, fill = type)) + 
+    geom_boxplot() + 
+    scale_fill_manual(values = type_cols) + 
+    theme_classic() + 
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) + 
+    theme(legend.position = "none")
+  return(p)
+}
+
+get_tail_distribution_plot = function(stat){
+  p = ggplot(stat, aes(x = factor(n_genes)  , y = frac_predicted_poorly, fill = type)) + 
+    geom_bar(stat = "identity" , position = "dodge") + 
+    scale_fill_manual(values = type_cols) + 
+    theme_classic() + 
+    labs(y = "" , x = "") + 
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) + 
+    ggtitle(paste0("Cell score < ", "0.5")) + 
+    theme(legend.position = "none")
+  return(p)
+}
+
+
+
+
+
+p_B_1 = get_cell_score_plot(stat[stat$type %in% c("geneBasis" , "SCMER") , ], "all") + 
+  facet_wrap(~system, scales = "free", ncol = 4) +
+  theme(strip.background = element_blank() , strip.text.x = element_blank()) + 
+  labs(x = "# Genes" , y = "Cell neighbourhood\npreservation score") +
+  theme(text=element_text(family="Arial"))
+p_B_1
+
+p_B_2 = get_tail_distribution_plot(stat_tail) + 
+  facet_wrap(~system, scales = "free", ncol = 4) +
+  theme(strip.background = element_blank() , strip.text.x = element_blank()) + 
+  labs(x = "# Genes" , y = "ln (weight of\nthe tail + 1)") +
+  theme(text=element_text(family="Arial"))
+p_B_2
+
+
+
+```
+
+
+
+# Session Info
+
+```{r sessinf}
+sessionInfo()
+```

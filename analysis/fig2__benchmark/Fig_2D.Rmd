@@ -1,0 +1,337 @@
+---
+title: "Figure 2D -- UMAPs colored by cell score and boxplot of cell score split by celltypes."
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+# Load dependencies
+
+```{r load, message = FALSE}
+
+
+library(SingleCellExperiment)
+library(batchelor)
+library(stats)
+library(BiocNeighbors)
+library(tibble)
+library(reshape2)
+library(plyr)
+library(dplyr)
+library(scran)
+library(batchelor)
+library(stringr)
+library(corrplot)
+library(ggcorrplot)
+library(wesanderson)
+library(viridis)
+
+root.dir = "/Users/alsu/Develop/geneBasis/"
+source(paste0(root.dir, "am_geneBasis/functions/main_functions.R"))
+source(paste0(root.dir, "am_geneBasis/functions/visualization_functions.R"))
+
+figures.dir = paste0(root.dir , "figures/benchmark/")
+
+
+```
+
+# Load stats
+
+## Atlas E8.5
+
+```{r mouse-embryo, message = FALSE}
+
+
+system = "atlas_E8.5"
+
+# read sce 
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+sce = retain_only_hvgs(sce ,n = 10000)
+
+celltype_legend_altered = c("Blood progenitors 1" = "Blood prog. 1" , "Blood progenitors 2" = "Blood prog. 2" , 
+                            "Caudal Mesoderm" = "Caudal Mes." , "Forebrain/Midbrain/Hindbrain" = "Brain" , 
+                            "Haematoendothelial progenitors" = "Haematoendo. prog." , 
+                            "Intermediate mesoderm" = "Intermediate Mes." , "Pharyngeal mesoderm" = "Pharyngeal Mes." , 
+                            "Somitic mesoderm" = "Somitic Mes.")
+updated_celltypes = sapply(1:ncol(sce) , function(i){
+  if (sce$celltype[i] %in% names(celltype_legend_altered)){
+    return(as.character( celltype_legend_altered[which(names(celltype_legend_altered) == sce$celltype[i])] ) )
+  }
+  else {
+    return(as.character( sce$celltype[i]) )
+  }
+})
+sce$celltype = updated_celltypes
+# get meta w/umaps
+meta = as.data.frame(colData(sce))
+if (!( "cell" %in% colnames(meta) )){
+  meta = rownames_to_column(meta , var = "cell")
+}
+umaps = as.data.frame( reducedDim(sce , "umap"))
+colnames(umaps)[which(colnames(umaps) == "x")] = "V1"
+colnames(umaps)[which(colnames(umaps) == "y")] = "V2"
+if (!( "cell" %in% colnames(umaps) )){
+  umaps = rownames_to_column(umaps , var = "cell")
+}
+meta = merge(meta, umaps)
+meta$sample = factor(meta$sample)
+meta$celltype = factor(meta$celltype)
+  
+# add cell score
+stat_cell_score.scgenefit = readRDS(paste0(root.dir , "data/benchmark/cell_score/" , system , "/cell_score__scgenefit.Rds"))
+
+# just my selection - for saturation analysis
+stat_cell_score.alsu = stat_cell_score.scgenefit[stat_cell_score.scgenefit$type == "geneBasis" & stat_cell_score.scgenefit$nPC == "all", ]
+
+# combine
+mouseEmbryo_meta_w_cells_score = merge(meta , stat_cell_score.alsu[stat_cell_score.alsu$n_genes == 150 , ], all.y = T , all.x = F)
+mouseEmbryo_meta_w_cells_score = mouseEmbryo_meta_w_cells_score[order(mouseEmbryo_meta_w_cells_score$score, decreasing = T) , ]
+mouseEmbryo_meta_w_cells_score$score[mouseEmbryo_meta_w_cells_score$score < 0] = 0
+mouseEmbryo_meta_w_cells_score$system = "mouseEmbryo"
+mouseEmbryo_meta_w_cells_score = mouseEmbryo_meta_w_cells_score[, c("cell", "celltype", "V1", "V2", "score", "system")]
+
+# define rare CTs
+tab = as.data.frame( table(sce$celltype) )
+colnames(tab) = c("celltype" , "n")
+tab$frac = tab$n/sum(tab$n)
+
+rare_CTs = as.character( tab$celltype[tab$n > 10 & tab$frac < 0.01] )
+mouseEmbryo_celltypes.2exclude = as.character(tab$celltype[tab$n < 10])
+
+mouseEmbryo_celltype_cols = celltype_colors[[which( names(celltype_colors) == system )]]
+
+
+```
+
+## Spleen
+
+```{r spleen, message = FALSE}
+
+
+system = "spleen"
+
+# read sce 
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+sce = retain_only_hvgs(sce ,n = 10000)
+
+# get meta w/umaps
+meta = as.data.frame(colData(sce))
+if (!( "cell" %in% colnames(meta) )){
+  meta = rownames_to_column(meta , var = "cell")
+}
+umaps = as.data.frame( reducedDim(sce , "UMAP"))
+colnames(umaps)[which(colnames(umaps) == "UMAP_1")] = "V1"
+colnames(umaps)[which(colnames(umaps) == "UMAP_2")] = "V2"
+if (!( "cell" %in% colnames(umaps) )){
+  umaps = rownames_to_column(umaps , var = "cell")
+}
+meta = merge(meta, umaps)
+meta$sample = factor(meta$sample)
+meta$celltype = factor(meta$celltype)
+
+# get stat
+stat_cell_score.scgenefit = readRDS(paste0(root.dir , "data/benchmark/cell_score/" , system , "/cell_score__scgenefit.Rds"))
+stat_cell_score.alsu = stat_cell_score.scgenefit[stat_cell_score.scgenefit$type == "geneBasis" & stat_cell_score.scgenefit$nPC == "all", ]
+
+
+# combine
+spleen_meta_w_cells_score = merge(meta , stat_cell_score.alsu[stat_cell_score.alsu$n_genes == 150 , c("cell", "score")], all.y = T , all.x = F)
+spleen_meta_w_cells_score = spleen_meta_w_cells_score[order(spleen_meta_w_cells_score$score, decreasing = T) , ]
+spleen_meta_w_cells_score$score[spleen_meta_w_cells_score$score < 0] = 0
+spleen_meta_w_cells_score$system = "spleen"
+spleen_meta_w_cells_score = spleen_meta_w_cells_score[, c("cell", "celltype", "V1", "V2", "score", "system")]
+
+# define rare CTs
+tab = as.data.frame( table(sce$celltype) )
+colnames(tab) = c("celltype" , "n")
+tab$frac = tab$n/sum(tab$n)
+
+rare_CTs = as.character( tab$celltype[tab$n > 10 & tab$frac < 0.01] )
+spleen_celltypes.2exclude = as.character(tab$celltype[tab$n < 10])
+
+spleen_celltype_cols = celltype_colors[[which( names(celltype_colors) == system )]]
+
+
+```
+
+
+## Pancreas
+
+```{r pancreas, message = FALSE}
+
+
+system = "pancreas"
+
+# read sce 
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+sce = retain_only_hvgs(sce ,n = 10000)
+
+# get meta w/umaps
+meta = as.data.frame(colData(sce))
+if (!( "cell" %in% colnames(meta) )){
+  meta = rownames_to_column(meta , var = "cell")
+}
+umaps = as.data.frame( reducedDim(sce , "UMAP"))
+colnames(umaps)[which(colnames(umaps) == "UMAP_1")] = "V1"
+colnames(umaps)[which(colnames(umaps) == "UMAP_2")] = "V2"
+if (!( "cell" %in% colnames(umaps) )){
+  umaps = rownames_to_column(umaps , var = "cell")
+}
+meta = merge(meta, umaps)
+meta$sample = factor(meta$sample)
+meta$celltype = factor(meta$celltype)
+
+# get stat
+stat_cell_score.scgenefit = readRDS(paste0(root.dir , "data/benchmark/cell_score/" , system , "/cell_score__scgenefit.Rds"))
+stat_cell_score.alsu = stat_cell_score.scgenefit[stat_cell_score.scgenefit$type == "geneBasis" & stat_cell_score.scgenefit$nPC == "all", ]
+
+
+# combine
+pancreas_meta_w_cells_score = merge(meta , stat_cell_score.alsu[stat_cell_score.alsu$n_genes == 150 , ], all.y = T , all.x = F)
+pancreas_meta_w_cells_score = pancreas_meta_w_cells_score[order(pancreas_meta_w_cells_score$score, decreasing = T) , ]
+pancreas_meta_w_cells_score$score[pancreas_meta_w_cells_score$score < 0] = 0
+pancreas_meta_w_cells_score$system = "pancreas"
+pancreas_meta_w_cells_score = pancreas_meta_w_cells_score[, c("cell", "celltype", "V1", "V2", "score", "system")]
+
+# define rare CTs
+tab = as.data.frame( table(sce$celltype) )
+colnames(tab) = c("celltype" , "n")
+tab$frac = tab$n/sum(tab$n)
+
+rare_CTs = as.character( tab$celltype[tab$n > 10 & tab$frac < 0.01] )
+pancreas_celltypes.2exclude = as.character(tab$celltype[tab$n < 10])
+
+pancreas_celltype_cols = celltype_colors[[which( names(celltype_colors) == system )]]
+
+
+
+```
+
+## Melanoma
+
+
+```{r melanoma, message = FALSE}
+
+
+system = "melanoma"
+
+# read sce 
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+sce = retain_only_hvgs(sce ,n = 10000)
+sce$celltype[is.na(sce$malignancy)] = "Not resolved"
+sce$malignancy[is.na(sce$malignancy)] = 0.5
+sce$celltype[sce$malignancy == 1] = "Malignant"
+sce$celltype[sce$celltype == "other"] = "Not resolved"
+
+# get meta w/umaps
+meta = as.data.frame(colData(sce))
+if (!( "cell" %in% colnames(meta) )){
+  meta = rownames_to_column(meta , var = "cell")
+}
+umaps = as.data.frame( reducedDim(sce , "UMAP_unbatched"))
+if (!( "cell" %in% colnames(umaps) )){
+  umaps = rownames_to_column(umaps , var = "cell")
+}
+meta = merge(meta, umaps)
+meta$sample = factor(meta$sample)
+meta$celltype = factor(meta$celltype)
+
+# get stat
+stat_cell_score.scgenefit = readRDS(paste0(root.dir , "data/benchmark/cell_score/" , system , "_unbatched/cell_score__scgenefit.Rds"))
+stat_cell_score.alsu = stat_cell_score.scgenefit[stat_cell_score.scgenefit$type == "geneBasis" & stat_cell_score.scgenefit$nPC == "all", ]
+
+# combine
+melanoma_meta_w_cells_score = merge(meta , stat_cell_score.alsu[stat_cell_score.alsu$n_genes == 150 , ], all.y = T , all.x = F)
+melanoma_meta_w_cells_score = melanoma_meta_w_cells_score[order(melanoma_meta_w_cells_score$score, decreasing = T) , ]
+melanoma_meta_w_cells_score$score[melanoma_meta_w_cells_score$score < 0] = 0
+melanoma_meta_w_cells_score$system = "melanoma"
+melanoma_meta_w_cells_score = melanoma_meta_w_cells_score[, c("cell", "celltype", "V1", "V2", "score", "system")]
+
+# define rare CTs
+tab = as.data.frame( table(sce$celltype) )
+colnames(tab) = c("celltype" , "n")
+tab$frac = tab$n/sum(tab$n)
+
+rare_CTs = as.character( tab$celltype[tab$n > 10 & tab$frac < 0.01] )
+melanoma_celltypes.2exclude = as.character(tab$celltype[tab$n < 10])
+
+melanoma_celltype_cols = celltype_colors[[which( names(celltype_colors) == system )]]
+
+
+
+```
+
+# Plot
+
+```{r plot, message = FALSE}
+
+
+mouseEmbryo_meta_w_cells_score$celltype = as.character(mouseEmbryo_meta_w_cells_score$celltype)
+mouseEmbryo_meta_w_cells_score$celltype_ext = paste0("mouseEmbryo_" , mouseEmbryo_meta_w_cells_score$celltype)
+
+spleen_meta_w_cells_score$celltype = as.character(spleen_meta_w_cells_score$celltype)
+spleen_meta_w_cells_score$celltype_ext = paste0("spleen_" , spleen_meta_w_cells_score$celltype)
+
+pancreas_meta_w_cells_score$celltype = as.character(pancreas_meta_w_cells_score$celltype)
+pancreas_meta_w_cells_score$celltype_ext = paste0("pancreas_" , pancreas_meta_w_cells_score$celltype)
+
+melanoma_meta_w_cells_score$celltype = as.character(melanoma_meta_w_cells_score$celltype)
+melanoma_meta_w_cells_score$celltype_ext = paste0("melanoma_" , melanoma_meta_w_cells_score$celltype)
+
+names(mouseEmbryo_celltype_cols) = paste0("mouseEmbryo_", names(mouseEmbryo_celltype_cols))
+names(spleen_celltype_cols) = paste0("spleen_", names(spleen_celltype_cols))
+names(pancreas_celltype_cols) = paste0("pancreas_", names(pancreas_celltype_cols))
+names(melanoma_celltype_cols) = paste0("melanoma_", names(melanoma_celltype_cols))
+
+
+celltype_cols = c(mouseEmbryo_celltype_cols, spleen_celltype_cols, pancreas_celltype_cols, melanoma_celltype_cols)
+
+
+meta = rbind(mouseEmbryo_meta_w_cells_score, spleen_meta_w_cells_score, pancreas_meta_w_cells_score, melanoma_meta_w_cells_score)
+meta$system = factor(meta$system, levels = c("mouseEmbryo", "spleen" , "pancreas" , "melanoma"))
+
+
+
+p_D_1 = ggplot(meta[!meta$celltype %in% mouseEmbryo_celltypes.2exclude, ] , aes(x = celltype , y = score , fill = celltype_ext)) + 
+  geom_boxplot() +
+  scale_fill_manual(values = celltype_cols) +
+  theme_classic() + 
+  facet_wrap(~system, scales = "free", ncol = 4) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) + 
+  theme(legend.position = "none") +
+  labs(y = "Cell neighbourhood\n preservation score", x = "Cell type") +
+  theme(strip.background = element_blank() , strip.text.x = element_blank()) + 
+  theme(text=element_text(family="Arial"))
+p_D_2 = ggplot(meta , aes(x = V1 , y = V2 , col = score)) +
+  geom_point(size=.4) + 
+  scale_color_viridis(discrete = F) + 
+  theme_classic() +
+  labs(x = "UMAP-1" , y = "UMAP-2") + 
+  theme(legend.position = "none") + 
+  facet_wrap(~system , scales = "free", ncol = 4) +
+  theme(strip.background = element_blank() , strip.text.x = element_blank()) + 
+  theme(text=element_text(family="Arial"))
+
+
+# for the legend
+p1 = ggplot(meta , aes(x = V1 , y = V2 , col = score)) +
+  geom_point(size=.4) + 
+  scale_color_viridis(discrete = F) + 
+  guides(fill=guide_legend(title=NULL)) +
+  theme_classic() +
+  labs(x = "UMAP-1" , y = "UMAP-2") + 
+  theme(legend.position = "top") +
+  guides(fill=guide_legend(title=NULL)) 
+p1
+
+
+
+```
+
+
+# Session Info
+
+```{r sessinf}
+sessionInfo()
+```

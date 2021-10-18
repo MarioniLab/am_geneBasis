@@ -1,0 +1,157 @@
+---
+title: "Figure 2A -- first genes by geneBasis"
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+# Load dependencies
+
+```{r load, message = FALSE}
+
+
+library(SingleCellExperiment)
+library(batchelor)
+library(stats)
+library(BiocNeighbors)
+library(tibble)
+library(reshape2)
+library(plyr)
+library(dplyr)
+library(scran)
+library(batchelor)
+library(stringr)
+library(corrplot)
+library(ggcorrplot)
+library(wesanderson)
+
+root.dir = "/Users/alsu/Develop/geneBasis/"
+source(paste0(root.dir, "am_geneBasis/functions/main_functions.R"))
+source(paste0(root.dir, "am_geneBasis/functions/visualization_functions.R"))
+
+system = "atlas_E8.5"
+figures.dir = paste0(root.dir , "figures/benchmark/", "firstGenes_coexpr" , "/")
+
+
+```
+
+# Get co-expr plots
+
+## Mouse embryo
+
+```{r mouse-embryo, message = FALSE}
+
+
+system = "atlas_E8.5"
+
+genes_alsu = readRDS(paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection.Rds"))
+genes_alsu = as.character( genes_alsu$gene )
+
+
+mouseEmbryo_genes = list(geneBasis = genes_alsu[1:10])
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+mouseEmbryo_sce = sce[rownames(sce) %in% unlist(mouseEmbryo_genes) , ]
+
+
+```
+
+
+## Spleen
+
+```{r spleen, message = FALSE}
+
+
+system = "spleen"
+
+# read gene selection 
+genes_alsu = readRDS(paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection.Rds"))
+genes_alsu = as.character( genes_alsu$gene )
+
+
+spleen_genes = list(geneBasis = genes_alsu[1:10])
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+spleen_sce = sce[rownames(sce) %in% unlist(spleen_genes) , ]
+
+
+```
+
+
+## Pancreas
+
+```{r pancreas, message = FALSE}
+
+system = "pancreas"
+
+# read gene selection 
+genes_alsu = readRDS(paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection.Rds"))
+genes_alsu = as.character( genes_alsu$gene )
+
+
+pancreas_genes = list(geneBasis = genes_alsu[1:10])
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+pancreas_sce = sce[rownames(sce) %in% unlist(pancreas_genes) , ]
+
+
+```
+
+## Melanoma
+
+```{r melanoma, message = FALSE}
+
+system = "melanoma"
+
+# read gene selection 
+genes_alsu = readRDS(paste0(root.dir , "data/gene_selection/" , system , "/" , "gene_selection_unbatched.Rds"))
+genes_alsu = as.character( genes_alsu$gene )
+
+melanoma_genes = list(geneBasis = genes_alsu[1:10])
+sce = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/sce_" , system , ".Rds"))
+melanoma_sce = sce[rownames(sce) %in% unlist(melanoma_genes) , ]
+
+
+```
+
+
+# Get co-expression plots
+
+
+```{r co-expr-plot, message = FALSE}
+
+
+get_coexpression_plot = function(sce , genes , system , title){
+  current.sce = sce[genes , ]
+  if (system == "mouseEmbryo"){
+    rownames(current.sce) = rowData(current.sce)[,2]
+  }
+  current.counts = as.matrix(logcounts(current.sce))
+  corr.stat = as.data.frame( cor(t(current.counts), method = "pearson") )
+  p <- ggcorrplot(corr.stat, hc.order = TRUE, outline.col = "white", ggtheme = ggplot2::theme_gray, colors = c("#6D9EC1", "white", "#E46726")) +
+    theme(axis.text.x = element_text(size=7), axis.text.y = element_text(size=7)) + 
+    ggtitle(title) + 
+    theme(legend.position = "bottom") + 
+    theme(text=element_text(family="Arial"))
+  p
+  return(p)
+}
+
+p1 = get_coexpression_plot(mouseEmbryo_sce , mouseEmbryo_genes$geneBasis , "mouseEmbryo" , NULL)
+p2 = get_coexpression_plot(spleen_sce , spleen_genes$geneBasis , "spleen" , NULL)
+p3 = get_coexpression_plot(pancreas_sce , pancreas_genes$geneBasis , "pancreas" , NULL)
+p4 = get_coexpression_plot(melanoma_sce , melanoma_genes$geneBasis , "melanoma" , NULL)
+
+p_A = ggarrange(p1,p2,p3,p4,common.legend = T, nrow = 1 , ncol = 4) + 
+  theme(legend.position = "bottom")
+p_A
+
+
+```
+
+
+
+
+# Session Info
+
+```{r sessinf}
+sessionInfo()
+```

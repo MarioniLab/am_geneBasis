@@ -1,0 +1,150 @@
+---
+title: "Figure 2C -- cell type mapping comparison between geneBasis and scGeneFit."
+output:
+  BiocStyle::html_document:
+    code_folding: hide
+    number_sections: yes
+    toc: yes  
+---
+# Load dependencies
+
+```{r load, message = FALSE}
+
+
+library(SingleCellExperiment)
+library(batchelor)
+library(stats)
+library(BiocNeighbors)
+library(tibble)
+library(reshape2)
+library(plyr)
+library(dplyr)
+library(scran)
+library(batchelor)
+library(stringr)
+library(corrplot)
+library(ggcorrplot)
+library(wesanderson)
+
+root.dir = "/Users/alsu/Develop/geneBasis/"
+source(paste0(root.dir, "am_geneBasis/functions/main_functions.R"))
+source(paste0(root.dir, "am_geneBasis/functions/visualization_functions.R"))
+
+figures.dir = paste0(root.dir , "figures/benchmark/")
+
+get_fraction_mapped_correctly_stat = function(mappings){
+  mappings$id = paste0(mappings$type , "_" , mappings$n_genes )
+  stat_frac_mapped_correctly = lapply(unique(mappings$id) , function(id){
+    current.mapping = mappings[mappings$id == id & mappings$option == "all", ]
+    current.stat = get_fraction_mapped_correctly(current.mapping)
+    current.stat$id = id
+    current.stat = merge(current.stat , unique(mappings[, c("id" , "n_genes" , "type")]) , all.x = T , all.y = F)
+    return(current.stat)
+  })
+  stat_frac_mapped_correctly = do.call(rbind , stat_frac_mapped_correctly)
+  return(stat_frac_mapped_correctly)
+}
+
+get_celltype_plot = function(stat){
+  p = ggplot(stat[!stat$celltype %in% celltypes.2exclude , ] , aes(x = factor(n_genes)  , y = frac_correctly_mapped, fill = type)) + 
+    geom_boxplot() + 
+    scale_fill_manual(values = type_cols) + 
+    theme_classic() + 
+    labs(y = "" , x = "") +
+    ylim(c(0,1)) + 
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) + 
+    theme(legend.position = "none")
+  return(p)
+}
+
+
+
+```
+
+# Load stats
+
+
+```{r load-stats, message = FALSE}
+
+
+system = "atlas_E8.5"
+mouseEmbryo_stat = readRDS(paste0(root.dir , "data/benchmark/celltype_classic/" , system , "/celltype_classic__scgenefit.Rds"))
+mouseEmbryo_stat = get_fraction_mapped_correctly_stat(mouseEmbryo_stat)
+celltypes.2exclude =  c("Notochord", "Parietal endoderm", "Rostral neurectoderm")
+mouseEmbryo_stat = mouseEmbryo_stat[!mouseEmbryo_stat$celltype %in% celltypes.2exclude, ]
+mouseEmbryo_stat$system = system
+mouseEmbryo_stat = mouseEmbryo_stat[!mouseEmbryo_stat$type == "hvgs",]
+
+
+system = "spleen"
+spleen_stat = readRDS(paste0(root.dir , "data/benchmark/celltype_classic/" , system , "/celltype_classic__scgenefit.Rds"))
+spleen_stat = get_fraction_mapped_correctly_stat(spleen_stat)
+celltypes.2exclude =  c("Unknown")
+spleen_stat = spleen_stat[!spleen_stat$celltype %in% celltypes.2exclude, ]
+spleen_stat$system = system
+spleen_stat = spleen_stat[!spleen_stat$type == "hvgs",]
+
+
+
+system = "pancreas"
+pancreas_stat = readRDS(paste0(root.dir , "data/benchmark/celltype_classic/" , system , "/celltype_classic__scgenefit.Rds"))
+pancreas_stat = get_fraction_mapped_correctly_stat(pancreas_stat)
+pancreas_stat$system = system
+pancreas_stat = pancreas_stat[!pancreas_stat$type == "hvgs",]
+
+system = "melanoma"
+melanoma_stat = readRDS(paste0(root.dir , "data/benchmark/celltype_classic/" , system , "_unbatched/celltype_classic__scgenefit.Rds"))
+melanoma_stat = get_fraction_mapped_correctly_stat(melanoma_stat)
+melanoma_stat$system = system
+melanoma_stat = melanoma_stat[!melanoma_stat$type == "hvgs",]
+
+
+stat = rbind(mouseEmbryo_stat, spleen_stat, pancreas_stat, melanoma_stat)
+stat$system = factor(stat$system , levels = c("atlas_E8.5", "spleen" , "pancreas" , "melanoma"))
+stat$n_genes = as.numeric(as.character(stat$n_genes))
+
+
+```
+
+## Plots
+
+```{r plot, message = FALSE}
+
+
+pals1 = wes_palette("Darjeeling1", n = 5)
+pals2 = wes_palette("Darjeeling2", n = 5)
+pals3 = wes_palette("Royal1", n = 4)
+pals4 = wes_palette("Royal2", n = 5)
+
+type_cols = c("geneBasis" = pals3[2] , "scgenefit" = pals1[3] , "SCMER" = pals1[5] )
+  
+get_celltype_plot = function(stat){
+  p = ggplot(stat[!stat$celltype %in% celltypes.2exclude , ] , aes(x = factor(n_genes)  , y = frac_correctly_mapped, fill = type)) + 
+    geom_boxplot() + 
+    scale_fill_manual(values = type_cols) + 
+    theme_classic() + 
+    labs(y = "" , x = "") +
+    ylim(c(0,1)) + 
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) + 
+    theme(legend.position = "none")
+  return(p)
+}
+
+
+
+p_C = get_celltype_plot(stat) + 
+  facet_wrap(~system, scales = "free", ncol = 4) +
+  theme(strip.background = element_blank() , strip.text.x = element_blank()) + 
+  labs(x = "# Genes" , y = "Fraction of cells mapped\nto the correct cell type") +
+  theme(text=element_text(family="Arial")) 
+p_C
+
+
+```
+
+
+# Session Info
+
+```{r sessinf}
+sessionInfo()
+```
