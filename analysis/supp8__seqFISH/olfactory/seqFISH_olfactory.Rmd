@@ -38,7 +38,7 @@ colnames(sce) = paste0("sce_" , colnames(sce))
 sce$cell = paste0("sce_" , sce$cell)
 meta_sce = as.data.frame(colData(sce))
 
-seqfish = readRDS(file = paste0(root.dir, "geneBasis/data/FISH_datasets/seqfish_olfactory" , ".Rds"))
+seqfish = readRDS(file = paste0(root.dir, "External/seqFISH_plus/seqfish_olfactory" , ".Rds"))
 colnames(seqfish) = paste0("seq_" , colnames(seqfish))
 seqfish$cell = paste0("seq_" , seqfish$cell)
 meta_seqfish = as.data.frame(colData(seqfish))
