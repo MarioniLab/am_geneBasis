@@ -46,7 +46,7 @@ system = "pancreas"
 ```{r read-seurat, message = FALSE}
 
 
-df = readRDS(paste0(root.dir , "data/scRNA_datasets/" , system , "/" , system , "_original.rds"))
+df = readRDS("/Users/alsu/Develop/External/Azimuth/pancreas.rds")
 sce = as.SingleCellExperiment(df)
 
 # add sample field
